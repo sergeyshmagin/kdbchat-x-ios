@@ -1144,6 +1144,12 @@ extension PreviewTests {
             try await assertSnapshots(matching: preview, step: index)
         }
     }
+
+    func testWhatsAppLoginScreen() async throws {
+        for (index, preview) in WhatsAppLoginScreen_Previews._allPreviews.enumerated() {
+            try await assertSnapshots(matching: preview, step: index)
+        }
+    }
 }
 
 // swiftlint:enable all

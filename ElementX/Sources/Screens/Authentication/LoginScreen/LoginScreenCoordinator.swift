@@ -22,6 +22,8 @@ enum LoginScreenCoordinatorAction {
     case configuredForOIDC
     /// Login was successful.
     case signedIn(UserSessionProtocol)
+    /// Show the server selection screen.
+    case changeServer
 }
 
 // Note: This code was brought over from Riot, we should move the authentication service logic into the view model.
@@ -61,6 +63,8 @@ final class LoginScreenCoordinator: CoordinatorProtocol {
                     actionsSubject.send(.configuredForOIDC)
                 case .signedIn(let userSession):
                     actionsSubject.send(.signedIn(userSession))
+                case .changeServer:
+                    actionsSubject.send(.changeServer)
                 }
             }
             .store(in: &cancellables)
@@ -71,6 +75,6 @@ final class LoginScreenCoordinator: CoordinatorProtocol {
     }
     
     func toPresentable() -> AnyView {
-        AnyView(LoginScreen(context: viewModel.context))
+        AnyView(KDBLoginScreen(context: viewModel.context))
     }
 }

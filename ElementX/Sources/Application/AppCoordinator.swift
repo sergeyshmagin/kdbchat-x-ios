@@ -634,7 +634,10 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     
     private func setupUserSession(isNewLogin: Bool) {
         guard let userSession else {
-            fatalError("User session not setup")
+            MXLog.error("User session not setup in setupUserSession")
+            // Возвращаемся к экрану авторизации
+            startAuthentication()
+            return
         }
         
         let userSessionFlowCoordinator = UserSessionFlowCoordinator(userSession: userSession,

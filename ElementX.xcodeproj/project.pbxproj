@@ -267,6 +267,8 @@
 		3113065AABBC14CEAE6843FA /* UserSessionFlowCoordinatorStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8774CF614849664B5B3C2A1 /* UserSessionFlowCoordinatorStateMachine.swift */; };
 		311868F5E65BA61AFA6CCC2C /* CompoundHook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B89D6C760E8CAE29CA28FB1 /* CompoundHook.swift */; };
 		3118D9ABFD4BE5A3492FF88A /* ElementCallConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC437C491EA6996513B1CEAB /* ElementCallConfiguration.swift */; };
+		31AEF7641486D380E6041C04 /* WhatsAppLoginScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D44EFCC3042E9B96E220578 /* WhatsAppLoginScreen.swift */; };
+		12AC7FBE183B4452876F1224 /* KDBLoginScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69A8A31CFFF4DD7833218A4 /* KDBLoginScreen.swift */; };
 		32B7891D937377A59606EDFC /* UserFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21DD8599815136EFF5B73F38 /* UserFlowTests.swift */; };
 		32F47002A331817F0E6BD7EB /* RoomMembershipDetailsProxyProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1434D5169F0EE319E226DA7F /* RoomMembershipDetailsProxyProtocol.swift */; };
 		339BC18777912E1989F2F17D /* Section.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584A61D9C459FAFEF038A7C0 /* Section.swift */; };
@@ -1783,6 +1785,8 @@
 		4CD6AC7546E8D7E5C73CEA48 /* ElementX.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ElementX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CDDDDD9FE1A699D23A5E096 /* LoginScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginScreen.swift; sourceTree = "<group>"; };
 		4D3A7375AB22721C436EB056 /* ComposerToolbarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerToolbarModels.swift; sourceTree = "<group>"; };
+		4D44EFCC3042E9B96E220578 /* WhatsAppLoginScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsAppLoginScreen.swift; sourceTree = "<group>"; };
+		D69A8A31CFFF4DD7833218A4 /* KDBLoginScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KDBLoginScreen.swift; sourceTree = "<group>"; };
 		4D635709C1D6D37C225AD40E /* RoomPowerLevelProxyProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomPowerLevelProxyProtocol.swift; sourceTree = "<group>"; };
 		4E2245243369B99216C7D84E /* ImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCache.swift; sourceTree = "<group>"; };
 		4E600B315B920B9687F8EE1B /* ComposerDraftServiceMock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerDraftServiceMock.swift; sourceTree = "<group>"; };
@@ -4125,6 +4129,8 @@
 			isa = PBXGroup;
 			children = (
 				4CDDDDD9FE1A699D23A5E096 /* LoginScreen.swift */,
+				4D44EFCC3042E9B96E220578 /* WhatsAppLoginScreen.swift */,
+				D69A8A31CFFF4DD7833218A4 /* KDBLoginScreen.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -7915,6 +7921,8 @@
 				CA12AE0DCD57D49CD96C699A /* WaveformCursorView.swift in Sources */,
 				63CDC201A5980F304F6D0A1C /* WaveformInteractionModifier.swift in Sources */,
 				B773ACD8881DB18E876D950C /* WaveformSource.swift in Sources */,
+				31AEF7641486D380E6041C04 /* WhatsAppLoginScreen.swift in Sources */,
+				12AC7FBE183B4452876F1224 /* KDBLoginScreen.swift in Sources */,
 				08CB4BD12CEEDE6AAE4A18DD /* WindowManager.swift in Sources */,
 				AE5AAD9E32511544FDFA5560 /* WindowManagerProtocol.swift in Sources */,
 				80F1B442DB5E2C362ACDD8E2 /* ZoomTransition.swift in Sources */,
@@ -8314,7 +8322,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				APP_DISPLAY_NAME = "Element X";
+				APP_DISPLAY_NAME = "KDBChat";
 				APP_GROUP_IDENTIFIER = group.io.element;
 				APP_NAME = ElementX;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "colors/accent-color";
@@ -8384,7 +8392,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				APP_DISPLAY_NAME = "Element X";
+				APP_DISPLAY_NAME = "KDBChat";
 				APP_GROUP_IDENTIFIER = group.io.element;
 				APP_NAME = ElementX;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "colors/accent-color";

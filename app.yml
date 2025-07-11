@@ -1,5 +1,5 @@
 settings:
-  APP_DISPLAY_NAME: Element X
+  APP_DISPLAY_NAME: KDBChat
   PRODUCTION_APP_NAME: Element
   APP_GROUP_IDENTIFIER: group.io.element
   BASE_BUNDLE_IDENTIFIER: io.element.elementx

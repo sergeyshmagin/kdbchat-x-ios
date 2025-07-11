@@ -34,7 +34,16 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
         case .none: ""
         }
         
-        let viewState = LoginScreenViewState(homeserver: authenticationService.homeserver.value,
+        // Устанавливаем сервер по умолчанию, если он не задан или имеет неподходящий адрес
+        let currentHomeserver = authenticationService.homeserver.value
+        let needsDefaultServer = currentHomeserver.address.isEmpty || 
+                                currentHomeserver.address == "example.com" ||
+                                currentHomeserver.address.hasPrefix("https://matrix.org")
+        
+        let defaultHomeserver = LoginHomeserver(address: "matrix.aibots.kz", loginMode: .unknown)
+        let homeserver = needsDefaultServer ? defaultHomeserver : currentHomeserver
+        
+        let viewState = LoginScreenViewState(homeserver: homeserver,
                                              bindings: LoginScreenBindings(username: username))
         
         super.init(initialViewState: viewState)
@@ -51,6 +60,12 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
             parseUsername()
         case .next:
             login()
+        case .updateHomeserverAddress(let address):
+            updateHomeserverAddress(address)
+        case .changeServer:
+            actionsSubject.send(.changeServer)
+        case .configureServer:
+            configureCurrentServer()
         }
     }
     
@@ -81,6 +96,90 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
             case .failure(let error):
                 stopLoading()
                 handleError(error)
+            }
+        }
+    }
+    
+    /// Updates the homeserver address and configures the authentication service.
+    private func updateHomeserverAddress(_ address: String) {
+        MXLog.info("Updating homeserver address to: \(address)")
+        // Сброс username и password при смене сервера
+        state.bindings.username = ""
+        state.bindings.password = ""
+        startLoading(isInteractionBlocking: false)
+        
+        Task {
+            MXLog.info("Configuring authentication service for: \(address)")
+            switch await authenticationService.configure(for: address, flow: .login) {
+            case .success:
+                MXLog.info("Successfully configured homeserver. Login mode: \(authenticationService.homeserver.value.loginMode)")
+                if authenticationService.homeserver.value.loginMode.supportsOIDCFlow {
+                    actionsSubject.send(.configuredForOIDC)
+                }
+                stopLoading()
+            case .failure(let error):
+                MXLog.error("Failed to configure homeserver: \(error)")
+                stopLoading()
+                handleError(error)
+            }
+        }
+    }
+    
+    /// Configures the current homeserver automatically.
+    private func configureCurrentServer() {
+        let currentAddress = state.homeserver.address
+        MXLog.info("Auto-configuring server: \(currentAddress)")
+        
+        startLoading(isInteractionBlocking: false)
+        
+        Task {
+            // Добавляем таймаут в 10 секунд для конфигурации
+            let result: Result<Void, AuthenticationServiceError>
+            
+            do {
+                result = try await withThrowingTaskGroup(of: Result<Void, AuthenticationServiceError>.self) { group in
+                    // Добавляем задачу конфигурации
+                    group.addTask { [weak self] in
+                        guard let self else { return .failure(AuthenticationServiceError.invalidServer) }
+                        return await authenticationService.configure(for: currentAddress, flow: .login)
+                    }
+                    
+                    // Добавляем задачу таймаута
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: 10_000_000_000) // 10 секунд
+                        return .failure(AuthenticationServiceError.invalidServer)
+                    }
+                    
+                    // Ждем первый результат
+                    guard let first = try await group.next() else {
+                        return .failure(AuthenticationServiceError.invalidServer)
+                    }
+                    
+                    group.cancelAll()
+                    return first
+                }
+            } catch {
+                result = .failure(AuthenticationServiceError.invalidServer)
+            }
+            
+            switch result {
+            case .success:
+                MXLog.info("Successfully auto-configured homeserver. Login mode: \(authenticationService.homeserver.value.loginMode)")
+                if authenticationService.homeserver.value.loginMode.supportsOIDCFlow {
+                    actionsSubject.send(.configuredForOIDC)
+                }
+                stopLoading()
+            case .failure(let error):
+                MXLog.error("Failed to auto-configure homeserver: \(error)")
+                stopLoading()
+                // При таймауте или ошибке показываем форму для ручного ввода
+                if error == AuthenticationServiceError.invalidServer {
+                    state.bindings.alertInfo = AlertInfo(id: .unknown,
+                                                         title: "Проблема с подключением",
+                                                         message: "Не удалось подключиться к серверу автоматически. Нажмите 'сменить сервер' для ручной настройки.")
+                } else {
+                    handleError(error)
+                }
             }
         }
     }

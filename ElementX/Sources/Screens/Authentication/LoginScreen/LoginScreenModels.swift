@@ -12,6 +12,8 @@ enum LoginScreenViewModelAction {
     case configuredForOIDC
     /// Login was successful.
     case signedIn(UserSessionProtocol)
+    /// Show the server selection screen.
+    case changeServer
     
     var isConfiguredForOIDC: Bool {
         switch self {
@@ -57,6 +59,12 @@ enum LoginScreenViewAction {
     case parseUsername
     /// Continue using the input username and password.
     case next
+    /// Update the homeserver address.
+    case updateHomeserverAddress(String)
+    /// Show the server selection screen.
+    case changeServer
+    /// Configure server automatically.
+    case configureServer
 }
 
 enum LoginScreenErrorType: Hashable {

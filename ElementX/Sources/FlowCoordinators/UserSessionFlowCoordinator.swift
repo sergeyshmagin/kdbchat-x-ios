@@ -220,12 +220,12 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     func attemptStartingOnboarding() {
-        MXLog.info("Attempting to start onboarding")
-        
-        if onboardingFlowCoordinator.shouldStart {
-            clearRoute(animated: false)
-            onboardingFlowCoordinator.start()
-        }
+        MXLog.info("Attempting to start onboarding (disabled)")
+        // Отключено: сразу показываем список чатов, без device verification и прочего
+        // if onboardingFlowCoordinator.shouldStart {
+        //     clearRoute(animated: false)
+        //     onboardingFlowCoordinator.start()
+        // }
     }
     
     private func clearPresentedSheets(animated: Bool) async {
@@ -332,7 +332,8 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 dismissRoomSelectionScreen()
                 
             default:
-                fatalError("Unknown transition: \(context)")
+                MXLog.error("Unknown transition: \(context)")
+                // Просто логируем и продолжаем
             }
         }
         
@@ -349,7 +350,8 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             if context.fromState == context.toState {
                 MXLog.error("Failed transition from equal states: \(context.fromState)")
             } else {
-                fatalError("Failed transition with context: \(context)")
+                MXLog.error("Failed transition with context: \(context)")
+                // Просто логируем и продолжаем
             }
         }
     }
@@ -479,7 +481,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     
     private func presentSessionVerificationScreen(flow: SessionVerificationScreenFlow) {
         guard let sessionVerificationController = userSession.clientProxy.sessionVerificationController else {
-            fatalError("The sessionVerificationController should aways be valid at this point")
+            MXLog.error("The sessionVerificationController is not available")
+            // Пропускаем верификацию сессии - просто продолжаем
+            return
         }
         
         let navigationStackCoordinator = NavigationStackCoordinator()

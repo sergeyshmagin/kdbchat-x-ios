@@ -72,6 +72,12 @@ class SessionVerificationScreenViewModel: SessionVerificationViewModelType, Sess
         case .deviceResponder(let details), .userResponder(let details):
             Task {
                 await self.sessionVerificationControllerProxy.acknowledgeVerificationRequest(details: details)
+                // Автоматически принимаем запрос на верификацию
+                _ = await self.sessionVerificationControllerProxy.acceptVerificationRequest()
+                // Запускаем SAS-подтверждение
+                _ = await self.sessionVerificationControllerProxy.startSasVerification()
+                // Автоматически подтверждаем challenge
+                _ = await self.sessionVerificationControllerProxy.approveVerification()
             }
         default:
             break

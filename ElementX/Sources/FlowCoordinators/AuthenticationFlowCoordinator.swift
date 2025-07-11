@@ -142,7 +142,9 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
             
             stateMachine.tryEvent(.applyProvisioningParameters, userInfo: provisioningParameters)
         default:
-            fatalError()
+            MXLog.error("Unknown state in presentationAnchor: \(stateMachine.state)")
+            // Возвращаемся к стартовому экрану
+            stateMachine.tryEvent(.start)
         }
     }
     
@@ -166,7 +168,8 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
         case .bugReportFlow:
             navigationStackCoordinator.setSheetCoordinator(nil)
         case .complete:
-            fatalError()
+            MXLog.error("Attempted to clearRoute in complete state")
+            // Ничего не делаем - состояние завершено
         }
     }
     
@@ -200,13 +203,15 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
         }
         stateMachine.addRoutes(event: .cancelledServerConfirmation, transitions: [.serverConfirmationScreen => .startScreen])
         
-        stateMachine.addRoutes(event: .changeServer(.login), transitions: [.serverConfirmationScreen => .serverSelectionScreen]) { [weak self] _ in
+        stateMachine.addRoutes(event: .changeServer(.login), transitions: [.serverConfirmationScreen => .serverSelectionScreen,
+                                                                       .startScreen => .serverSelectionScreen]) { [weak self] _ in
             self?.showServerSelectionScreen(authenticationFlow: .login)
         }
         stateMachine.addRoutes(event: .changeServer(.register), transitions: [.serverConfirmationScreen => .serverSelectionScreen]) { [weak self] _ in
             self?.showServerSelectionScreen(authenticationFlow: .register)
         }
-        stateMachine.addRoutes(event: .dismissedServerSelection, transitions: [.serverSelectionScreen => .serverConfirmationScreen])
+        stateMachine.addRoutes(event: .dismissedServerSelection, transitions: [.serverSelectionScreen => .serverConfirmationScreen,
+                                                                             .serverSelectionScreen => .startScreen])
         
         stateMachine.addRoutes(event: .continueWithOIDC, transitions: [.serverConfirmationScreen => .oidcAuthentication,
                                                                        .startScreen => .oidcAuthentication]) { [weak self] context in
@@ -238,7 +243,10 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
         stateMachine.addRoutes(event: .signedIn, transitions: [.qrCodeLoginScreen => .complete,
                                                                .oidcAuthentication => .complete,
                                                                .loginScreen => .complete]) { [weak self] context in
-            guard let userSession = context.userInfo as? UserSessionProtocol else { fatalError("The user session wasn't included in the context") }
+            guard let userSession = context.userInfo as? UserSessionProtocol else { 
+                MXLog.error("The user session wasn't included in the context")
+                return
+            }
             self?.userHasSignedIn(userSession: userSession)
         }
         
@@ -250,42 +258,38 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
         
         // Unhandled
         
-        stateMachine.addErrorHandler { context in
+        stateMachine.addErrorHandler { [weak self] context in
             switch (context.fromState, context.toState) {
             case (.complete, .complete):
                 break // Ignore all events triggered by
             default:
-                fatalError("Unexpected transition: \(context)")
+                MXLog.error("Unexpected transition: \(context)")
+                // Пытаемся вернуться в безопасное состояние
+                self?.stateMachine.tryEvent(.start)
             }
         }
     }
     
     private func showStartScreen(fromState: State, applying provisioningParameters: AccountProvisioningParameters? = nil) {
-        let parameters = AuthenticationStartScreenParameters(authenticationService: authenticationService,
-                                                             provisioningParameters: provisioningParameters,
-                                                             isBugReportServiceEnabled: bugReportService.isEnabled,
-                                                             appSettings: appSettings,
-                                                             userIndicatorController: userIndicatorController)
-        let coordinator = AuthenticationStartScreenCoordinator(parameters: parameters)
+        // Показываем WhatsAppLoginScreen напрямую вместо AuthenticationStartScreen
+        let parameters = LoginScreenCoordinatorParameters(authenticationService: authenticationService,
+                                                          loginHint: nil,
+                                                          userIndicatorController: userIndicatorController,
+                                                          analytics: analytics)
+        let coordinator = LoginScreenCoordinator(parameters: parameters)
         
         coordinator.actions
             .sink { [weak self] action in
                 guard let self else { return }
                 
                 switch action {
-                case .loginWithQR:
-                    stateMachine.tryEvent(.loginWithQR)
-                case .login:
-                    stateMachine.tryEvent(.confirmServer(.login))
-                case .register:
-                    stateMachine.tryEvent(.confirmServer(.register))
-                case .reportProblem:
-                    stateMachine.tryEvent(.reportProblem)
-                    
-                case .loginDirectlyWithOIDC(let oidcData, let window):
-                    stateMachine.tryEvent(.continueWithOIDC, userInfo: (oidcData, window))
-                case .loginDirectlyWithPassword(let loginHint):
-                    stateMachine.tryEvent(.continueWithPassword, userInfo: loginHint)
+                case .signedIn(let userSession):
+                    stateMachine.tryEvent(.signedIn, userInfo: userSession)
+                case .configuredForOIDC:
+                    // Pop back to the confirmation screen for OIDC login to continue.
+                    navigationStackCoordinator.pop(animated: false)
+                case .changeServer:
+                    stateMachine.tryEvent(.changeServer(.login))
                 }
             }
             .store(in: &cancellables)
@@ -424,6 +428,8 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
                 case .configuredForOIDC:
                     // Pop back to the confirmation screen for OIDC login to continue.
                     navigationStackCoordinator.pop(animated: false)
+                case .changeServer:
+                    stateMachine.tryEvent(.changeServer(.login))
                 }
             }
             .store(in: &cancellables)

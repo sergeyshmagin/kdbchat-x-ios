@@ -26,10 +26,8 @@ struct LoginScreen: View {
                 case .password:
                     loginForm
                 case .oidc:
-                    // This should never be shown.
                     ProgressView()
                 default:
-                    // This should never be shown either.
                     loginUnavailableText
                 }
             }
@@ -42,7 +40,6 @@ struct LoginScreen: View {
         .alert(item: $context.alertInfo)
     }
     
-    /// The header containing the title and icon.
     var header: some View {
         VStack(spacing: 8) {
             BigIcon(icon: \.lockSolid)
@@ -56,7 +53,6 @@ struct LoginScreen: View {
         .padding(.horizontal, 16)
     }
     
-    /// The form with text fields for username and password, along with a submit button.
     var loginForm: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(L10n.screenLoginFormHeader)
@@ -100,7 +96,6 @@ struct LoginScreen: View {
         }
     }
     
-    /// Text shown if neither password or OIDC login is supported.
     var loginUnavailableText: some View {
         Text(L10n.screenLoginErrorUnsupportedAuthentication)
             .font(.body)
@@ -110,13 +105,11 @@ struct LoginScreen: View {
             .accessibilityIdentifier(A11yIdentifiers.loginScreen.unsupportedServer)
     }
     
-    /// Parses the username for a homeserver.
     private func usernameFocusChanged(isFocussed: Bool) {
         guard !isFocussed, !context.username.isEmpty else { return }
         context.send(viewAction: .parseUsername)
     }
     
-    /// Sends the `next` view action so long as valid credentials have been input.
     private func submit() {
         guard context.viewState.canSubmit else { return }
         context.send(viewAction: .next)
