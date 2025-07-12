@@ -58,6 +58,15 @@ class SessionVerificationScreenViewModel: SessionVerificationViewModelType, Sess
                     }
                     
                     self.stateMachine.processEvent(.didReceiveChallenge(emojis: emojis))
+                    
+                    // Автоматически подтверждаем challenge без участия пользователя
+                    MXLog.info("Auto-approving verification challenge")
+                    Task {
+                        let result = await self.sessionVerificationControllerProxy.approveVerification()
+                        if case .failure(let error) = result {
+                            MXLog.error("Failed to auto-approve verification: \(error)")
+                        }
+                    }
                 case .finished:
                     self.stateMachine.processEvent(.didAcceptChallenge)
                 case .cancelled:
@@ -71,13 +80,49 @@ class SessionVerificationScreenViewModel: SessionVerificationViewModelType, Sess
         switch flow {
         case .deviceResponder(let details), .userResponder(let details):
             Task {
+                MXLog.info("Auto-verifying device verification request")
                 await self.sessionVerificationControllerProxy.acknowledgeVerificationRequest(details: details)
+                
                 // Автоматически принимаем запрос на верификацию
-                _ = await self.sessionVerificationControllerProxy.acceptVerificationRequest()
+                let acceptResult = await self.sessionVerificationControllerProxy.acceptVerificationRequest()
+                if case .failure(let error) = acceptResult {
+                    MXLog.error("Failed to accept verification request: \(error)")
+                    return
+                }
+                
                 // Запускаем SAS-подтверждение
-                _ = await self.sessionVerificationControllerProxy.startSasVerification()
+                let sasResult = await self.sessionVerificationControllerProxy.startSasVerification()
+                if case .failure(let error) = sasResult {
+                    MXLog.error("Failed to start SAS verification: \(error)")
+                    return
+                }
+                
+                // Ждем немного для получения challenge данных
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 секунда
+                
                 // Автоматически подтверждаем challenge
-                _ = await self.sessionVerificationControllerProxy.approveVerification()
+                let approveResult = await self.sessionVerificationControllerProxy.approveVerification()
+                if case .failure(let error) = approveResult {
+                    MXLog.error("Failed to approve verification: \(error)")
+                    return
+                }
+                
+                MXLog.info("Auto-verification completed successfully")
+            }
+        case .deviceInitiator:
+            // Для инициатора автоматически запускаем процесс
+            Task {
+                MXLog.info("Auto-starting device verification as initiator")
+                
+                // Запрашиваем верификацию устройства
+                let requestResult = await self.sessionVerificationControllerProxy.requestDeviceVerification()
+                if case .failure(let error) = requestResult {
+                    MXLog.error("Failed to request device verification: \(error)")
+                    return
+                }
+                
+                // Остальные шаги будут выполнены через callbacks
+                MXLog.info("Device verification request sent")
             }
         default:
             break

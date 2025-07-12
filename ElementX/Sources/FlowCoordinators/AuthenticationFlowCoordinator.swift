@@ -204,14 +204,14 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
         stateMachine.addRoutes(event: .cancelledServerConfirmation, transitions: [.serverConfirmationScreen => .startScreen])
         
         stateMachine.addRoutes(event: .changeServer(.login), transitions: [.serverConfirmationScreen => .serverSelectionScreen,
-                                                                       .startScreen => .serverSelectionScreen]) { [weak self] _ in
+                                                                           .startScreen => .serverSelectionScreen]) { [weak self] _ in
             self?.showServerSelectionScreen(authenticationFlow: .login)
         }
         stateMachine.addRoutes(event: .changeServer(.register), transitions: [.serverConfirmationScreen => .serverSelectionScreen]) { [weak self] _ in
             self?.showServerSelectionScreen(authenticationFlow: .register)
         }
         stateMachine.addRoutes(event: .dismissedServerSelection, transitions: [.serverSelectionScreen => .serverConfirmationScreen,
-                                                                             .serverSelectionScreen => .startScreen])
+                                                                               .serverSelectionScreen => .startScreen])
         
         stateMachine.addRoutes(event: .continueWithOIDC, transitions: [.serverConfirmationScreen => .oidcAuthentication,
                                                                        .startScreen => .oidcAuthentication]) { [weak self] context in
@@ -242,11 +242,14 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
         
         stateMachine.addRoutes(event: .signedIn, transitions: [.qrCodeLoginScreen => .complete,
                                                                .oidcAuthentication => .complete,
-                                                               .loginScreen => .complete]) { [weak self] context in
-            guard let userSession = context.userInfo as? UserSessionProtocol else { 
+                                                               .loginScreen => .complete,
+                                                               .startScreen => .complete]) { [weak self] context in
+            MXLog.info("AuthenticationFlowCoordinator received .signedIn event from state: \(context.fromState)")
+            guard let userSession = context.userInfo as? UserSessionProtocol else {
                 MXLog.error("The user session wasn't included in the context")
                 return
             }
+            MXLog.info("Calling userHasSignedIn for user: \(userSession.clientProxy.userID)")
             self?.userHasSignedIn(userSession: userSession)
         }
         
@@ -264,8 +267,8 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
                 break // Ignore all events triggered by
             default:
                 MXLog.error("Unexpected transition: \(context)")
-                // Пытаемся вернуться в безопасное состояние
-                self?.stateMachine.tryEvent(.start)
+                // НЕ вызываем .start повторно - это приводит к бесконечной рекурсии
+                // Просто логируем ошибку и оставляем state machine в текущем состоянии
             }
         }
     }
@@ -461,6 +464,8 @@ class AuthenticationFlowCoordinator: FlowCoordinatorProtocol {
     // MARK: - Completion
         
     private func userHasSignedIn(userSession: UserSessionProtocol) {
+        MXLog.info("AuthenticationFlowCoordinator userHasSignedIn called, notifying delegate")
         delegate?.authenticationFlowCoordinator(didLoginWithSession: userSession)
+        MXLog.info("AuthenticationFlowCoordinator delegate notification completed")
     }
 }

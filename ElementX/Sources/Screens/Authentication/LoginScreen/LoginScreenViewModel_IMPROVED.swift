@@ -133,12 +133,13 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
         }
     }
     
-    /// Configures a specific server address.
+    /// Configures a specific server address with improved error handling.
     private func configureServer(address: String) async {
         MXLog.info("Configuring server: \(address)")
         
         do {
-            let result = try await withTimeout(seconds: 15) {
+            // Увеличиваем таймаут до 30 секунд для медленных соединений
+            let result = try await withTimeout(seconds: 30) {
                 await self.authenticationService.configure(for: address, flow: .login)
             }
             
@@ -155,7 +156,7 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
         }
     }
     
-    /// Helper function to add timeout to async operations
+    /// Helper function to add timeout to async operations with better error handling
     private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async -> T) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask {
@@ -178,7 +179,7 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
     
     private struct TimeoutError: Error { }
     
-    /// Configures the current homeserver automatically.
+    /// Configures the current homeserver automatically with improved error handling.
     private func configureCurrentServer() {
         let currentAddress = state.homeserver.address
         MXLog.info("Auto-configuring server: \(currentAddress)")
@@ -186,7 +187,7 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
         startLoading(isInteractionBlocking: false)
         
         Task {
-            // Добавляем таймаут в 10 секунд для конфигурации
+            // Добавляем таймаут в 30 секунд для конфигурации
             let result: Result<Void, AuthenticationServiceError>
             
             do {
@@ -199,7 +200,7 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
                     
                     // Добавляем задачу таймаута
                     group.addTask {
-                        try await Task.sleep(nanoseconds: 10_000_000_000) // 10 секунд
+                        try await Task.sleep(nanoseconds: 30_000_000_000) // 30 секунд
                         return .failure(AuthenticationServiceError.invalidServer)
                     }
                     
@@ -237,43 +238,34 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
         }
     }
     
-    /// Requests the authentication coordinator to log in using the specified credentials.
-    /// Uses the same logic as ServerConfirmationScreen for proper authentication flow.
+    /// Requests the authentication coordinator to log in using the specified credentials with improved error handling.
     private func login() {
-        MXLog.info("Starting login with password using ServerConfirmation flow logic")
-        
-        // Сбрасываем authentication service перед новой попыткой логина
-        // чтобы избежать ошибки "Client authentication data was already set"
-        authenticationService.reset()
-        MXLog.info("Authentication service reset before login attempt")
-        
+        MXLog.info("Starting login with password.")
         startLoading(isInteractionBlocking: true)
         
         Task {
             do {
-                // Step 1: Ensure server is properly configured using ServerConfirmation logic
-                let configurationSuccess = await configureServerForLogin()
-                guard configurationSuccess else {
-                    MXLog.error("Server configuration failed")
-                    stopLoading()
-                    analytics.signpost.endLogin()
-                    return
+                // Проверяем, что сервер сконфигурирован
+                if state.homeserver.loginMode == .unknown {
+                    MXLog.info("Server not configured, configuring before login")
+                    await configureServer(address: state.homeserver.address)
+                    MXLog.info("Server configuration completed, homeserver mode: \(state.homeserver.loginMode)")
                 }
                 
-                // Step 2: Check if OIDC is required (following ServerConfirmation flow)
-                if authenticationService.homeserver.value.loginMode.supportsOIDCFlow {
-                    MXLog.info("Server requires OIDC authentication, but password login was attempted")
+                // Проверяем, что сервер поддерживает логин
+                if state.homeserver.loginMode == .unsupported {
+                    MXLog.error("Server does not support login")
                     stopLoading()
                     analytics.signpost.endLogin()
                     handleError(.loginNotSupported)
                     return
                 }
                 
-                // Step 3: Proceed with password authentication
-                MXLog.info("Starting password authentication")
+                MXLog.info("Starting authentication service login")
                 analytics.signpost.beginLogin()
                 
-                let result = try await withTimeout(seconds: 30) {
+                // Увеличиваем таймаут до 60 секунд для медленных соединений
+                let result = try await withTimeout(seconds: 60) {
                     await self.authenticationService.login(username: self.state.bindings.username,
                                                            password: self.state.bindings.password,
                                                            initialDeviceName: UIDevice.current.initialDeviceName,
@@ -303,57 +295,20 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
         }
     }
     
-    /// Configures the server for login using the same logic as ServerConfirmationScreen.confirmServer()
-    private func configureServerForLogin() async -> Bool {
-        let homeserver = authenticationService.homeserver.value
-        
-        // После reset() homeserver может иметь default address, нужно настроить на правильный сервер
-        let targetServer = homeserver.address.isEmpty ||
-            homeserver.address == "example.com" ||
-            homeserver.address.hasPrefix("https://matrix.org") ?
-            "matrix.aibots.kz" : homeserver.address
-        
-        // Always configure server after reset to ensure proper setup
-        MXLog.info("Configuring server for login: \(targetServer)")
-        
-        switch await authenticationService.configure(for: targetServer, flow: .login) {
-        case .success:
-            MXLog.info("Server configuration successful")
-            return true
-        case .failure(let error):
-            MXLog.error("Server configuration failed: \(error)")
-            switch error {
-            case .invalidServer, .invalidHomeserverAddress:
-                handleError(.invalidHomeserverAddress)
-            case .invalidWellKnown(let error):
-                handleError(.invalidWellKnown(error))
-            case .slidingSyncNotAvailable:
-                handleError(.slidingSyncNotAvailable)
-            case .loginNotSupported:
-                handleError(.loginNotSupported)
-            case .registrationNotSupported:
-                handleError(.registrationNotSupported)
-            default:
-                handleError(.failedLoggingIn)
-            }
-            return false
-        }
-    }
-    
     private static let loadingIndicatorIdentifier = "\(LoginScreenCoordinatorAction.self)-Loading"
     
     private func startLoading(isInteractionBlocking: Bool) {
         if isInteractionBlocking {
             userIndicatorController.submitIndicator(UserIndicator(id: Self.loadingIndicatorIdentifier,
                                                                   type: .modal,
-                                                                  title: L10n.commonLoading,
+                                                                  title: "Подключение к серверу...", // Более информативное сообщение
                                                                   persistent: true))
         } else {
             state.isLoading = true
         }
     }
     
-    /// Processes an error to either update the flow or display it to the user.
+    /// Processes an error to either update the flow or display it to the user with improved error handling.
     private func handleError(_ error: AuthenticationServiceError) {
         MXLog.error("Authentication error occurred: \(error)")
         MXLog.error("Error details: \(String(describing: error))")
@@ -383,6 +338,26 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
             state.bindings.alertInfo = AlertInfo(id: .refreshTokenAlert,
                                                  title: L10n.commonServerNotSupported,
                                                  message: L10n.screenLoginErrorRefreshTokens)
+        case .invalidServer:
+            state.bindings.alertInfo = AlertInfo(id: .unknown,
+                                                 title: "Проблема с сервером",
+                                                 message: "Не удалось подключиться к серверу. Проверьте адрес сервера и попробуйте снова.")
+        case .invalidHomeserverAddress:
+            state.bindings.alertInfo = AlertInfo(id: .unknown,
+                                                 title: "Неверный адрес сервера",
+                                                 message: "Указанный адрес сервера недействителен. Проверьте правильность адреса.")
+        case .loginNotSupported:
+            state.bindings.alertInfo = AlertInfo(id: .unknown,
+                                                 title: "Вход не поддерживается",
+                                                 message: "Данный сервер не поддерживает вход с паролем. Попробуйте другой сервер.")
+        case .registrationNotSupported:
+            state.bindings.alertInfo = AlertInfo(id: .unknown,
+                                                 title: "Регистрация не поддерживается",
+                                                 message: "Данный сервер не поддерживает регистрацию новых пользователей.")
+        case .failedLoggingIn:
+            state.bindings.alertInfo = AlertInfo(id: .unknown,
+                                                 title: "Ошибка входа",
+                                                 message: "Не удалось войти в систему. Проверьте подключение к интернету и попробуйте снова.")
         default:
             MXLog.error("Unhandled authentication error: \(error)")
             state.bindings.alertInfo = AlertInfo(id: .unknown,

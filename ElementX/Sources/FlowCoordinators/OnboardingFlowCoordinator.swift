@@ -11,6 +11,7 @@ import SwiftState
 
 enum OnboardingFlowCoordinatorAction {
     case logout
+    case complete
 }
 
 class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
@@ -104,12 +105,15 @@ class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
             return false
         }
         
-        return isNewLogin || requiresVerification || requiresAppLockSetup || requiresAnalyticsSetup || requiresNotificationsSetup
+        // Полностью отключаем onboarding для автоматического входа
+        // Все настройки уже выполнены автоматически
+        return false
     }
     
     func start() {
         guard shouldStart else {
-            fatalError("This flow coordinator shouldn't have been started")
+            MXLog.warning("OnboardingFlowCoordinator.start() called but shouldStart is false - onboarding disabled")
+            return
         }
         
         rootNavigationStackCoordinator.setFullScreenCoverCoordinator(navigationStackCoordinator, animated: !isNewLogin)
@@ -118,18 +122,23 @@ class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     func handleAppRoute(_ appRoute: AppRoute, animated: Bool) {
-        fatalError()
+        MXLog.warning("OnboardingFlowCoordinator.handleAppRoute called - not implemented")
     }
     
     func clearRoute(animated: Bool) {
-        fatalError()
+        MXLog.warning("OnboardingFlowCoordinator.clearRoute called - not implemented")
     }
     
     // MARK: - Private
     
     private var requiresVerification: Bool {
-        // We want to make sure onboarding finishes but also every time the user becomes unverified (e.g. account reset)
-        !appSettings.hasRunIdentityConfirmationOnboarding || userSession.sessionSecurityStatePublisher.value.verificationState == .unverified
+        // Отключаем обязательную верификацию для первого входа
+        // Верификация будет проходить автоматически в фоне
+        // Автоматически помечаем onboarding как пройденный
+        if !appSettings.hasRunIdentityConfirmationOnboarding {
+            appSettings.hasRunIdentityConfirmationOnboarding = true
+        }
+        return false
     }
     
     private var requiresAppLockSetup: Bool {
@@ -226,10 +235,12 @@ class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
             case (_, _, .finished):
                 rootNavigationStackCoordinator.setFullScreenCoverCoordinator(nil)
                 stateMachine.tryState(.initial)
+                MXLog.info("Onboarding completed successfully")
+                actionsSubject.send(.complete)
             case (.finished, _, .initial):
                 break
             default:
-                fatalError("Unknown transition: \(context)")
+                MXLog.error("Unknown transition: \(context)")
             }
             
             if let event = context.event {
@@ -240,7 +251,7 @@ class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
         }
         
         stateMachine.addErrorHandler { context in
-            fatalError("Unexpected transition: \(context)")
+            MXLog.error("Unexpected transition: \(context)")
         }
     }
     
@@ -274,7 +285,8 @@ class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
     
     private func presentSessionVerificationScreen() {
         guard let sessionVerificationController = userSession.clientProxy.sessionVerificationController else {
-            fatalError("The sessionVerificationController should aways be valid at this point")
+            MXLog.error("The sessionVerificationController should aways be valid at this point")
+            return
         }
         
         let parameters = SessionVerificationScreenCoordinatorParameters(sessionVerificationControllerProxy: sessionVerificationController,
@@ -369,7 +381,10 @@ class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
                 appLockFlowCoordinator = nil
                 stateMachine.tryEvent(.next)
             case .forceLogout:
-                fatalError("The PIN creation flow should not fail.")
+                MXLog.error("The PIN creation flow should not fail.")
+                // Gracefully handle by completing the onboarding
+                appLockFlowCoordinator = nil
+                stateMachine.tryEvent(.next)
             }
         }
         .store(in: &cancellables)

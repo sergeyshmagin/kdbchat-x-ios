@@ -1,0 +1,27 @@
+input_dir: ElementX/
+output_dir: ElementX/Sources/Generated/
+xcassets:
+  inputs:
+    - Resources/Assets.xcassets
+  outputs:
+    templateName: swift5
+    output: Assets.swift
+strings:
+  - inputs: Resources/Localizations/en.lproj
+    filter: Localizable*
+    outputs:
+      templatePath: Tools/SwiftGen/Templates/Strings/structured-swift5-element.stencil
+      output: Strings.swift
+      params:
+        enumName: L10n
+        lookupFunction: tr
+        publicAccess: false
+  - inputs: Resources/Localizations/en.lproj
+    filter: Untranslated*
+    outputs:
+      templatePath: Tools/SwiftGen/Templates/Strings/structured-swift5-element-untranslated.stencil
+      output: Strings+Untranslated.swift
+      params:
+        enumName: UntranslatedL10n
+        lookupFunction: tr
+        publicAccess: false

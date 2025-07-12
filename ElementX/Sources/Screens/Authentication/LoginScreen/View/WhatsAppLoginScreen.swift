@@ -16,7 +16,7 @@ struct WhatsAppLoginScreen: View {
     @FocusState private var isServerFocused: Bool
 
     @Bindable var context: LoginScreenViewModel.Context
-    @State private var serverAddress: String = "https://matrix.aibots.kz"
+    @State private var serverAddress = "https://matrix.aibots.kz"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -102,14 +102,12 @@ struct WhatsAppLoginScreen: View {
     var whatsAppLoginForm: some View {
         VStack(spacing: 20) {
             // Поле сервера
-            whatsAppTextField(
-                text: $serverAddress,
-                placeholder: "Сервер",
-                icon: "server.rack",
-                isFocused: $isServerFocused,
-                contentType: .URL,
-                submitLabel: .next
-            ) {
+            whatsAppTextField(text: $serverAddress,
+                              placeholder: "Сервер",
+                              icon: "server.rack",
+                              isFocused: $isServerFocused,
+                              contentType: .URL,
+                              submitLabel: .next) {
                 isUsernameFocused = true
             }
             .onChange(of: serverAddress) { _, newValue in
@@ -118,26 +116,22 @@ struct WhatsAppLoginScreen: View {
             }
             
             // Поле логина
-            whatsAppTextField(
-                text: $context.username,
-                placeholder: "Имя пользователя или email",
-                icon: "person.fill",
-                isFocused: $isUsernameFocused,
-                contentType: .username,
-                submitLabel: .next
-            ) {
+            whatsAppTextField(text: $context.username,
+                              placeholder: "Имя пользователя или email",
+                              icon: "person.fill",
+                              isFocused: $isUsernameFocused,
+                              contentType: .username,
+                              submitLabel: .next) {
                 isPasswordFocused = true
             }
             // Поле пароля
-            whatsAppTextField(
-                text: $context.password,
-                placeholder: "Пароль",
-                icon: "lock.fill",
-                isSecure: true,
-                isFocused: $isPasswordFocused,
-                contentType: .password,
-                submitLabel: .done
-            ) {
+            whatsAppTextField(text: $context.password,
+                              placeholder: "Пароль",
+                              icon: "lock.fill",
+                              isSecure: true,
+                              isFocused: $isPasswordFocused,
+                              contentType: .password,
+                              submitLabel: .done) {
                 submit()
             }
             // Кнопка входа
@@ -167,16 +161,14 @@ struct WhatsAppLoginScreen: View {
     }
 
     /// WhatsApp-style text field
-    func whatsAppTextField(
-        text: Binding<String>,
-        placeholder: String,
-        icon: String,
-        isSecure: Bool = false,
-        isFocused: FocusState<Bool>.Binding,
-        contentType: UITextContentType? = nil,
-        submitLabel: SubmitLabel = .done,
-        onSubmit: @escaping () -> Void = {}
-    ) -> some View {
+    func whatsAppTextField(text: Binding<String>,
+                           placeholder: String,
+                           icon: String,
+                           isSecure: Bool = false,
+                           isFocused: FocusState<Bool>.Binding,
+                           contentType: UITextContentType? = nil,
+                           submitLabel: SubmitLabel = .done,
+                           onSubmit: @escaping () -> Void = { }) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16))
@@ -215,13 +207,13 @@ struct WhatsAppLoginScreen: View {
             Text("Продолжая, вы соглашаетесь с ")
                 .font(.system(size: 12))
                 .foregroundColor(.whatsAppTextSecondary)
-            + Text("Условиями использования")
+                + Text("Условиями использования")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.whatsAppGreen)
-            + Text(" и ")
+                + Text(" и ")
                 .font(.system(size: 12))
                 .foregroundColor(.whatsAppTextSecondary)
-            + Text("Политикой конфиденциальности")
+                + Text("Политикой конфиденциальности")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.whatsAppGreen)
             // Сервер
@@ -276,9 +268,9 @@ struct WhatsAppLoginScreen_Previews: PreviewProvider, TestablePreview {
         Task { await authenticationService.configure(for: homeserverAddress, flow: .login) }
 
         let viewModel = LoginScreenViewModel(authenticationService: authenticationService,
-                                           loginHint: nil,
-                                           userIndicatorController: UserIndicatorControllerMock(),
-                                           analytics: ServiceLocator.shared.analytics)
+                                             loginHint: nil,
+                                             userIndicatorController: UserIndicatorControllerMock(),
+                                             analytics: ServiceLocator.shared.analytics)
 
         if withCredentials {
             viewModel.context.username = "alice"
@@ -287,4 +279,4 @@ struct WhatsAppLoginScreen_Previews: PreviewProvider, TestablePreview {
 
         return viewModel
     }
-} 
+}

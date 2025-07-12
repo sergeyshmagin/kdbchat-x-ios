@@ -62,6 +62,7 @@ final class LoginScreenCoordinator: CoordinatorProtocol {
                 case .configuredForOIDC:
                     actionsSubject.send(.configuredForOIDC)
                 case .signedIn(let userSession):
+                    MXLog.info("LoginScreenCoordinator received signedIn action, forwarding to AuthenticationFlowCoordinator")
                     actionsSubject.send(.signedIn(userSession))
                 case .changeServer:
                     actionsSubject.send(.changeServer)

@@ -73,13 +73,13 @@ struct KDBLoginScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .alert(item: $context.alertInfo)
         .alert("Обратитесь в службу поддержки вашей компании", isPresented: $isShowingForgotPasswordAlert) {
-            Button("OK", role: .cancel) {}
+            Button("OK", role: .cancel) { }
         }
         .onAppear {
             // Автоматически конфигурируем сервер при появлении экрана только если сервер не настроен
-            if context.viewState.homeserver.address.isEmpty || 
-               context.viewState.homeserver.address == "example.com" ||
-               context.viewState.homeserver.loginMode == .unknown {
+            if context.viewState.homeserver.address.isEmpty ||
+                context.viewState.homeserver.address == "example.com" ||
+                context.viewState.homeserver.loginMode == .unknown {
                 // Запускаем конфигурацию только один раз
                 context.send(viewAction: .configureServer)
             }
@@ -102,7 +102,7 @@ struct KDBLoginScreen: View {
                 .submitLabel(.next)
                 .onSubmit { isPasswordFocused = true }
                 .onChange(of: isUsernameFocused) { _, newValue in
-                    if !newValue && !context.username.isEmpty {
+                    if !newValue, !context.username.isEmpty {
                         context.send(viewAction: .parseUsername)
                     }
                 }
@@ -153,4 +153,4 @@ struct KDBLoginScreen: View {
     private func changeServer() {
         context.send(viewAction: .changeServer)
     }
-} 
+}

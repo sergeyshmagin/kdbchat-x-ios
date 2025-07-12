@@ -43,38 +43,54 @@ class AuthenticationService: AuthenticationServiceProtocol {
     // MARK: - Public
     
     func configure(for homeserverAddress: String, flow: AuthenticationFlow) async -> Result<Void, AuthenticationServiceError> {
+        MXLog.info("Starting server configuration for: \(homeserverAddress)")
         do {
             var homeserver = LoginHomeserver(address: homeserverAddress, loginMode: .unknown)
             
-            let client = try await makeClientBuilder().build(homeserverAddress: homeserverAddress)
+            MXLog.info("Creating client builder for: \(homeserverAddress)")
+            let clientBuilder = makeClientBuilder()
+            
+            MXLog.info("Building client for: \(homeserverAddress)")
+            let client = try await clientBuilder.build(homeserverAddress: homeserverAddress)
+            
+            MXLog.info("Getting homeserver login details for: \(homeserverAddress)")
             let loginDetails = await client.homeserverLoginDetails()
             
-            MXLog.info("Sliding sync: \(client.slidingSyncVersion())")
+            MXLog.info("Sliding sync version: \(client.slidingSyncVersion())")
+            MXLog.info("Supports OIDC login: \(loginDetails.supportsOidcLogin())")
+            MXLog.info("Supports password login: \(loginDetails.supportsPasswordLogin())")
             
-            homeserver.loginMode = if loginDetails.supportsOidcLogin() {
-                .oidc(supportsCreatePrompt: loginDetails.supportedOidcPrompts().contains(.create))
+            if loginDetails.supportsOidcLogin() {
+                MXLog.info("Setting login mode to OIDC")
+                homeserver.loginMode = .oidc(supportsCreatePrompt: loginDetails.supportedOidcPrompts().contains(.create))
             } else if loginDetails.supportsPasswordLogin() {
-                .password
+                MXLog.info("Setting login mode to password")
+                homeserver.loginMode = .password
             } else {
-                .unsupported
+                MXLog.info("Setting login mode to unsupported")
+                homeserver.loginMode = .unsupported
             }
             
             if flow == .login, homeserver.loginMode == .unsupported {
+                MXLog.error("Login not supported for server: \(homeserverAddress)")
                 return .failure(.loginNotSupported)
             }
             if flow == .register, !homeserver.loginMode.supportsOIDCFlow {
+                MXLog.error("Registration not supported for server: \(homeserverAddress)")
                 return .failure(.registrationNotSupported)
             }
             
+            MXLog.info("Storing client and sending homeserver update")
             self.client = client
             self.flow = flow
             homeserverSubject.send(homeserver)
+            MXLog.info("Server configuration completed successfully for: \(homeserverAddress)")
             return .success(())
         } catch ClientBuildError.WellKnownDeserializationError(let error) {
             MXLog.error("The user entered a server with an invalid well-known file: \(error)")
             return .failure(.invalidWellKnown(error))
         } catch ClientBuildError.SlidingSyncVersion(let error) {
-            MXLog.info("User entered a homeserver that isn't configured for sliding sync: \(error)")
+            MXLog.error("Server \(homeserverAddress) doesn't support sliding sync (required for ElementX): \(error)")
             return .failure(.slidingSyncNotAvailable)
         } catch {
             MXLog.error("Failed configuring a server: \(error)")
@@ -117,9 +133,17 @@ class AuthenticationService: AuthenticationServiceProtocol {
     }
     
     func login(username: String, password: String, initialDeviceName: String?, deviceID: String?) async -> Result<UserSessionProtocol, AuthenticationServiceError> {
-        guard let client else { return .failure(.failedLoggingIn) }
+        guard let client else {
+            MXLog.error("Login failed: client is nil")
+            return .failure(.failedLoggingIn)
+        }
+        
+        MXLog.info("Starting login for username: \(username), server: \(client.homeserver())")
+        
         do {
+            MXLog.info("Calling client.login with username: \(username)")
             try await client.login(username: username, password: password, initialDeviceName: initialDeviceName, deviceId: deviceID)
+            MXLog.info("client.login completed successfully")
             
             let refreshToken = try? client.session().refreshToken
             if refreshToken != nil {
@@ -128,19 +152,42 @@ class AuthenticationService: AuthenticationServiceProtocol {
                 return .failure(.sessionTokenRefreshNotSupported)
             }
             
-            return await userSession(for: client)
+            MXLog.info("Creating user session for client")
+            let userSessionResult = await userSession(for: client)
+            switch userSessionResult {
+            case .success(let session):
+                MXLog.info("User session created successfully for: \(session.clientProxy.userID)")
+                return .success(session)
+            case .failure(let error):
+                MXLog.error("Failed to create user session: \(error)")
+                return .failure(error)
+            }
         } catch let ClientError.MatrixApi(errorKind, _, _, _) {
-            MXLog.error("Failed logging in with error kind: \(errorKind)")
+            MXLog.error("Failed logging in with Matrix API error kind: \(errorKind)")
             switch errorKind {
             case .forbidden:
+                MXLog.error("Login failed: invalid credentials (forbidden)")
                 return .failure(.invalidCredentials)
             case .userDeactivated:
+                MXLog.error("Login failed: user account deactivated")
                 return .failure(.accountDeactivated)
             default:
+                MXLog.error("Login failed: unhandled Matrix API error kind: \(errorKind)")
                 return .failure(.failedLoggingIn)
             }
         } catch {
-            MXLog.error("Failed logging in with error: \(error)")
+            MXLog.error("Failed logging in with general error: \(error)")
+            MXLog.error("Error type: \(type(of: error))")
+            MXLog.error("Error description: \(String(describing: error))")
+            if let localizedError = error as? LocalizedError {
+                MXLog.error("Localized error description: \(localizedError.localizedDescription)")
+                if let failureReason = localizedError.failureReason {
+                    MXLog.error("Failure reason: \(failureReason)")
+                }
+                if let recoverySuggestion = localizedError.recoverySuggestion {
+                    MXLog.error("Recovery suggestion: \(recoverySuggestion)")
+                }
+            }
             return .failure(.failedLoggingIn)
         }
     }
@@ -171,10 +218,17 @@ class AuthenticationService: AuthenticationServiceProtocol {
     }
     
     private func userSession(for client: ClientProtocol) async -> Result<UserSessionProtocol, AuthenticationServiceError> {
-        switch await userSessionStore.userSession(for: client, sessionDirectories: sessionDirectories, passphrase: passphrase) {
+        MXLog.info("Creating user session for client with homeserver: \(client.homeserver())")
+        
+        let result = await userSessionStore.userSession(for: client, sessionDirectories: sessionDirectories, passphrase: passphrase)
+        switch result {
         case .success(let clientProxy):
+            MXLog.info("Successfully created user session with user ID: \(clientProxy.clientProxy.userID)")
             return .success(clientProxy)
-        case .failure:
+        case .failure(let error):
+            MXLog.error("Failed to create user session: \(error)")
+            MXLog.error("UserSessionStore error type: \(type(of: error))")
+            MXLog.error("UserSessionStore error description: \(String(describing: error))")
             return .failure(.failedLoggingIn)
         }
     }

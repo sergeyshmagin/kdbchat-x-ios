@@ -9,10 +9,104 @@ import AnalyticsEvents
 import BackgroundTasks
 import Combine
 import Intents
+import KeychainAccess
 import MatrixRustSDK
 import Sentry
 import SwiftUI
 import Version
+
+/// Сервис для автоматического управления recovery keys
+protocol AutoRecoveryServiceProtocol {
+    func setupAutoRecoveryForNewLogin(userSession: UserSessionProtocol) async
+    func restoreKeysFromBackup(userSession: UserSessionProtocol) async
+}
+
+class AutoRecoveryService: AutoRecoveryServiceProtocol {
+    private let keychain = Keychain(service: Bundle.main.bundleIdentifier ?? "io.element.elementx")
+        .accessibility(.whenUnlockedThisDeviceOnly)
+    
+    private func recoveryKeyKeychainKey(for userID: String) -> String {
+        "recovery_key_\(userID)"
+    }
+    
+    func setupAutoRecoveryForNewLogin(userSession: UserSessionProtocol) async {
+        let userID = userSession.clientProxy.userID
+        MXLog.info("Setting up auto recovery for new login: \(userID)")
+        
+        // Запускаем процесс в фоне с задержкой чтобы не блокировать вход
+        Task.detached { [weak self] in
+            guard let self else { return }
+            
+            // Ждем 5 секунд чтобы дать время для синхронизации
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 секунд
+            
+            // Проверяем есть ли уже recovery key в keychain
+            let existingKey = try? self.keychain.get(self.recoveryKeyKeychainKey(for: userID))
+            
+            if existingKey != nil {
+                MXLog.info("Recovery key already exists for \(userID), attempting restore")
+                await self.restoreKeysFromBackup(userSession: userSession)
+                return
+            }
+            
+            // Генерируем новый recovery key
+            await self.generateAndStoreRecoveryKey(userSession: userSession)
+        }
+    }
+    
+    func restoreKeysFromBackup(userSession: UserSessionProtocol) async {
+        let userID = userSession.clientProxy.userID
+        MXLog.info("Attempting to restore keys from backup for \(userID)")
+        
+        guard let recoveryKey = try? keychain.get(recoveryKeyKeychainKey(for: userID)) else {
+            MXLog.error("No recovery key found in keychain for \(userID)")
+            await generateAndStoreRecoveryKey(userSession: userSession)
+            return
+        }
+        
+        let result = await userSession.clientProxy.secureBackupController.confirmRecoveryKey(recoveryKey)
+        switch result {
+        case .success:
+            MXLog.info("Successfully restored keys from backup for \(userID)")
+        case .failure(let error):
+            MXLog.error("Failed to restore keys from backup: \(error)")
+            // Если восстановление не удалось, генерируем новый key
+            await generateAndStoreRecoveryKey(userSession: userSession)
+        }
+    }
+    
+    private func generateAndStoreRecoveryKey(userSession: UserSessionProtocol) async {
+        let userID = userSession.clientProxy.userID
+        MXLog.info("Generating new recovery key for \(userID)")
+        
+        // Сначала включаем backup если он не включен
+        let enableResult = await userSession.clientProxy.secureBackupController.enable()
+        switch enableResult {
+        case .success:
+            MXLog.info("Secure backup enabled for \(userID)")
+        case .failure(let error):
+            MXLog.error("Failed to enable secure backup: \(error)")
+        }
+        
+        // Генерируем recovery key
+        let result = await userSession.clientProxy.secureBackupController.generateRecoveryKey()
+        switch result {
+        case .success(let recoveryKey):
+            MXLog.info("Generated recovery key for \(userID)")
+            
+            // Сохраняем в keychain
+            do {
+                try keychain.set(recoveryKey, key: recoveryKeyKeychainKey(for: userID))
+                MXLog.info("Stored recovery key in keychain for \(userID)")
+            } catch {
+                MXLog.error("Failed to store recovery key in keychain: \(error)")
+            }
+            
+        case .failure(let error):
+            MXLog.error("Failed to generate recovery key: \(error)")
+        }
+    }
+}
 
 class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDelegate, NotificationManagerDelegate, SecureWindowManagerDelegate {
     private let stateMachine: AppCoordinatorStateMachine
@@ -23,6 +117,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     private let appDelegate: AppDelegate
     private let appHooks: AppHooks
     private let elementCallService: ElementCallServiceProtocol
+    private let autoRecoveryService: AutoRecoveryServiceProtocol
 
     /// Common background task to continue long-running tasks in the background.
     private var backgroundTask: UIBackgroundTaskIdentifier?
@@ -36,7 +131,11 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                 observeUserSessionChanges()
                 startSync()
                 performSettingsToAccountDataMigration(userSession: userSession)
-                Task { await appHooks.configure(with: userSession) }
+                Task {
+                    await appHooks.configure(with: userSession)
+                    // Настраиваем автоматический recovery для нового входа (временно отключено)
+                    // await autoRecoveryService.setupAutoRecoveryForNewLogin(userSession: userSession)
+                }
             }
         }
     }
@@ -93,6 +192,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         appRouteURLParser = AppRouteURLParser(appSettings: appSettings)
         
         elementCallService = ElementCallService()
+        autoRecoveryService = AutoRecoveryService()
         
         navigationRootCoordinator = NavigationRootCoordinator()
         
@@ -299,8 +399,10 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     // MARK: - AuthenticationFlowCoordinatorDelegate
     
     func authenticationFlowCoordinator(didLoginWithSession userSession: UserSessionProtocol) {
+        MXLog.info("AuthenticationFlowCoordinator didLoginWithSession called for user: \(userSession.clientProxy.userID)")
         self.userSession = userSession
         authenticationFlowCoordinator = nil
+        MXLog.info("Processing .createdUserSession event")
         stateMachine.processEvent(.createdUserSession)
     }
     
@@ -633,12 +735,18 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     }
     
     private func setupUserSession(isNewLogin: Bool) {
+        MXLog.info("Setting up user session, isNewLogin: \(isNewLogin)")
+        
         guard let userSession else {
-            MXLog.error("User session not setup in setupUserSession")
-            // Возвращаемся к экрану авторизации
-            startAuthentication()
+            MXLog.error("User session not setup in setupUserSession, returning to authentication")
+            // Возвращаемся к экрану авторизации через stateMachine
+            DispatchQueue.main.async { [weak self] in
+                self?.stateMachine.processEvent(.startWithAuthentication)
+            }
             return
         }
+        
+        MXLog.info("Creating UserSessionFlowCoordinator for user: \(userSession.clientProxy.userID)")
         
         let userSessionFlowCoordinator = UserSessionFlowCoordinator(userSession: userSession,
                                                                     navigationRootCoordinator: navigationRootCoordinator,
@@ -652,6 +760,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                                                                     analytics: ServiceLocator.shared.analytics,
                                                                     notificationManager: notificationManager,
                                                                     isNewLogin: isNewLogin)
+        
+        MXLog.info("UserSessionFlowCoordinator created successfully")
         
         userSessionFlowCoordinator.actionsPublisher
             .sink { [weak self] action in
@@ -668,18 +778,30 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
             }
             .store(in: &cancellables)
         
-        userSessionFlowCoordinator.start()
+        MXLog.info("Starting UserSessionFlowCoordinator")
         
-        self.userSessionFlowCoordinator = userSessionFlowCoordinator
-        
-        Task {
-            await runPostSessionSetupTasks()
+        // Запускаем в главном потоке для предотвращения race conditions
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            
+            MXLog.info("Starting UserSessionFlowCoordinator on main thread")
+            userSessionFlowCoordinator.start()
+            
+            self.userSessionFlowCoordinator = userSessionFlowCoordinator
+            
+            MXLog.info("UserSessionFlowCoordinator started and assigned")
+            
+            Task {
+                await self.runPostSessionSetupTasks()
+            }
         }
     }
         
     private func logout(isSoft: Bool) {
         guard let userSession else {
-            fatalError("User session not setup")
+            MXLog.error("User session not setup for logout, proceeding anyway")
+            stateMachine.processEvent(.completedSigningOut)
+            return
         }
         
         showLoadingIndicator()
@@ -751,7 +873,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     
     private func configureElementCallService() {
         guard let userSession else {
-            fatalError("User session not setup")
+            MXLog.error("User session not setup for ElementCall configuration")
+            return
         }
         
         elementCallService.setClientProxy(userSession.clientProxy)
@@ -801,7 +924,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     
     private func observeUserSessionChanges() {
         guard let userSession else {
-            fatalError("User session not setup")
+            MXLog.error("User session not setup for observation")
+            return
         }
         
         userSessionObserver = userSession.callbacks

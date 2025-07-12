@@ -219,13 +219,23 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         }
     }
     
+    private var onboardingAttempted = false
+    
     func attemptStartingOnboarding() {
-        MXLog.info("Attempting to start onboarding (disabled)")
-        // Отключено: сразу показываем список чатов, без device verification и прочего
-        // if onboardingFlowCoordinator.shouldStart {
-        //     clearRoute(animated: false)
-        //     onboardingFlowCoordinator.start()
-        // }
+        guard !onboardingAttempted else {
+            MXLog.info("Onboarding already attempted, skipping")
+            return
+        }
+        onboardingAttempted = true
+        
+        MXLog.info("Attempting to start onboarding")
+        if onboardingFlowCoordinator.shouldStart {
+            MXLog.info("Onboarding is required, starting...")
+            clearRoute(animated: false)
+            onboardingFlowCoordinator.start()
+        } else {
+            MXLog.info("Onboarding is not required, skipping")
+        }
     }
     
     private func clearPresentedSheets(animated: Bool) async {
@@ -245,8 +255,10 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             let animated = (context.userInfo as? UserSessionFlowCoordinatorStateMachine.EventUserInfo)?.animated ?? true
             switch (context.fromState, context.event, context.toState) {
             case (.initial, .start, .roomList):
+                MXLog.info("State machine transition: .initial -> .start -> .roomList")
                 presentHomeScreen()
-                attemptStartingOnboarding()
+                // attemptStartingOnboarding() уже будет вызван в presentHomeScreen(), не дублируем
+                // attemptStartingOnboarding()
             case(.roomList(let roomListSelectedRoomID), .selectRoom(let roomID, let via, let entryPoint), .roomList):
                 if roomListSelectedRoomID == roomID,
                    !entryPoint.isEventID, // Don't reuse the existing room so the live timeline is hidden while the detached timeline is loading.
@@ -426,6 +438,10 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 switch action {
                 case .logout:
                     logout()
+                case .complete:
+                    MXLog.info("Onboarding completed, onboarding flow finished")
+                    // Onboarding завершен, возвращаемся к основному экрану
+                    presentHomeScreen()
                 }
             }
             .store(in: &cancellables)
@@ -510,6 +526,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     private func presentHomeScreen() {
+        MXLog.info("presentHomeScreen() called - creating HomeScreenCoordinator")
         let parameters = HomeScreenCoordinatorParameters(userSession: userSession,
                                                          bugReportService: bugReportService,
                                                          selectedRoomPublisher: selectedRoomSubject.asCurrentValuePublisher(),
@@ -518,6 +535,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                                                          notificationManager: notificationManager,
                                                          userIndicatorController: ServiceLocator.shared.userIndicatorController)
         let coordinator = HomeScreenCoordinator(parameters: parameters)
+        MXLog.info("HomeScreenCoordinator created successfully")
         
         coordinator.actions
             .sink { [weak self] action in
@@ -559,9 +577,17 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             }
             .store(in: &cancellables)
         
+        MXLog.info("Setting HomeScreenCoordinator as root coordinator")
         sidebarNavigationStackCoordinator.setRootCoordinator(coordinator)
         
+        MXLog.info("Setting navigationSplitCoordinator as root coordinator in navigationRootCoordinator")
         navigationRootCoordinator.setRootCoordinator(navigationSplitCoordinator)
+        MXLog.info("Home screen setup completed successfully")
+        
+        // Вызываем onboarding только один раз после полной настройки home screen
+        DispatchQueue.main.async { [weak self] in
+            self?.attemptStartingOnboarding()
+        }
     }
     
     private func presentReportRoom(for roomID: String) async {
