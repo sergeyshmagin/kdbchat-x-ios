@@ -250,55 +250,46 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
         startLoading(isInteractionBlocking: true)
         
         Task {
-            do {
-                // Step 1: Ensure server is properly configured using ServerConfirmation logic
-                let configurationSuccess = await configureServerForLogin()
-                guard configurationSuccess else {
-                    MXLog.error("Server configuration failed")
-                    stopLoading()
-                    analytics.signpost.endLogin()
-                    return
-                }
-                
-                // Step 2: Check if OIDC is required (following ServerConfirmation flow)
-                if authenticationService.homeserver.value.loginMode.supportsOIDCFlow {
-                    MXLog.info("Server requires OIDC authentication, but password login was attempted")
-                    stopLoading()
-                    analytics.signpost.endLogin()
-                    handleError(.loginNotSupported)
-                    return
-                }
-                
-                // Step 3: Proceed with password authentication
-                MXLog.info("Starting password authentication")
-                analytics.signpost.beginLogin()
-                
-                let result = try await withTimeout(seconds: 30) {
-                    await self.authenticationService.login(username: self.state.bindings.username,
-                                                           password: self.state.bindings.password,
-                                                           initialDeviceName: UIDevice.current.initialDeviceName,
-                                                           deviceID: nil)
-                }
-                
-                MXLog.info("Authentication service login completed")
-                
-                switch result {
-                case .success(let userSession):
-                    MXLog.info("Login successful, sending signedIn action")
-                    actionsSubject.send(.signedIn(userSession))
-                    analytics.signpost.endLogin()
-                    stopLoading()
-                case .failure(let error):
-                    MXLog.error("Login failed with error: \(error)")
-                    stopLoading()
-                    analytics.signpost.endLogin()
-                    handleError(error)
-                }
-            } catch {
-                MXLog.error("Login process timed out or failed: \(error)")
+            // Step 1: Ensure server is properly configured using ServerConfirmation logic
+            let configurationSuccess = await configureServerForLogin()
+            guard configurationSuccess else {
+                MXLog.error("Server configuration failed")
                 stopLoading()
                 analytics.signpost.endLogin()
-                handleError(.failedLoggingIn)
+                return
+            }
+            
+            // Step 2: Check if OIDC is required (following ServerConfirmation flow)
+            if authenticationService.homeserver.value.loginMode.supportsOIDCFlow {
+                MXLog.info("Server requires OIDC authentication, but password login was attempted")
+                stopLoading()
+                analytics.signpost.endLogin()
+                handleError(.loginNotSupported)
+                return
+            }
+            
+            // Step 3: Proceed with password authentication
+            MXLog.info("Starting password authentication")
+            analytics.signpost.beginLogin()
+            
+            let result = await self.authenticationService.login(username: self.state.bindings.username,
+                                                   password: self.state.bindings.password,
+                                                   initialDeviceName: UIDevice.current.initialDeviceName,
+                                                   deviceID: nil)
+            
+            MXLog.info("Authentication service login completed")
+            
+            switch result {
+            case .success(let userSession):
+                MXLog.info("Login successful, sending signedIn action")
+                actionsSubject.send(.signedIn(userSession))
+                analytics.signpost.endLogin()
+                stopLoading()
+            case .failure(let error):
+                MXLog.error("Login failed with error: \(error)")
+                stopLoading()
+                analytics.signpost.endLogin()
+                handleError(error)
             }
         }
     }

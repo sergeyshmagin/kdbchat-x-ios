@@ -311,7 +311,7 @@ final class AppSettings {
     let elementCallPosthogAPIKey = "phc_rXGHx9vDmyEvyRxPziYtdVIv0ahEv8A9uLWFcCi1WcU"
     let elementCallPosthogSentryDSN = "https://3bd2f95ba5554d4497da7153b552ffb5@sentry.tools.element.io/41"
     
-    @UserPreference(key: UserDefaultsKeys.elementCallBaseURLOverride, defaultValue: nil, storageType: .userDefaults(store))
+    @UserPreference(key: UserDefaultsKeys.elementCallBaseURLOverride, defaultValue: URL(string: "https://call.aibots.kz"), storageType: .userDefaults(store))
     var elementCallBaseURLOverride: URL?
     
     // MARK: - Users
@@ -343,7 +343,7 @@ final class AppSettings {
     @UserPreference(key: UserDefaultsKeys.knockingEnabled, defaultValue: false, storageType: .userDefaults(store))
     var knockingEnabled
     
-    @UserPreference(key: UserDefaultsKeys.threadsEnabled, defaultValue: isDevelopmentBuild, storageType: .userDefaults(store))
+    @UserPreference(key: UserDefaultsKeys.threadsEnabled, defaultValue: true, storageType: .userDefaults(store))
     var developerOptionsEnabled
     
     #endif

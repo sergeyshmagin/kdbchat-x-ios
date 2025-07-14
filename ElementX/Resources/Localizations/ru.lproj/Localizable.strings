@@ -54,7 +54,7 @@
 "action_copy_link_to_message" = "Скопировать ссылку в сообщение";
 "action_copy_text" = "Копировать текст";
 "action_create" = "Создать";
-"action_create_a_room" = "Создать комнату";
+"action_create_a_room" = "Создать группу";
 "action_deactivate" = "Отключить";
 "action_deactivate_account" = "Отключить учётную запись";
 "action_decline" = "Отклонить";
@@ -75,7 +75,7 @@
 "action_go_back" = "Вернуться";
 "action_ignore" = "Игнорировать";
 "action_invite" = "Пригласить";
-"action_invite_friends" = "Пригласить в комнату";
+"action_invite_friends" = "Пригласить в группу";
 "action_invite_friends_to_app" = "Пригласить в %1$@";
 "action_invite_people_to_app" = "Пригласите пользователей в %1$@";
 "action_invites_list" = "Приглашения";
@@ -377,8 +377,8 @@
 "notification_mentioned_you_body" = "Упомянул вас: %1$@";
 "notification_new_messages" = "Новые сообщения";
 "notification_reaction_body" = "Отреагировал на %1$@";
-"notification_room_invite_body" = "Пригласил вас в комнату";
-"notification_room_invite_body_with_sender" = "%1$@ пригласил вас присоединиться к комнате";
+"notification_room_invite_body" = "Пригласил вас в группу";
+"notification_room_invite_body_with_sender" = "%1$@ пригласил вас присоединиться к группе";
 "notification_sender_me" = "Я";
 "notification_sender_mention_reply" = "%1$@ упомянул или ответил";
 "notification_test_push_notification_content" = "Вы просматриваете уведомление! Нажмите на меня!";
@@ -561,7 +561,7 @@
 "screen_security_and_privacy_room_access_invite_only_option_description" = "Люди могут присоединиться только по приглашению";
 "screen_security_and_privacy_room_access_invite_only_option_title" = "Только по приглашению";
 "screen_security_and_privacy_room_access_section_header" = "Доступ в комнату";
-"screen_security_and_privacy_room_access_space_members_option_description" = "Пространства в настоящее время не поддерживаются.";
+"screen_security_and_privacy_room_access_space_members_option_description" = "Сообщества в настоящее время не поддерживаются.";
 "screen_security_and_privacy_room_access_space_members_option_title" = "Участники пространства";
 "screen_security_and_privacy_room_address_section_footer" = "Вам понадобится адрес комнаты, чтобы сделать ее видимой в каталоге комнат.";
 "screen_security_and_privacy_room_directory_visibility_section_footer" = "Разрешить поиск этой комнаты %1$@ в каталоге общественных комнат";
@@ -573,12 +573,12 @@
 "screen_security_and_privacy_room_publishing_section_header" = "Публикация комнат";
 "screen_security_and_privacy_room_visibility_section_footer" = "Адреса комнат — это способ найти комнату и получить к ним доступ. Это также гарантирует, что вы сможете легко поделиться своей комнатой с другими.\nАдрес также необходим для отображения комнаты в каталоге %1$@ общедоступных комнат.";
 "screen_security_and_privacy_title" = "Безопасность и конфиденциальность";
-"screen_start_chat_join_room_by_address_action" = "Присоединиться к комнате по адресу";
+"screen_start_chat_join_room_by_address_action" = "Присоединиться к группе по адресу";
 "screen_start_chat_join_room_by_address_invalid_address" = "Недействительный адрес";
 "screen_start_chat_join_room_by_address_placeholder" = "Ввести...";
-"screen_start_chat_join_room_by_address_room_found" = "Соответствующая комната найдена";
-"screen_start_chat_join_room_by_address_room_not_found" = "Комната не найдена";
-"screen_start_chat_join_room_by_address_supporting_text" = "прим. #room-name:matrix.org";
+"screen_start_chat_join_room_by_address_room_found" = "Соответствующая группа найдена";
+"screen_start_chat_join_room_by_address_room_not_found" = "Группа не найдена";
+"screen_start_chat_join_room_by_address_supporting_text" = "прим. #group-name:matrix.org";
 "screen_timeline_item_menu_send_failure_changed_identity" = "Сообщение не отправлено, потому что подтвержденная личность %1$@ была сброшена.";
 "screen_timeline_item_menu_send_failure_unsigned_device" = "Сообщение не отправлено, потому что %1$@ не проверил одно или несколько устройств.";
 "screen_timeline_item_menu_send_failure_you_unsigned_device" = "Сообщение не отправлено, поскольку вы не подтвердили одно или несколько своих устройств.";
@@ -687,7 +687,7 @@
 "screen_create_poll_question_desc" = "Вопрос или тема";
 "screen_create_poll_question_hint" = "О чём будет опрос?";
 "screen_create_poll_title" = "Создать опрос";
-"screen_create_room_action_create_room" = "Создать новую комнату";
+"screen_create_room_action_create_room" = "Создать новую группу";
 "screen_create_room_error_creating_room" = "Произошла ошибка при создании комнаты";
 "screen_create_room_private_option_description" = "Доступ в эту комнату имеют только приглашенные пользователи. Все сообщения защищены сквозным шифрованием.";
 "screen_create_room_private_option_title" = "Частная комната";
@@ -737,12 +737,12 @@
 "screen_join_room_fail_message" = "Не удалось присоединиться к комнате.";
 "screen_join_room_fail_reason" = "Доступ в эту комнату возможен только по приглашениям или может быть ограничен на уровне пространства.";
 "screen_join_room_forget_action" = "Забыть эту комнату";
-"screen_join_room_invite_required_message" = "Вам необходимо приглашение для того, чтобы присоединиться к этой комнате";
+"screen_join_room_invite_required_message" = "Вам необходимо приглашение для того, чтобы присоединиться к этой группе";
 "screen_join_room_join_action" = "Присоединиться к комнате";
 "screen_join_room_join_restricted_message" = "Чтобы присоединиться, вам необходимо приглашение или быть участником сообщества.";
 "screen_join_room_knock_action" = "Постучите, чтобы присоединиться";
 "screen_join_room_space_not_supported_description" = "%1$@ еще не поддерживает пространства. Вы можете получить к ним доступ в веб-версии.";
-"screen_join_room_space_not_supported_title" = "Пространства пока не поддерживаются";
+"screen_join_room_space_not_supported_title" = "Сообщества пока не поддерживаются";
 "screen_join_room_subtitle_knock" = "Нажмите кнопку ниже и администратор комнаты получит уведомление. После одобрения вы сможете присоединиться к обсуждению.";
 "screen_join_room_subtitle_no_preview" = "Вы должны быть участником этой комнаты, чтобы просмотреть историю сообщений.";
 "screen_join_room_title_knock" = "Хотите присоединиться к этой комнате?";
@@ -1021,8 +1021,8 @@
 "screen_roomlist_filter_mixed_empty_state_subtitle" = "Вы можете убрать фильтры, чтобы увидеть другие ваши чаты.";
 "screen_roomlist_filter_mixed_empty_state_title" = "У вас нет чатов для этой подборки";
 "screen_roomlist_filter_people_empty_state_title" = "У вас пока нет личных сообщений";
-"screen_roomlist_filter_rooms" = "Комнаты";
-"screen_roomlist_filter_rooms_empty_state_title" = "Вас пока нет ни в одной комнате";
+"screen_roomlist_filter_rooms" = "Группы";
+"screen_roomlist_filter_rooms_empty_state_title" = "Вас пока нет ни в одной группе";
 "screen_roomlist_filter_unreads" = "Непрочитанные";
 "screen_roomlist_filter_unreads_empty_state_title" = "Поздравляем!\nУ вас нет непрочитанных сообщений!";
 "screen_roomlist_main_space_title" = "Все чаты";
@@ -1260,7 +1260,7 @@
 "screen_chat_backup_recovery_action_setup" = "Настроить восстановление";
 "screen_create_account_title" = "Создать учетную запись";
 "screen_create_poll_cancel_confirmation_content_ios" = "Ваши изменения не будут сохранены";
-"screen_create_room_add_people_title" = "Пригласить в комнату";
+"screen_create_room_add_people_title" = "Пригласить в группу";
 "screen_create_room_public_option_title" = "Общедоступная комната";
 "screen_create_room_room_name_label" = "Название комнаты";
 "screen_create_room_title" = "Создать комнату";
@@ -1290,7 +1290,7 @@
 "screen_room_change_role_section_moderators" = "Модераторы";
 "screen_room_change_role_section_users" = "Участники";
 "screen_room_change_role_unsaved_changes_title" = "Сохранить изменения?";
-"screen_room_details_invite_people_title" = "Пригласить в комнату";
+"screen_room_details_invite_people_title" = "Пригласить в группу";
 "screen_room_details_leave_conversation_title" = "Покинуть беседу";
 "screen_room_details_leave_room_title" = "Покинуть комнату";
 "screen_room_details_media_gallery_title" = "Медиа и файлы";

@@ -132,7 +132,7 @@ struct KDBLoginScreen: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(context.viewState.canSubmit && !context.viewState.isLoading ? Color.blue : Color(.systemGray4))
+                .background(context.viewState.canSubmit && !context.viewState.isLoading ? Color.black : Color(.systemGray4))
                 .foregroundColor(.white)
                 .cornerRadius(24)
             }

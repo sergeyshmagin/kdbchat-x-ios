@@ -220,6 +220,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     private var onboardingAttempted = false
+    private var homeScreenPresented = false
     
     func attemptStartingOnboarding() {
         guard !onboardingAttempted else {
@@ -234,7 +235,13 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             clearRoute(animated: false)
             onboardingFlowCoordinator.start()
         } else {
-            MXLog.info("Onboarding is not required, skipping")
+            MXLog.info("Onboarding is not required, skipping - ensuring home screen is shown")
+            if !homeScreenPresented {
+                MXLog.info("Home screen not yet presented, ensuring it's shown")
+                presentHomeScreen()
+            } else {
+                MXLog.info("Home screen already presented, no action needed")
+            }
         }
     }
     
@@ -256,9 +263,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             switch (context.fromState, context.event, context.toState) {
             case (.initial, .start, .roomList):
                 MXLog.info("State machine transition: .initial -> .start -> .roomList")
-                presentHomeScreen()
-                // attemptStartingOnboarding() уже будет вызван в presentHomeScreen(), не дублируем
-                // attemptStartingOnboarding()
+                attemptStartingOnboarding()
             case(.roomList(let roomListSelectedRoomID), .selectRoom(let roomID, let via, let entryPoint), .roomList):
                 if roomListSelectedRoomID == roomID,
                    !entryPoint.isEventID, // Don't reuse the existing room so the live timeline is hidden while the detached timeline is loading.
@@ -526,6 +531,12 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     private func presentHomeScreen() {
+        guard !homeScreenPresented else {
+            MXLog.info("Home screen already presented, skipping duplicate call")
+            return
+        }
+        homeScreenPresented = true
+        
         MXLog.info("presentHomeScreen() called - creating HomeScreenCoordinator")
         let parameters = HomeScreenCoordinatorParameters(userSession: userSession,
                                                          bugReportService: bugReportService,
@@ -583,11 +594,6 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         MXLog.info("Setting navigationSplitCoordinator as root coordinator in navigationRootCoordinator")
         navigationRootCoordinator.setRootCoordinator(navigationSplitCoordinator)
         MXLog.info("Home screen setup completed successfully")
-        
-        // Вызываем onboarding только один раз после полной настройки home screen
-        DispatchQueue.main.async { [weak self] in
-            self?.attemptStartingOnboarding()
-        }
     }
     
     private func presentReportRoom(for roomID: String) async {
