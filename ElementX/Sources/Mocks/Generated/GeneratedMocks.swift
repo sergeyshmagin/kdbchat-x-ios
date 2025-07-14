@@ -2389,6 +2389,70 @@ class ClientProxyMock: ClientProxyProtocol, @unchecked Sendable {
     var underlyingIsLiveKitRTCSupported: Bool!
     var isLiveKitRTCSupportedClosure: (() async -> Bool)?
 
+    //MARK: - requestOpenIdToken
+
+    var requestOpenIdTokenUnderlyingCallsCount = 0
+    var requestOpenIdTokenCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return requestOpenIdTokenUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = requestOpenIdTokenUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                requestOpenIdTokenUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    requestOpenIdTokenUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var requestOpenIdTokenCalled: Bool {
+        return requestOpenIdTokenCallsCount > 0
+    }
+
+    var requestOpenIdTokenUnderlyingReturnValue: Result<OpenIdTokenResponse, ClientProxyError>!
+    var requestOpenIdTokenReturnValue: Result<OpenIdTokenResponse, ClientProxyError>! {
+        get {
+            if Thread.isMainThread {
+                return requestOpenIdTokenUnderlyingReturnValue
+            } else {
+                var returnValue: Result<OpenIdTokenResponse, ClientProxyError>? = nil
+                DispatchQueue.main.sync {
+                    returnValue = requestOpenIdTokenUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                requestOpenIdTokenUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    requestOpenIdTokenUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var requestOpenIdTokenClosure: (() async -> Result<OpenIdTokenResponse, ClientProxyError>)?
+
+    func requestOpenIdToken() async -> Result<OpenIdTokenResponse, ClientProxyError> {
+        requestOpenIdTokenCallsCount += 1
+        if let requestOpenIdTokenClosure = requestOpenIdTokenClosure {
+            return await requestOpenIdTokenClosure()
+        } else {
+            return requestOpenIdTokenReturnValue
+        }
+    }
     //MARK: - isOnlyDeviceLeft
 
     var isOnlyDeviceLeftUnderlyingCallsCount = 0

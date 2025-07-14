@@ -92,6 +92,9 @@ packages:
     # path: ../matrix-rich-text-editor/platforms/ios/lib/WysiwygComposer
   
   # External dependencies
+  LiveKit:
+    url: https://github.com/livekit/client-sdk-ios
+    minorVersion: 2.0.0
   Algorithms:
     url: https://github.com/apple/swift-algorithms
     minorVersion: 1.2.1

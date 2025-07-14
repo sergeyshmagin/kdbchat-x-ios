@@ -144,6 +144,7 @@ targets:
         DEVELOPMENT_ASSET_PATHS: DevelopmentAssets/Media
         OTHER_SWIFT_FLAGS:
         - "-DIS_MAIN_APP"
+        - "-DLIVEKIT_ENABLED"
 
     preBuildScripts:
     - name: 🛠 SwiftGen
@@ -220,6 +221,7 @@ targets:
     - package: KeychainAccess
     - package: Kingfisher
     - package: KZFileWatchers
+    - package: LiveKit
     - package: LoremSwiftum
     - package: LRUCache
     - package: Mapbox

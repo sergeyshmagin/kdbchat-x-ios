@@ -273,9 +273,9 @@ class LoginScreenViewModel: LoginScreenViewModelType, LoginScreenViewModelProtoc
             analytics.signpost.beginLogin()
             
             let result = await self.authenticationService.login(username: self.state.bindings.username,
-                                                   password: self.state.bindings.password,
-                                                   initialDeviceName: UIDevice.current.initialDeviceName,
-                                                   deviceID: nil)
+                                                                password: self.state.bindings.password,
+                                                                initialDeviceName: UIDevice.current.initialDeviceName,
+                                                                deviceID: nil)
             
             MXLog.info("Authentication service login completed")
             

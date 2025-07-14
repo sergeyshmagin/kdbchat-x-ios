@@ -1089,6 +1089,101 @@ class ClientProxy: ClientProxyProtocol {
         }
     }
     
+    func requestOpenIdToken() async -> Result<OpenIdTokenResponse, ClientProxyError> {
+        // Try different API versions
+        let apiVersions = ["v3", "r0"]
+        
+        for version in apiVersions {
+            let result = await attemptOpenIdTokenRequest(apiVersion: version)
+            switch result {
+            case .success(let response):
+                return .success(response)
+            case .failure(let error):
+                if case .openIdTokenRequestFailed = error {
+                    MXLog.warning("OpenID token request failed with \(version), trying next version")
+                    continue
+                } else {
+                    return .failure(error)
+                }
+            }
+        }
+        
+        MXLog.error("Failed to get OpenID token with all API versions")
+        return .failure(.openIdTokenRequestFailed)
+    }
+    
+    private func attemptOpenIdTokenRequest(apiVersion: String) async -> Result<OpenIdTokenResponse, ClientProxyError> {
+        do {
+            MXLog.info("Requesting OpenID token from Matrix homeserver (API version: \(apiVersion))")
+            
+            // Build request URL
+            let baseURL = homeserver.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let encodedUserID = userID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userID
+            let requestURL = "\(baseURL)/_matrix/client/\(apiVersion)/user/\(encodedUserID)/openid/request_token"
+            
+            MXLog.info("OpenID token request URL: \(requestURL)")
+            
+            guard let url = URL(string: requestURL) else {
+                MXLog.error("Failed to construct OpenID token URL")
+                return .failure(.openIdTokenRequestFailed)
+            }
+            
+            // Create request
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            // Get access token from client
+            let accessToken = try await client.session().accessToken
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            
+            // Send empty JSON body
+            request.httpBody = "{}".data(using: .utf8)
+            
+            // Make request
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                MXLog.error("Invalid response type for OpenID token request")
+                return .failure(.openIdTokenRequestFailed)
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                MXLog.error("OpenID token request failed with status code: \(httpResponse.statusCode)")
+                if let errorData = String(data: data, encoding: .utf8) {
+                    MXLog.error("OpenID token error response: \(errorData)")
+                }
+                return .failure(.openIdTokenRequestFailed)
+            }
+            
+            // Parse response
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            
+            guard let accessToken = json?["access_token"] as? String,
+                  let tokenType = json?["token_type"] as? String,
+                  let matrixServerName = json?["matrix_server_name"] as? String,
+                  let expiresIn = json?["expires_in"] as? Int else {
+                MXLog.error("Invalid OpenID token response format")
+                if let responseData = String(data: data, encoding: .utf8) {
+                    MXLog.error("OpenID token response data: \(responseData)")
+                }
+                return .failure(.openIdTokenRequestFailed)
+            }
+            
+            let tokenResponse = OpenIdTokenResponse(accessToken: accessToken,
+                                                    tokenType: tokenType,
+                                                    matrixServerName: matrixServerName,
+                                                    expiresIn: expiresIn)
+            
+            MXLog.info("OpenID token request successful with API version: \(apiVersion)")
+            return .success(tokenResponse)
+            
+        } catch {
+            MXLog.error("Failed requesting OpenID token with API version \(apiVersion): \(error)")
+            return .failure(.openIdTokenRequestFailed)
+        }
+    }
+    
     func userIdentity(for userID: String) async -> Result<UserIdentityProxyProtocol?, ClientProxyError> {
         do {
             return try await .success(client.encryption().userIdentity(userId: userID).map(UserIdentityProxy.init))

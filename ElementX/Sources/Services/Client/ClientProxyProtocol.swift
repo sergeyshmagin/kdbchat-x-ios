@@ -40,6 +40,14 @@ enum ClientProxyError: Error {
     case failedResolvingRoomAlias
     case roomNotInLocalStore
     case invalidInvite
+    case openIdTokenRequestFailed
+}
+
+struct OpenIdTokenResponse {
+    let accessToken: String
+    let tokenType: String
+    let matrixServerName: String
+    let expiresIn: Int
 }
 
 enum SlidingSyncConstants {
@@ -97,6 +105,8 @@ protocol ClientProxyProtocol: AnyObject, MediaLoaderProtocol {
     var userDisplayNamePublisher: CurrentValuePublisher<String?, Never> { get }
 
     var userAvatarURLPublisher: CurrentValuePublisher<URL?, Never> { get }
+    
+    func requestOpenIdToken() async -> Result<OpenIdTokenResponse, ClientProxyError>
 
     /// We delay fetching this until after the first sync. Nil until then
     var ignoredUsersPublisher: CurrentValuePublisher<[String]?, Never> { get }

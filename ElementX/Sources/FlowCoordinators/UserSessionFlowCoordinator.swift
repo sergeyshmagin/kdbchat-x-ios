@@ -11,6 +11,10 @@ import Combine
 import MatrixRustSDK
 import SwiftUI
 
+#if LIVEKIT_ENABLED
+import LiveKit
+#endif
+
 enum UserSessionFlowCoordinatorAction {
     case logout
     case clearCache
@@ -811,6 +815,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     private func presentCallScreen(roomProxy: JoinedRoomProxyProtocol, notifyOtherParticipants: Bool) {
+        #if LIVEKIT_ENABLED
+        presentLiveKitCallScreen(roomProxy: roomProxy)
+        #else
         let colorScheme: ColorScheme = appMediator.windowManager.mainWindow.traitCollection.userInterfaceStyle == .light ? .light : .dark
         presentCallScreen(configuration: .init(roomProxy: roomProxy,
                                                clientProxy: userSession.clientProxy,
@@ -819,7 +826,41 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                                                elementCallBaseURLOverride: appSettings.elementCallBaseURLOverride,
                                                colorScheme: colorScheme,
                                                notifyOtherParticipants: notifyOtherParticipants))
+        #endif
     }
+    
+    #if LIVEKIT_ENABLED
+    private func presentLiveKitCallScreen(roomProxy: JoinedRoomProxyProtocol) {
+        let authService = LiveKitAuthService(clientProxy: userSession.clientProxy)
+        let callScreen = LiveKitCallScreen(roomId: roomProxy.id, authService: authService)
+        
+        let coordinator = LiveKitCallScreenCoordinator(callScreen: callScreen)
+        
+        navigationSplitCoordinator.setSheetCoordinator(coordinator, animated: true) { [weak self] in
+            // Cleanup when call screen is dismissed
+        }
+    }
+    
+    private class LiveKitCallScreenCoordinator: CoordinatorProtocol {
+        private let callScreen: LiveKitCallScreen
+        
+        init(callScreen: LiveKitCallScreen) {
+            self.callScreen = callScreen
+        }
+        
+        func start() {
+            // Implementation not needed for this simple coordinator
+        }
+        
+        func stop() {
+            // Implementation not needed for this simple coordinator
+        }
+        
+        func toPresentable() -> AnyView {
+            AnyView(callScreen)
+        }
+    }
+    #endif
     
     private var callScreenPictureInPictureController: AVPictureInPictureController?
     private func presentCallScreen(configuration: ElementCallConfiguration) {
