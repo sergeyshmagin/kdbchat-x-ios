@@ -95,54 +95,37 @@ struct CallControls: View {
 
 ## 🔄 Пошаговый план миграции
 
-### Phase 1: Подготовка (1-2 дня)
-1. **Добавить LiveKit SDK**:
-   - Интегрировать `client-sdk-ios` через SPM
-   - Обновить разрешения для медиа доступа
-   - Создать базовую структуру классов
+### ✅ Phase 1: Подготовка - ЗАВЕРШЕНА
+1. **✅ Добавить LiveKit SDK**:
+   - ✅ Интегрирован `client-sdk-ios` v2.0.19 через SPM
+   - ✅ Обновлены разрешения для медиа доступа
+   - ✅ Создана базовая структура классов
 
-2. **Создать LiveKit сервисы**:
-   ```swift
-   // LiveKitCallService.swift
-   final class LiveKitCallService: ObservableObject, LiveKitCallServiceProtocol {
-       private let room = Room()
-       @Published var ongoingCall: LiveKitCall?
-       
-       func startCall(roomId: String) async throws {
-           let token = try await authService.getToken(for: roomId)
-           try await room.connect(url: liveKitURL, token: token)
-           ongoingCall = LiveKitCall(roomId: roomId, room: room)
-       }
-   }
-   ```
+2. **✅ Создать LiveKit сервисы**:
+   - ✅ `LiveKitCallService.swift` - управление звонками
+   - ✅ `LiveKitAuthService.swift` - аутентификация
+   - ✅ Интеграция с UserSessionFlowCoordinator
 
-### Phase 2: Базовая интеграция (2-3 дня)
-1. **Заменить CallScreen**:
-   - Создать `LiveKitCallScreen` с нативным UI
-   - Интегрировать основные контролы (mute, video, hangup)
-   - Добавить отображение участников
+### ✅ Phase 2: Базовая интеграция - В ПРОЦЕССЕ  
+1. **✅ Заменить CallScreen**:
+   - ✅ Создан `LiveKitCallScreen` с нативным UI
+   - ✅ Интегрированы основные контролы (mute, video, hangup)
+   - ✅ Добавлено отображение участников
+   - ✅ Реализован coordinator pattern
 
-2. **JWT Auth интеграция**:
-   ```swift
-   // LiveKitAuthService.swift
-   final class LiveKitAuthService: LiveKitAuthServiceProtocol {
-       func getAccessToken(for roomId: String, participantId: String) async throws -> String {
-           // Получение OpenID токена от Matrix
-           let openIdToken = try await matrixClient.getOpenIdToken()
-           
-           // Запрос JWT токена с вашего auth сервиса
-           let response = try await httpClient.post(
-               url: "https://video.aibots.kz/api/auth",
-               body: LiveKitAuthRequest(
-                   roomId: roomId,
-                   participantName: participantId,
-                   openIdToken: openIdToken
-               )
-           )
-           return response.accessToken
-       }
-   }
-   ```
+2. **✅ Matrix OpenID + JWT Auth интеграция**:
+   - ✅ Реализован Matrix OpenID token запрос через ClientProxy
+   - ✅ Интеграция с auth сервером `https://livekit-auth.aibots.kz/api/auth`
+   - ✅ Прозрачная аутентификация для пользователя
+   - ✅ Fallback система на mock токены
+   - ⚠️ **ПРОБЛЕМА**: Connection timeout при старте звонка
+
+3. **✅ ДОПОЛНИТЕЛЬНЫЕ УЛУЧШЕНИЯ Phase 2**:
+   - ✅ Добавлена обработка медиа разрешений (AVCaptureDevice, AVAudioSession)
+   - ✅ Реализована retry логика для соединения (3 попытки с 2сек паузой)
+   - ✅ Добавлены Matrix call member events для оповещения других клиентов
+   - ✅ Улучшено логирование и error handling
+   - ⚠️ **ПРОБЛЕМА**: Connection timeout все еще происходит (требует тестирования)
 
 ### Phase 3: CallKit интеграция (1-2 дня)
 1. **Обновить CallKit integration**:

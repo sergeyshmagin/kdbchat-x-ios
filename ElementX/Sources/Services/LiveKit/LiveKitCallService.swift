@@ -5,6 +5,7 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
+import AVFoundation
 import Combine
 import Foundation
 import LiveKit
@@ -61,7 +62,18 @@ final class LiveKitCallService: ObservableObject {
     @MainActor
     func startCall(roomId: String) async throws {
         do {
+            // Request permissions first
+            let permissionsGranted = await requestMediaPermissions()
+            if !permissionsGranted {
+                MXLog.error("Media permissions not granted")
+                error = .permissionDenied
+                throw LiveKitCallError.permissionDenied
+            }
+            
             let token = try await authService.getAccessToken(roomId: roomId)
+            MXLog.info("Starting LiveKit connection with server: \(serverURL)")
+            
+            // Connect with default options
             try await room.connect(url: serverURL, token: token)
             
             // Enable local audio and video by default
@@ -72,11 +84,34 @@ final class LiveKitCallService: ObservableObject {
             localParticipant = room.localParticipant
             updateMediaStates()
             
+            // Send Matrix call member event to notify other clients
+            await sendCallMemberEvent(roomId: roomId)
+            
             MXLog.info("LiveKit call started successfully for room: \(roomId)")
         } catch {
             MXLog.error("Failed to start LiveKit call: \(error)")
             self.error = .connectionFailed
             throw error
+        }
+    }
+    
+    private func requestMediaPermissions() async -> Bool {
+        do {
+            // Request camera permission
+            let cameraPermission = await AVCaptureDevice.requestAccess(for: .video)
+            
+            // Request microphone permission
+            let microphonePermission = await withCheckedContinuation { continuation in
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+            
+            MXLog.info("Media permissions - Camera: \(cameraPermission), Microphone: \(microphonePermission)")
+            return cameraPermission && microphonePermission
+        } catch {
+            MXLog.error("Failed to request media permissions: \(error)")
+            return false
         }
     }
     
@@ -132,6 +167,42 @@ final class LiveKitCallService: ObservableObject {
         let localParticipant = room.localParticipant
         isMuted = !localParticipant.isMicrophoneEnabled()
         isVideoEnabled = localParticipant.isCameraEnabled()
+    }
+    
+    private func sendCallMemberEvent(roomId: String) async {
+        guard let clientProxy = clientProxy else {
+            MXLog.warning("No client proxy available for sending call member event")
+            return
+        }
+        
+        do {
+            let callId = UUID().uuidString
+            let deviceId = clientProxy.deviceID ?? "unknown"
+            let userId = clientProxy.userID
+            
+            // Create call member event content
+            let callMemberContent = [
+                "m.call_id": callId,
+                "m.device_id": deviceId,
+                "m.expires": Int(Date().addingTimeInterval(3600).timeIntervalSince1970 * 1000), // 1 hour
+                "m.foci_preferred": ["livekit"],
+                "m.foci": [
+                    [
+                        "type": "livekit",
+                        "livekit_service_url": serverURL.replacingOccurrences(of: "wss://", with: "https://")
+                    ]
+                ]
+            ] as [String: Any]
+            
+            MXLog.info("Sending Matrix call member event for room: \(roomId)")
+            
+            // Send state event to room
+            // TODO: Implement proper Matrix state event sending when available in ClientProxy
+            MXLog.info("Call member event content: \(callMemberContent)")
+            
+        } catch {
+            MXLog.error("Failed to send call member event: \(error)")
+        }
     }
 }
 

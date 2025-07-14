@@ -39,14 +39,30 @@ final class LiveKitCallViewModel: ObservableObject {
         isLoading = true
         error = nil
         
-        do {
-            try await callService.startCall(roomId: roomId)
-            MXLog.info("LiveKit call started for room: \(roomId)")
-        } catch {
-            self.error = error as? LiveKitCallError ?? .connectionFailed
-            MXLog.error("Failed to start call: \(error)")
+        // Try connecting with retry mechanism
+        var retryCount = 0
+        let maxRetries = 3
+        
+        while retryCount < maxRetries {
+            do {
+                try await callService.startCall(roomId: roomId)
+                MXLog.info("LiveKit call started for room: \(roomId)")
+                isLoading = false
+                return
+            } catch let connectionError {
+                retryCount += 1
+                self.error = connectionError as? LiveKitCallError ?? .connectionFailed
+                MXLog.error("Failed to start call (attempt \(retryCount)): \(connectionError)")
+                
+                if retryCount < maxRetries {
+                    MXLog.info("Retrying connection in 2 seconds... (attempt \(retryCount + 1)/\(maxRetries))")
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    self.error = nil // Clear error before retry
+                }
+            }
         }
         
+        MXLog.error("Failed to connect after \(maxRetries) attempts")
         isLoading = false
     }
     
