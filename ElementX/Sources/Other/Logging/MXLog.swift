@@ -16,6 +16,11 @@ enum MXLog {
     private nonisolated(unsafe) static var currentTarget: String!
     
     static func configure(currentTarget: String) {
+        guard !currentTarget.isEmpty else {
+            print("ERROR: MXLog.configure called with empty target")
+            return
+        }
+        
         self.currentTarget = currentTarget
         
         rootSpan = Span(file: #file, line: #line, level: .info, target: self.currentTarget, name: "root")
@@ -117,11 +122,23 @@ enum MXLog {
                                    function: String = #function,
                                    line: Int = #line,
                                    column: Int = #column) -> Span {
-        if Span.current().isNone() {
-            rootSpan.enter()
+        guard let currentTarget = currentTarget else {
+            // Fallback to a default target if not configured
+            print("WARNING: MXLog not configured, using default target")
+            return Span(file: file, line: UInt32(line), level: level.rustLogLevel, target: "default", name: name)
         }
         
-        return Span(file: file, line: UInt32(line), level: level.rustLogLevel, target: currentTarget, name: name)
+        if Span.current().isNone() {
+            rootSpan?.enter()
+        }
+        
+        do {
+            return Span(file: file, line: UInt32(line), level: level.rustLogLevel, target: currentTarget, name: name)
+        } catch {
+            print("ERROR: Failed to create span '\(name)': \(error)")
+            // Return a dummy span to prevent crashes
+            return Span(file: file, line: UInt32(line), level: level.rustLogLevel, target: "fallback", name: name)
+        }
     }
     
     // periphery:ignore:parameters function,column
@@ -131,7 +148,15 @@ enum MXLog {
                             function: String = #function,
                             line: Int = #line,
                             column: Int = #column) {
-        guard let rootSpan else {
+        guard let rootSpan = rootSpan else {
+            // Fallback to print if not configured
+            print("[\(level)] \(message)")
+            return
+        }
+        
+        guard let currentTarget = currentTarget else {
+            // Fallback to print if target not configured
+            print("[\(level)] \(message)")
             return
         }
         
@@ -139,6 +164,10 @@ enum MXLog {
             rootSpan.enter()
         }
         
-        logEvent(file: (file as NSString).lastPathComponent, line: UInt32(line), level: level.rustLogLevel, target: currentTarget, message: "\(message)")
+        do {
+            logEvent(file: (file as NSString).lastPathComponent, line: UInt32(line), level: level.rustLogLevel, target: currentTarget, message: "\(message)")
+        } catch {
+            print("ERROR: Failed to log event: \(error) - Message: \(message)")
+        }
     }
 }

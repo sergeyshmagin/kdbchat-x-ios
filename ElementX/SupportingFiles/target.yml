@@ -94,7 +94,7 @@ targets:
           voip
         ]
         BGTaskSchedulerPermittedIdentifiers: [
-          io.element.elementx.background.refresh
+          io.sergeyshmagin.kdbchat.background.refresh
         ]
         UTExportedTypeDeclarations:
         - UTTypeConformsTo: [public.text]

@@ -212,44 +212,88 @@ struct LiveKitCallScreen: View {
 
     @ViewBuilder
     private var callControlsView: some View {
-        HStack(spacing: 30) {
-            // Mute button
-            Button {
-                Task { await viewModel.toggleMicrophone() }
-            } label: {
-                Image(systemName: viewModel.isMuted ? "mic.slash.fill" : "mic.fill")
-                    .font(.title2)
-                    .foregroundColor(viewModel.isMuted ? .red : .white)
-                    .frame(width: 60, height: 60)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
-            }
-            
-            // Video button
-            Button {
-                Task { await viewModel.toggleCamera() }
-            } label: {
-                Image(systemName: viewModel.isVideoEnabled ? "video.fill" : "video.slash.fill")
-                    .font(.title2)
-                    .foregroundColor(viewModel.isVideoEnabled ? .white : .red)
-                    .frame(width: 60, height: 60)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
-            }
-            
-            // Hang up button
-            Button {
-                Task {
-                    await viewModel.endCall()
-                    dismiss()
+        VStack(spacing: 20) {
+            // Secondary controls
+            HStack(spacing: 40) {
+                // Speaker button
+                Button {
+                    // TODO: Toggle speaker/earpiece
+                } label: {
+                    Image(systemName: "speaker.wave.3.fill")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .frame(width: 50, height: 50)
+                        .background(Color.white.opacity(0.2))
+                        .clipShape(Circle())
                 }
-            } label: {
-                Image(systemName: "phone.down.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 60, height: 60)
-                    .background(Color.red)
-                    .clipShape(Circle())
+                
+                // Camera flip button
+                Button {
+                    // TODO: Toggle front/back camera
+                } label: {
+                    Image(systemName: "camera.rotate.fill")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .frame(width: 50, height: 50)
+                        .background(Color.white.opacity(0.2))
+                        .clipShape(Circle())
+                }
+                
+                // Screen share button (future feature)
+                Button {
+                    // TODO: Screen sharing
+                } label: {
+                    Image(systemName: "rectangle.on.rectangle")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .frame(width: 50, height: 50)
+                        .background(Color.white.opacity(0.2))
+                        .clipShape(Circle())
+                }
+            }
+            
+            // Primary controls
+            HStack(spacing: 30) {
+                // Mute button
+                Button {
+                    Task { await viewModel.toggleMicrophone() }
+                } label: {
+                    Image(systemName: viewModel.isMuted ? "mic.slash.fill" : "mic.fill")
+                        .font(.title2)
+                        .foregroundColor(viewModel.isMuted ? .red : .white)
+                        .frame(width: 60, height: 60)
+                        .background(viewModel.isMuted ? Color.red.opacity(0.3) : Color.white.opacity(0.2))
+                        .clipShape(Circle())
+                }
+                .disabled(viewModel.isLoading)
+                
+                // Video button
+                Button {
+                    Task { await viewModel.toggleCamera() }
+                } label: {
+                    Image(systemName: viewModel.isVideoEnabled ? "video.fill" : "video.slash.fill")
+                        .font(.title2)
+                        .foregroundColor(viewModel.isVideoEnabled ? .white : .red)
+                        .frame(width: 60, height: 60)
+                        .background(viewModel.isVideoEnabled ? Color.white.opacity(0.2) : Color.red.opacity(0.3))
+                        .clipShape(Circle())
+                }
+                .disabled(viewModel.isLoading)
+                
+                // Hang up button
+                Button {
+                    Task {
+                        await viewModel.endCall()
+                        dismiss()
+                    }
+                } label: {
+                    Image(systemName: "phone.down.fill")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                        .frame(width: 60, height: 60)
+                        .background(Color.red)
+                        .clipShape(Circle())
+                }
             }
         }
     }
@@ -263,13 +307,60 @@ struct ParticipantView: View {
     
     var body: some View {
         ZStack {
-            // Video view placeholder - will be replaced with actual video rendering
-            Rectangle()
-                .fill(Color.gray.opacity(0.5))
+            // Video view - actual video rendering from LiveKit
+            if isVideoEnabled, let videoTrack = videoTrack {
+                // TODO: Implement proper VideoView integration with LiveKit track
+                Rectangle()
+                    .fill(Color.blue.opacity(0.3))
+                    .overlay(
+                        VStack {
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(.white)
+                            Text("Video Active")
+                                .foregroundColor(.white)
+                                .font(.caption)
+                        }
+                    )
+                    .cornerRadius(12)
+            } else {
+                // Placeholder when video is disabled
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        VStack {
+                            Image(systemName: "person.circle.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Text(displayName)
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.top, 8)
+                        }
+                    )
+            }
             
             // Participant info overlay
             VStack {
+                // Connection status indicator (top right)
+                HStack {
+                    Spacer()
+                    if !isLocal, participant.connectionQuality != .excellent {
+                        Image(systemName: connectionQualityIcon)
+                            .font(.caption)
+                            .foregroundColor(connectionQualityColor)
+                            .padding(4)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.top, 8)
+                .padding(.trailing, 8)
+                
                 Spacer()
+                
+                // Name and audio indicator (bottom)
                 HStack {
                     Text(displayName)
                         .font(.caption)
@@ -286,6 +377,13 @@ struct ParticipantView: View {
                         Image(systemName: "mic.slash.fill")
                             .font(.caption)
                             .foregroundColor(.red)
+                            .padding(4)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    } else if isLocal || isSpeaking {
+                        Image(systemName: "mic.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
                             .padding(4)
                             .background(Color.black.opacity(0.6))
                             .clipShape(Circle())
@@ -309,6 +407,56 @@ struct ParticipantView: View {
             return (participant as? LocalParticipant)?.isMicrophoneEnabled() ?? false
         } else {
             return !(participant.audioTracks.isEmpty)
+        }
+    }
+    
+    private var isVideoEnabled: Bool {
+        if isLocal {
+            return (participant as? LocalParticipant)?.isCameraEnabled() ?? false
+        } else {
+            return !participant.videoTracks.isEmpty
+        }
+    }
+    
+    private var videoTrack: VideoTrack? {
+        if isLocal {
+            // For local participant, get the camera track
+            if let localParticipant = participant as? LocalParticipant {
+                return localParticipant.videoTracks.first?.track as? VideoTrack
+            }
+        } else if let remoteParticipant = participant as? RemoteParticipant {
+            return remoteParticipant.videoTracks.first?.track as? VideoTrack
+        }
+        return nil
+    }
+    
+    private var isSpeaking: Bool {
+        participant.isSpeaking
+    }
+    
+    private var connectionQualityIcon: String {
+        guard let remoteParticipant = participant as? RemoteParticipant else { return "wifi" }
+        
+        switch remoteParticipant.connectionQuality {
+        case .poor: return "wifi.exclamationmark"
+        case .good: return "wifi"
+        case .excellent: return "wifi"
+        case .unknown: return "wifi"
+        case .lost: return "wifi.slash"
+        @unknown default: return "wifi"
+        }
+    }
+    
+    private var connectionQualityColor: Color {
+        guard let remoteParticipant = participant as? RemoteParticipant else { return .white }
+        
+        switch remoteParticipant.connectionQuality {
+        case .poor: return .red
+        case .good: return .yellow
+        case .excellent: return .green
+        case .unknown: return .white
+        case .lost: return .red
+        @unknown default: return .white
         }
     }
 }

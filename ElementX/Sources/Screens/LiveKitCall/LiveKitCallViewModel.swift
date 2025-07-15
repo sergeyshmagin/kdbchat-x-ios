@@ -39,30 +39,39 @@ final class LiveKitCallViewModel: ObservableObject {
         isLoading = true
         error = nil
         
+        // First, test auth server connectivity if using real authentication
+        MXLog.info("Testing LiveKit authentication server connectivity...")
+        let authTestResult = await callService.authService.testConnection()
+        if !authTestResult {
+            MXLog.warning("Auth server connectivity test failed, but continuing with fallback")
+        }
+        
         // Try connecting with retry mechanism
         var retryCount = 0
         let maxRetries = 3
         
         while retryCount < maxRetries {
             do {
+                MXLog.info("Starting call attempt \(retryCount + 1)/\(maxRetries) for room: \(roomId)")
                 try await callService.startCall(roomId: roomId)
-                MXLog.info("LiveKit call started for room: \(roomId)")
+                MXLog.info("✅ LiveKit call started successfully for room: \(roomId)")
                 isLoading = false
                 return
             } catch let connectionError {
                 retryCount += 1
                 self.error = connectionError as? LiveKitCallError ?? .connectionFailed
-                MXLog.error("Failed to start call (attempt \(retryCount)): \(connectionError)")
+                MXLog.error("❌ Failed to start call (attempt \(retryCount)): \(connectionError)")
                 
                 if retryCount < maxRetries {
-                    MXLog.info("Retrying connection in 2 seconds... (attempt \(retryCount + 1)/\(maxRetries))")
-                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    let waitTime = retryCount * 2 // Progressive backoff: 2s, 4s, 6s
+                    MXLog.info("⏳ Retrying connection in \(waitTime) seconds... (attempt \(retryCount + 1)/\(maxRetries))")
+                    try? await Task.sleep(nanoseconds: UInt64(waitTime) * 1_000_000_000)
                     self.error = nil // Clear error before retry
                 }
             }
         }
         
-        MXLog.error("Failed to connect after \(maxRetries) attempts")
+        MXLog.error("❌ Failed to connect after \(maxRetries) attempts")
         isLoading = false
     }
     

@@ -22,7 +22,7 @@ protocol AutoRecoveryServiceProtocol {
 }
 
 class AutoRecoveryService: AutoRecoveryServiceProtocol {
-    private let keychain = Keychain(service: Bundle.main.bundleIdentifier ?? "io.element.elementx")
+    private let keychain = Keychain(service: Bundle.main.bundleIdentifier ?? "io.sergeyshmagin.kdbchat")
         .accessibility(.whenUnlockedThisDeviceOnly)
     
     private func recoveryKeyKeychainKey(for userID: String) -> String {
@@ -940,7 +940,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     }
     
     private func observeNetworkState() {
-        let reachabilityNotificationIdentifier = "io.element.elementx.reachability.notification"
+        let reachabilityNotificationIdentifier = "io.sergeyshmagin.kdbchat.reachability.notification"
         appMediator.networkMonitor
             .reachabilityPublisher
             .sink { reachability in

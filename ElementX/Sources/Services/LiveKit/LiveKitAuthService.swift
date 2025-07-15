@@ -11,6 +11,7 @@ import Foundation
 
 protocol LiveKitAuthServiceProtocol {
     func getAccessToken(roomId: String) async throws -> String
+    func testConnection() async -> Bool
 }
 
 // MARK: - Data Models
@@ -50,6 +51,13 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
             let mockToken = generateMockJWT(roomId: roomId, participantName: "test-user")
             return mockToken
         }
+    }
+    
+    func testConnection() async -> Bool {
+        MXLog.info("Testing LiveKit auth server connection...")
+        let isReachable = await testServerConnectivity()
+        MXLog.info("Auth server reachability test result: \(isReachable ? "✅ Connected" : "❌ Failed")")
+        return isReachable
     }
     
     // MARK: - Private Methods
@@ -153,6 +161,14 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
     
     private func performAuthRequest(_ authRequest: LiveKitAuthRequest) async throws -> String {
         MXLog.info("Requesting LiveKit token from server: \(authURL)")
+        MXLog.info("Request payload: roomId=\(authRequest.roomId), participantName=\(authRequest.participantName)")
+        
+        // Test server connectivity first
+        let serverReachable = await testServerConnectivity()
+        if !serverReachable {
+            MXLog.warning("Auth server not reachable, using mock token")
+            return generateMockJWT(roomId: authRequest.roomId, participantName: authRequest.participantName)
+        }
         
         // Use real server authentication
         guard let url = URL(string: authURL) else {
@@ -162,32 +178,67 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.timeoutInterval = 10.0 // 10 second timeout for auth
         
         do {
             let requestData = try JSONEncoder().encode(authRequest)
             request.httpBody = requestData
             
+            MXLog.info("Sending auth request to server...")
             let (data, response) = try await URLSession.shared.data(for: request)
             
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                MXLog.error("LiveKit auth request failed with response: \(response)")
-                
-                // Fallback to mock token if server fails
-                MXLog.warning("Server authentication failed, using mock token as fallback")
+            guard let httpResponse = response as? HTTPURLResponse else {
+                MXLog.error("Invalid response type from auth server")
+                return generateMockJWT(roomId: authRequest.roomId, participantName: authRequest.participantName)
+            }
+            
+            MXLog.info("Auth server response status: \(httpResponse.statusCode)")
+            
+            guard httpResponse.statusCode == 200 else {
+                if let responseBody = String(data: data, encoding: .utf8) {
+                    MXLog.error("Auth server error response: \(responseBody)")
+                }
+                MXLog.warning("Server authentication failed with status \(httpResponse.statusCode), using mock token as fallback")
                 return generateMockJWT(roomId: authRequest.roomId, participantName: authRequest.participantName)
             }
             
             let authResponse = try JSONDecoder().decode(LiveKitAuthResponse.self, from: data)
             MXLog.info("LiveKit auth successful for room: \(authRequest.roomId)")
+            MXLog.info("Received token length: \(authResponse.accessToken.count) characters")
             return authResponse.accessToken
             
         } catch {
             MXLog.error("LiveKit authentication error: \(error)")
             
+            // Check if it's a network timeout
+            if let urlError = error as? URLError, urlError.code == .timedOut {
+                MXLog.error("Auth request timed out after 10 seconds")
+            }
+            
             // Fallback to mock token if server fails
             MXLog.warning("Server authentication failed with error: \(error), using mock token as fallback")
             return generateMockJWT(roomId: authRequest.roomId, participantName: authRequest.participantName)
+        }
+    }
+    
+    private func testServerConnectivity() async -> Bool {
+        guard let url = URL(string: authURL) else { return false }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 5.0 // Quick connectivity test
+        
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                MXLog.info("Auth server connectivity test: status \(httpResponse.statusCode)")
+                return httpResponse.statusCode < 500 // Accept any non-server-error response
+            }
+            return false
+        } catch {
+            MXLog.warning("Auth server connectivity test failed: \(error)")
+            return false
         }
     }
 }
@@ -206,5 +257,10 @@ final class MockLiveKitAuthService: LiveKitAuthServiceProtocol {
         
         MXLog.info("Mock LiveKit token generated for room: \(roomId)")
         return mockToken
+    }
+    
+    func testConnection() async -> Bool {
+        MXLog.info("Mock auth service - connection test always returns true")
+        return true
     }
 }

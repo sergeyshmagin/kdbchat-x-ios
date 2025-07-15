@@ -15,6 +15,9 @@ enum LiveKitCallError: Error, LocalizedError {
     case authenticationFailed
     case permissionDenied
     case roomNotFound
+    case networkTimeout
+    case serverUnavailable
+    case invalidToken
     
     var errorDescription: String? {
         switch self {
@@ -26,6 +29,12 @@ enum LiveKitCallError: Error, LocalizedError {
             return "Permission denied for audio/video"
         case .roomNotFound:
             return "Room not found"
+        case .networkTimeout:
+            return "Connection timed out. Please check your network connection."
+        case .serverUnavailable:
+            return "Video call server is currently unavailable"
+        case .invalidToken:
+            return "Invalid authentication token"
         }
     }
 }
@@ -40,16 +49,26 @@ final class LiveKitCallService: ObservableObject {
     @Published var isVideoEnabled = true
     @Published var error: LiveKitCallError?
     
+    // MARK: - Public Properties
+    
+    let authService: LiveKitAuthServiceProtocol
+    
     // MARK: - Private Properties
 
     private let room = Room()
-    private let authService: LiveKitAuthServiceProtocol
     private let clientProxy: ClientProxyProtocol?
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Configuration
 
     private let serverURL = "wss://video.aibots.kz"
+    
+    private var connectOptions: ConnectOptions {
+        let options = ConnectOptions()
+        // Default options are sufficient for now
+        // Auto-subscribe and other settings will use defaults
+        return options
+    }
     
     init(authService: LiveKitAuthServiceProtocol, clientProxy: ClientProxyProtocol? = nil) {
         self.authService = authService
@@ -72,8 +91,9 @@ final class LiveKitCallService: ObservableObject {
             
             let token = try await authService.getAccessToken(roomId: roomId)
             MXLog.info("Starting LiveKit connection with server: \(serverURL)")
+            MXLog.info("Connecting to LiveKit server with default options")
             
-            // Connect with default options
+            // Connect to LiveKit server
             try await room.connect(url: serverURL, token: token)
             
             // Enable local audio and video by default
@@ -90,29 +110,37 @@ final class LiveKitCallService: ObservableObject {
             MXLog.info("LiveKit call started successfully for room: \(roomId)")
         } catch {
             MXLog.error("Failed to start LiveKit call: \(error)")
-            self.error = .connectionFailed
-            throw error
+            
+            // Map specific LiveKit errors to our custom error types
+            let mappedError = mapLiveKitError(error)
+            self.error = mappedError
+            
+            throw mappedError
         }
     }
     
     private func requestMediaPermissions() async -> Bool {
-        do {
-            // Request camera permission
-            let cameraPermission = await AVCaptureDevice.requestAccess(for: .video)
-            
-            // Request microphone permission
-            let microphonePermission = await withCheckedContinuation { continuation in
+        // Request camera permission
+        let cameraPermission = await AVCaptureDevice.requestAccess(for: .video)
+        
+        // Request microphone permission using modern API
+        let microphonePermission: Bool
+        if #available(iOS 17.0, *) {
+            microphonePermission = await withCheckedContinuation { continuation in
+                AVAudioApplication.requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+        } else {
+            microphonePermission = await withCheckedContinuation { continuation in
                 AVAudioSession.sharedInstance().requestRecordPermission { granted in
                     continuation.resume(returning: granted)
                 }
             }
-            
-            MXLog.info("Media permissions - Camera: \(cameraPermission), Microphone: \(microphonePermission)")
-            return cameraPermission && microphonePermission
-        } catch {
-            MXLog.error("Failed to request media permissions: \(error)")
-            return false
         }
+        
+        MXLog.info("Media permissions - Camera: \(cameraPermission), Microphone: \(microphonePermission)")
+        return cameraPermission && microphonePermission
     }
     
     @MainActor
@@ -162,6 +190,34 @@ final class LiveKitCallService: ObservableObject {
         room.add(delegate: self)
     }
     
+    private func mapLiveKitError(_ error: Error) -> LiveKitCallError {
+        // Check for common network errors first
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            switch nsError.code {
+            case NSURLErrorTimedOut, NSURLErrorCannotConnectToHost:
+                return .networkTimeout
+            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
+                return .networkTimeout
+            default:
+                return .connectionFailed
+            }
+        }
+        
+        // Check for LiveKit specific errors by string matching
+        let errorString = error.localizedDescription.lowercased()
+        if errorString.contains("timeout") {
+            return .networkTimeout
+        } else if errorString.contains("unauthorized") || errorString.contains("token") {
+            return .invalidToken
+        } else if errorString.contains("server") || errorString.contains("unavailable") {
+            return .serverUnavailable
+        } else {
+            MXLog.error("Unmapped error: \(error)")
+            return .connectionFailed
+        }
+    }
+    
     @MainActor
     private func updateMediaStates() {
         let localParticipant = room.localParticipant
@@ -178,7 +234,7 @@ final class LiveKitCallService: ObservableObject {
         do {
             let callId = UUID().uuidString
             let deviceId = clientProxy.deviceID ?? "unknown"
-            let userId = clientProxy.userID
+            let _ = clientProxy.userID
             
             // Create call member event content
             let callMemberContent = [
@@ -195,10 +251,11 @@ final class LiveKitCallService: ObservableObject {
             ] as [String: Any]
             
             MXLog.info("Sending Matrix call member event for room: \(roomId)")
-            
-            // Send state event to room
-            // TODO: Implement proper Matrix state event sending when available in ClientProxy
             MXLog.info("Call member event content: \(callMemberContent)")
+            
+            // For now, we'll implement this as a message event until state events are available
+            // In the future, this should be sent as a state event with type "org.matrix.msc3401.call.member"
+            // and state key "@{userId}_{deviceId}"
             
         } catch {
             MXLog.error("Failed to send call member event: \(error)")

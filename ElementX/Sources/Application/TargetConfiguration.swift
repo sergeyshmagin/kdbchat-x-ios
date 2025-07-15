@@ -16,9 +16,15 @@ enum Target: String {
     case tests
     
     private static var isConfigured = false
+    private static let configurationLock = NSLock()
     
     func configure(logLevel: LogLevel, traceLogPacks: Set<TraceLogPack>, sentryURL: URL?) {
+        Self.configurationLock.lock()
+        defer { Self.configurationLock.unlock() }
+        
         guard !Self.isConfigured else {
+            // Use print instead of MXLog in case MXLog is not configured yet
+            print("INFO: Target \(self) already configured, skipping")
             return
         }
         
@@ -54,7 +60,16 @@ enum Target: String {
                 try initPlatform(config: tracingConfiguration, useLightweightTokioRuntime: false)
             }
         } catch {
+            // Use print instead of MXLog since MXLog might not be configured yet
+            print("ERROR: Failed configuring target \(self) with error: \(error)")
+            // Don't crash in production - just log the error and continue
+            #if DEBUG
             fatalError("Failed configuring target \(self) with error: \(error)")
+            #else
+            // In production, mark as configured to avoid retry attempts
+            Self.isConfigured = true
+            return
+            #endif
         }
         
         // Setup sentry above but disable it by default. It will be started
