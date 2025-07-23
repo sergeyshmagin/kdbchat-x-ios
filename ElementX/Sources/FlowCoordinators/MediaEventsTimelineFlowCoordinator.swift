@@ -62,7 +62,8 @@ class MediaEventsTimelineFlowCoordinator: FlowCoordinatorProtocol {
     private func presentMediaEventsTimeline() async {
         let timelineItemFactory = RoomTimelineItemFactory(userID: userSession.clientProxy.userID,
                                                           attributedStringBuilder: AttributedStringBuilder(mentionBuilder: MentionBuilder()),
-                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userSession.clientProxy.userID))
+                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userSession.clientProxy.userID),
+                                                          roomID: roomProxy.id)
         
         guard case let .success(mediaTimelineController) = await timelineControllerFactory.buildMessageFilteredTimelineController(focus: .live,
                                                                                                                                   allowedMessageTypes: [.image, .video],

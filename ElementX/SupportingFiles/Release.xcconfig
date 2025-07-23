@@ -1,0 +1,14 @@
+// Release configuration overrides
+// Helps with dSYM symbol upload issues
+
+// Ensure dSYM files are generated for all frameworks
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+
+// Strip debugging symbols from external frameworks to reduce upload size
+STRIP_STYLE = non-global
+
+// Enable symbol visibility for better crash reporting
+GCC_SYMBOLS_PRIVATE_EXTERN = NO
+
+// Optimize for better symbol generation
+ENABLE_BITCODE = NO

@@ -12,6 +12,7 @@ import MatrixRustSDK
 import SwiftUI
 
 #if LIVEKIT_ENABLED
+import CallKit
 import LiveKit
 #endif
 
@@ -27,12 +28,21 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     private let navigationRootCoordinator: NavigationRootCoordinator
     private let navigationSplitCoordinator: NavigationSplitCoordinator
     private let bugReportService: BugReportServiceProtocol
+    #if LIVEKIT_ENABLED
+    // LiveKit services are passed to initializer
+    #else
     private let elementCallService: ElementCallServiceProtocol
+    #endif
     private let appMediator: AppMediatorProtocol
+    
+    #if LIVEKIT_ENABLED
+    private let liveKitCallKitService: LiveKitCallKitService
+    #endif
     private let appSettings: AppSettings
     private let appHooks: AppHooks
     private let analytics: AnalyticsService
     private let notificationManager: NotificationManagerProtocol
+    private let badgeCountService: BadgeCountServiceProtocol
     
     private let stateMachine: UserSessionFlowCoordinatorStateMachine
     
@@ -68,6 +78,73 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     /// For testing purposes.
     var statePublisher: AnyPublisher<UserSessionFlowCoordinatorStateMachine.State, Never> { stateMachine.statePublisher }
     
+#if LIVEKIT_ENABLED
+    init(userSession: UserSessionProtocol,
+         navigationRootCoordinator: NavigationRootCoordinator,
+         appLockService: AppLockServiceProtocol,
+         bugReportService: BugReportServiceProtocol,
+         liveKitAuthService: LiveKitAuthServiceProtocol,
+         liveKitCallKitService: LiveKitCallKitService,
+         timelineControllerFactory: TimelineControllerFactoryProtocol,
+         appMediator: AppMediatorProtocol,
+         appSettings: AppSettings,
+         appHooks: AppHooks,
+         analytics: AnalyticsService,
+         notificationManager: NotificationManagerProtocol,
+         badgeCountService: BadgeCountServiceProtocol,
+         isNewLogin: Bool) {
+        stateMachine = UserSessionFlowCoordinatorStateMachine()
+        self.userSession = userSession
+        self.navigationRootCoordinator = navigationRootCoordinator
+        self.bugReportService = bugReportService
+        self.liveKitCallKitService = liveKitCallKitService
+        self.timelineControllerFactory = timelineControllerFactory
+        self.appMediator = appMediator
+        self.appSettings = appSettings
+        self.appHooks = appHooks
+        self.analytics = analytics
+        self.notificationManager = notificationManager
+        self.badgeCountService = badgeCountService
+        
+        navigationSplitCoordinator = NavigationSplitCoordinator(placeholderCoordinator: PlaceholderScreenCoordinator())
+        
+        sidebarNavigationStackCoordinator = NavigationStackCoordinator(navigationSplitCoordinator: navigationSplitCoordinator)
+        detailNavigationStackCoordinator = NavigationStackCoordinator(navigationSplitCoordinator: navigationSplitCoordinator)
+        
+        navigationSplitCoordinator.setSidebarCoordinator(sidebarNavigationStackCoordinator)
+                
+        settingsFlowCoordinator = SettingsFlowCoordinator(parameters: .init(userSession: userSession,
+                                                                            windowManager: appMediator.windowManager,
+                                                                            appLockService: appLockService,
+                                                                            bugReportService: bugReportService,
+                                                                            notificationSettings: userSession.clientProxy.notificationSettings,
+                                                                            secureBackupController: userSession.clientProxy.secureBackupController,
+                                                                            appSettings: appSettings,
+                                                                            navigationSplitCoordinator: navigationSplitCoordinator,
+                                                                            userIndicatorController: ServiceLocator.shared.userIndicatorController,
+                                                                            analytics: analytics))
+        
+        onboardingFlowCoordinator = OnboardingFlowCoordinator(userSession: userSession,
+                                                              appLockService: appLockService,
+                                                              analyticsService: analytics,
+                                                              appSettings: appSettings,
+                                                              notificationManager: notificationManager,
+                                                              navigationStackCoordinator: detailNavigationStackCoordinator,
+                                                              userIndicatorController: ServiceLocator.shared.userIndicatorController,
+                                                              windowManager: appMediator.windowManager,
+                                                              isNewLogin: isNewLogin)
+        
+        setupStateMachine()
+        
+        setupObservers()
+        
+        // Reset the forced PIN unlock flag.
+        if isNewLogin {
+            // Note: biometricUnlockTrust property might not be available in all AppLockService implementations
+            // appLockService.biometricUnlockTrust = .trusted
+        }
+    }
+    #else
     init(userSession: UserSessionProtocol,
          navigationRootCoordinator: NavigationRootCoordinator,
          appLockService: AppLockServiceProtocol,
@@ -79,6 +156,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
          appHooks: AppHooks,
          analytics: AnalyticsService,
          notificationManager: NotificationManagerProtocol,
+         badgeCountService: BadgeCountServiceProtocol,
          isNewLogin: Bool) {
         stateMachine = UserSessionFlowCoordinatorStateMachine()
         self.userSession = userSession
@@ -91,6 +169,11 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         self.appHooks = appHooks
         self.analytics = analytics
         self.notificationManager = notificationManager
+        self.badgeCountService = badgeCountService
+        
+        #if LIVEKIT_ENABLED
+        liveKitCallKitService = LiveKitCallKitService()
+        #endif
         
         navigationSplitCoordinator = NavigationSplitCoordinator(placeholderCoordinator: PlaceholderScreenCoordinator())
         
@@ -124,6 +207,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         
         setupObservers()
     }
+    #endif
     
     func start() {
         stateMachine.processEvent(.start)
@@ -282,7 +366,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 } else {
                     Task { await self.startRoomFlow(roomID: roomID, via: via, entryPoint: entryPoint, animated: animated) }
                 }
+                #if !LIVEKIT_ENABLED
                 hideCallScreenOverlay() // Turn any active call into a PiP so that navigation from a notification is visible to the user.
+                #endif
             case(.roomList, .deselectRoom, .roomList):
                 dismissRoomFlow(animated: animated)
                                 
@@ -428,6 +514,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             }
             .store(in: &cancellables)
         
+        #if !LIVEKIT_ENABLED
         elementCallService.actions
             .receive(on: DispatchQueue.main)
             .sink { [weak self] action in
@@ -439,6 +526,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 }
             }
             .store(in: &cancellables)
+        #endif
         
         onboardingFlowCoordinator.actions
             .sink { [weak self] action in
@@ -548,6 +636,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                                                          appSettings: appSettings,
                                                          analyticsService: analytics,
                                                          notificationManager: notificationManager,
+                                                         badgeCountService: badgeCountService,
                                                          userIndicatorController: ServiceLocator.shared.userIndicatorController)
         let coordinator = HomeScreenCoordinator(parameters: parameters)
         MXLog.info("HomeScreenCoordinator created successfully")
@@ -706,20 +795,26 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                                via: [String],
                                entryPoint: RoomFlowCoordinatorEntryPoint,
                                animated: Bool) async {
+        #if LIVEKIT_ENABLED
+        let ongoingCallRoomIDPublisher = CurrentValueSubject<String?, Never>(nil).asCurrentValuePublisher()
+        #else
+        let ongoingCallRoomIDPublisher = elementCallService.ongoingCallRoomIDPublisher
+        #endif
+        
         let coordinator = await RoomFlowCoordinator(roomID: roomID,
                                                     userSession: userSession,
                                                     isChildFlow: false,
                                                     timelineControllerFactory: timelineControllerFactory,
                                                     navigationStackCoordinator: detailNavigationStackCoordinator,
                                                     emojiProvider: EmojiProvider(appSettings: appSettings),
-                                                    ongoingCallRoomIDPublisher: elementCallService.ongoingCallRoomIDPublisher,
+                                                    ongoingCallRoomIDPublisher: ongoingCallRoomIDPublisher,
                                                     appMediator: appMediator,
                                                     appSettings: appSettings,
                                                     appHooks: appHooks,
                                                     analytics: analytics,
                                                     userIndicatorController: ServiceLocator.shared.userIndicatorController)
         
-        coordinator.actions.sink { [weak self] action in
+        coordinator.actions.sink { [weak self] (action: RoomFlowCoordinatorAction) in
             guard let self else { return }
             
             switch action {
@@ -742,13 +837,13 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         
         switch entryPoint {
         case .room:
-            coordinator.handleAppRoute(.room(roomID: roomID, via: via), animated: animated)
+            coordinator.handleAppRoute(AppRoute.room(roomID: roomID, via: via), animated: animated)
         case .eventID(let eventID):
-            coordinator.handleAppRoute(.event(eventID: eventID, roomID: roomID, via: via), animated: animated)
+            coordinator.handleAppRoute(AppRoute.event(eventID: eventID, roomID: roomID, via: via), animated: animated)
         case .roomDetails:
-            coordinator.handleAppRoute(.roomDetails(roomID: roomID), animated: animated)
+            coordinator.handleAppRoute(AppRoute.roomDetails(roomID: roomID), animated: animated)
         case .share(let payload):
-            coordinator.handleAppRoute(.share(payload), animated: animated)
+            coordinator.handleAppRoute(AppRoute.share(payload), animated: animated)
         }
                 
         Task {
@@ -803,7 +898,12 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     // MARK: Calls
     
     private func presentCallScreen(genericCallLink url: URL) {
+        #if LIVEKIT_ENABLED
+        // LiveKit doesn't support generic call links yet
+        MXLog.warning("Generic call links not supported with LiveKit integration")
+        #else
         presentCallScreen(configuration: .init(genericCallLink: url))
+        #endif
     }
     
     private func presentCallScreen(roomID: String, notifyOtherParticipants: Bool) async {
@@ -831,37 +931,26 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     
     #if LIVEKIT_ENABLED
     private func presentLiveKitCallScreen(roomProxy: JoinedRoomProxyProtocol) {
+        MXLog.info("Presenting LiveKit call screen for room: \(roomProxy.id)")
+        
         let authService = LiveKitAuthService(clientProxy: userSession.clientProxy)
-        let callScreen = LiveKitCallScreen(roomId: roomProxy.id, authService: authService)
+        let liveKitCallCoordinator = LiveKitCallCoordinator(roomId: roomProxy.id, authService: authService)
         
-        let coordinator = LiveKitCallScreenCoordinator(callScreen: callScreen)
+        liveKitCallCoordinator.actionsPublisher
+            .sink { [weak self] action in
+                guard let self else { return }
+                switch action {
+                case .dismiss:
+                    navigationSplitCoordinator.setOverlayCoordinator(nil)
+                }
+            }
+            .store(in: &cancellables)
         
-        navigationSplitCoordinator.setSheetCoordinator(coordinator, animated: true) { [weak self] in
-            // Cleanup when call screen is dismissed
-        }
-    }
-    
-    private class LiveKitCallScreenCoordinator: CoordinatorProtocol {
-        private let callScreen: LiveKitCallScreen
-        
-        init(callScreen: LiveKitCallScreen) {
-            self.callScreen = callScreen
-        }
-        
-        func start() {
-            // Implementation not needed for this simple coordinator
-        }
-        
-        func stop() {
-            // Implementation not needed for this simple coordinator
-        }
-        
-        func toPresentable() -> AnyView {
-            AnyView(callScreen)
-        }
+        navigationSplitCoordinator.setOverlayCoordinator(liveKitCallCoordinator, animated: true)
     }
     #endif
     
+    #if !LIVEKIT_ENABLED
     private var callScreenPictureInPictureController: AVPictureInPictureController?
     private func presentCallScreen(configuration: ElementCallConfiguration) {
         guard elementCallService.ongoingCallRoomIDPublisher.value != configuration.callRoomID else {
@@ -918,6 +1007,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         
         navigationSplitCoordinator.setOverlayCoordinator(nil)
     }
+    #endif
     
     // MARK: Secure backup
     

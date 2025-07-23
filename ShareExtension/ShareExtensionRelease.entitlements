@@ -6,9 +6,5 @@
 	<array>
 		<string>group.io.sergeyshmagin.kdbchat</string>
 	</array>
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(KEYCHAIN_ACCESS_GROUP_IDENTIFIER)</string>
-	</array>
 </dict>
 </plist>

@@ -205,6 +205,7 @@ struct HomeScreenRoomCell_Previews: PreviewProvider, TestablePreview {
                                    appSettings: ServiceLocator.shared.settings,
                                    analyticsService: ServiceLocator.shared.analytics,
                                    notificationManager: NotificationManagerMock(),
+                                   badgeCountService: BadgeCountService(appSettings: ServiceLocator.shared.settings),
                                    userIndicatorController: ServiceLocator.shared.userIndicatorController)
     }
 }

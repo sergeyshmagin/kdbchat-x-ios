@@ -66,13 +66,13 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>To take pictures or videos and send them as a message $(APP_DISPLAY_NAME) needs access to the camera.</string>
+	<string>To take pictures or videos, send them as messages, and make video calls $(APP_DISPLAY_NAME) needs access to the camera.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Face ID is used to access your app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Grant location access so that $(APP_DISPLAY_NAME) can share your location.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>To record and send messages with audio, $(APP_DISPLAY_NAME) needs to access the microphone.</string>
+	<string>To record and send messages with audio, and make voice/video calls $(APP_DISPLAY_NAME) needs to access the microphone.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This lets you save images and videos to your photo library.</string>
 	<key>NSUserActivityTypes</key>
@@ -86,6 +86,7 @@
 		<string>fetch</string>
 		<string>processing</string>
 		<string>voip</string>
+		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>

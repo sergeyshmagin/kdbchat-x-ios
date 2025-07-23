@@ -18,7 +18,8 @@ class TimelineItemFactoryTests: XCTestCase {
 
         let factory = RoomTimelineItemFactory(userID: ownUserID,
                                               attributedStringBuilder: AttributedStringBuilder(mentionBuilder: MentionBuilder()),
-                                              stateEventStringBuilder: RoomStateEventStringBuilder(userID: ownUserID))
+                                              stateEventStringBuilder: RoomStateEventStringBuilder(userID: ownUserID),
+                                              roomID: "!test:matrix.org")
         
         let eventTimelineItem = EventTimelineItem.mockCallInvite(sender: senderUserID)
         

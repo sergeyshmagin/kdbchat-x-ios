@@ -9,6 +9,8 @@ import Foundation
 
 enum DeveloperOptionsScreenViewModelAction {
     case clearCache
+    case checkNotificationPermissions
+    case requestNotificationPermissions
 }
 
 struct DeveloperOptionsScreenViewState: BindableState {
@@ -33,6 +35,8 @@ struct DeveloperOptionsScreenViewStateBindings {
 
 enum DeveloperOptionsScreenViewAction {
     case clearCache
+    case checkNotificationPermissions
+    case requestNotificationPermissions
 }
 
 protocol DeveloperOptionsProtocol: AnyObject {

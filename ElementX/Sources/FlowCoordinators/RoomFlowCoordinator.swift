@@ -4,13 +4,23 @@
 // SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 // Please see LICENSE files in the repository root for full details.
 //
+// Note: This coordinator delegates call presentation to UserSessionFlowCoordinator
+// which handles the actual implementation using LiveKit or ElementCall based on build configuration.
+//
 
 import Combine
 import SwiftState
 import SwiftUI
 import UserNotifications
 
+#if LIVEKIT_ENABLED
+// LiveKit imports for call functionality
+import LiveKit
+#endif
+
 enum RoomFlowCoordinatorAction: Equatable {
+    /// Request to present call screen for the given room
+    /// The actual implementation (LiveKit or ElementCall) is handled by UserSessionFlowCoordinator
     case presentCallScreen(roomProxy: JoinedRoomProxyProtocol)
     case verifyUser(userID: String)
     case finished
@@ -199,6 +209,9 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
         }
     }
     
+    /// Presents the call screen for the specified room
+    /// This method delegates to UserSessionFlowCoordinator which handles 
+    /// the actual presentation using either LiveKit or ElementCall based on build configuration
     private func presentCallScreen(roomID: String) async {
         guard case let .joined(roomProxy) = await userSession.clientProxy.roomForIdentifier(roomID) else {
             return
@@ -491,7 +504,8 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
         let userID = userSession.clientProxy.userID
         let timelineItemFactory = RoomTimelineItemFactory(userID: userID,
                                                           attributedStringBuilder: AttributedStringBuilder(mentionBuilder: MentionBuilder()),
-                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userID))
+                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userID),
+                                                          roomID: roomProxy.id)
         let timelineController = timelineControllerFactory.buildTimelineController(roomProxy: roomProxy,
                                                                                    initialFocussedEventID: presentationAction?.focusedEvent?.eventID,
                                                                                    timelineItemFactory: timelineItemFactory,
@@ -581,7 +595,8 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
         
         let timelineItemFactory = RoomTimelineItemFactory(userID: userSession.clientProxy.userID,
                                                           attributedStringBuilder: AttributedStringBuilder(mentionBuilder: MentionBuilder()),
-                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userSession.clientProxy.userID))
+                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userSession.clientProxy.userID),
+                                                          roomID: roomProxy.id)
         
         guard let threadRootEventID = itemID.eventID else {
             fatalError("Invalid thread event ID")
@@ -1117,7 +1132,8 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
         
         let timelineItemFactory = RoomTimelineItemFactory(userID: userID,
                                                           attributedStringBuilder: AttributedStringBuilder(mentionBuilder: MentionBuilder()),
-                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userID))
+                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userID),
+                                                          roomID: roomProxy.id)
                 
         let timelineController = timelineControllerFactory.buildTimelineController(roomProxy: roomProxy,
                                                                                    initialFocussedEventID: nil,
@@ -1160,6 +1176,7 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
             case .openDirectChat(let roomID):
                 stateMachine.tryEvent(.startChildFlow(roomID: roomID, via: [], entryPoint: .room))
             case .startCall(let roomID):
+                // Start call using LiveKit or ElementCall based on build configuration
                 Task { await self.presentCallScreen(roomID: roomID) }
             case .verifyUser(let userID):
                 actionsSubject.send(.verifyUser(userID: userID))
@@ -1187,6 +1204,7 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
             case .openDirectChat(let roomID):
                 stateMachine.tryEvent(.startChildFlow(roomID: roomID, via: [], entryPoint: .room))
             case .startCall(let roomID):
+                // Start call using LiveKit or ElementCall based on build configuration
                 Task { await self.presentCallScreen(roomID: roomID) }
             case .dismiss:
                 break // Not supported when pushed.

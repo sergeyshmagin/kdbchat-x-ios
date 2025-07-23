@@ -64,35 +64,43 @@ class NotificationServiceExtension: UNNotificationServiceExtension {
         }
         
         Task {
-            await Target.nse.configure(logLevel: settings.logLevel,
-                                       traceLogPacks: settings.traceLogPacks,
-                                       sentryURL: nil)
-            
-            MXLog.info("\(tag) #########################################")
-            
-            ExtensionLogger.logMemory(with: tag)
-            
-            MXLog.info("\(tag) Received payload: \(request.content.userInfo)")
-            
             do {
-                let userSession = try await NSEUserSession(credentials: credentials,
-                                                           roomID: roomID,
-                                                           clientSessionDelegate: keychainController,
-                                                           appHooks: appHooks,
-                                                           appSettings: settings)
+                await Target.nse.configure(logLevel: settings.logLevel,
+                                           traceLogPacks: settings.traceLogPacks,
+                                           sentryURL: nil)
                 
-                notificationHandler = NotificationHandler(userSession: userSession,
-                                                          settings: settings,
-                                                          contentHandler: contentHandler,
-                                                          notificationContent: mutableContent,
-                                                          tag: tag)
+                MXLog.info("\(tag) #########################################")
                 
                 ExtensionLogger.logMemory(with: tag)
-                MXLog.info("\(tag) Configured user session")
                 
-                await notificationHandler?.processEvent(eventID, roomID: roomID)
+                MXLog.info("\(tag) Received payload: \(request.content.userInfo)")
+                
+                do {
+                    let userSession = try await NSEUserSession(credentials: credentials,
+                                                               roomID: roomID,
+                                                               clientSessionDelegate: keychainController,
+                                                               appHooks: appHooks,
+                                                               appSettings: settings)
+                    
+                    notificationHandler = NotificationHandler(userSession: userSession,
+                                                              settings: settings,
+                                                              contentHandler: contentHandler,
+                                                              notificationContent: mutableContent,
+                                                              tag: tag)
+                    
+                    ExtensionLogger.logMemory(with: tag)
+                    MXLog.info("\(tag) Configured user session")
+                    
+                    await notificationHandler?.processEvent(eventID, roomID: roomID)
+                } catch {
+                    MXLog.error("\(tag) Failed creating user session with error: \(error)")
+                    // Deliver the original notification as fallback
+                    contentHandler(request.content)
+                }
             } catch {
-                MXLog.error("Failed creating user session with error: \(error)")
+                MXLog.error("\(tag) Critical error in NSE: \(error)")
+                // Deliver the original notification as final fallback
+                contentHandler(request.content)
             }
         }
     }

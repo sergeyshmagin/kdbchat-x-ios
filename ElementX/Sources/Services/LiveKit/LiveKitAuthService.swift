@@ -5,6 +5,7 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
+#if LIVEKIT_ENABLED
 import Foundation
 
 // MARK: - Protocol
@@ -12,6 +13,7 @@ import Foundation
 protocol LiveKitAuthServiceProtocol {
     func getAccessToken(roomId: String) async throws -> String
     func testConnection() async -> Bool
+    func configure(userSession: UserSessionProtocol)
 }
 
 // MARK: - Data Models
@@ -30,7 +32,7 @@ struct LiveKitAuthResponse: Codable {
 // MARK: - Service Implementation
 
 final class LiveKitAuthService: LiveKitAuthServiceProtocol {
-    private let clientProxy: ClientProxyProtocol?
+    private var clientProxy: ClientProxyProtocol?
     
     // MARK: - Configuration
 
@@ -38,6 +40,11 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
     
     init(clientProxy: ClientProxyProtocol? = nil) {
         self.clientProxy = clientProxy
+    }
+    
+    func configure(userSession: UserSessionProtocol) {
+        self.clientProxy = userSession.clientProxy
+        MXLog.info("LiveKit auth service configured with user session")
     }
     
     func getAccessToken(roomId: String) async throws -> String {
@@ -246,6 +253,11 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
 // MARK: - Mock Implementation for Testing
 
 final class MockLiveKitAuthService: LiveKitAuthServiceProtocol {
+    func configure(userSession: UserSessionProtocol) {
+        // Mock implementation - no configuration needed
+        MXLog.info("Mock LiveKit auth service configured")
+    }
+    
     func getAccessToken(roomId: String) async throws -> String {
         // Return a mock JWT token for testing
         // In a real implementation, this would be a proper JWT
@@ -264,3 +276,4 @@ final class MockLiveKitAuthService: LiveKitAuthServiceProtocol {
         return true
     }
 }
+#endif

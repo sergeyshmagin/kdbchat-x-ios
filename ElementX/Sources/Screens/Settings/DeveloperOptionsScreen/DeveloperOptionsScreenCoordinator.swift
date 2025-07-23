@@ -7,6 +7,7 @@
 
 import Combine
 import SwiftUI
+import UserNotifications
 
 enum DeveloperOptionsScreenCoordinatorAction {
     case clearCache
@@ -33,6 +34,10 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
                 switch action {
                 case .clearCache:
                     actionsSubject.send(.clearCache)
+                case .checkNotificationPermissions:
+                    Task { await self.checkNotificationPermissions() }
+                case .requestNotificationPermissions:
+                    Task { await self.requestNotificationPermissions() }
                 }
             }
             .store(in: &cancellables)
@@ -40,5 +45,94 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
     
     func toPresentable() -> AnyView {
         AnyView(DeveloperOptionsScreen(context: viewModel.context))
+    }
+    
+    // MARK: - Notification Permissions Debugging
+    
+    private func checkNotificationPermissions() async {
+        let center = UNUserNotificationCenter.current()
+        let authStatus = await center.authorizationStatus()
+        let settings = await center.notificationSettings()
+        let appSettings = ServiceLocator.shared.settings
+        
+        let message = """
+        🔔 NOTIFICATION PERMISSIONS STATUS:
+        
+        📱 Authorization: \(authStatus.description)
+        🎵 Sound: \(settings.soundSetting.description)
+        🚨 Alert: \(settings.alertSetting.description)
+        🔴 Badge: \(settings.badgeSetting.description)
+        📢 Notification Center: \(settings.notificationCenterSetting.description)
+        🔒 Lock Screen: \(settings.lockScreenSetting.description)
+        
+        ⚙️ App Settings:
+        • Enable Notifications: \(appSettings?.enableNotifications ?? false)
+        • Hide Badge: \(appSettings?.hideUnreadMessagesBadge ?? false)
+        • Enable In-App: \(appSettings?.enableInAppNotifications ?? false)
+        
+        📋 Next Steps:
+        \(authStatus == .authorized ? "✅ Permissions granted!" : "❌ Go to iOS Settings → [App] → Notifications")
+        """
+        
+        await MainActor.run {
+            print("📱 \(message)")
+        }
+        
+        MXLog.info(message)
+    }
+    
+    private func requestNotificationPermissions() async {
+        let center = UNUserNotificationCenter.current()
+        
+        do {
+            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
+            let message = granted ? 
+                "✅ Notification permissions granted!" : 
+                "❌ Notification permissions denied. Check iOS Settings → [App] → Notifications"
+                
+            await MainActor.run {
+                print("📱 \(message)")
+            }
+            
+            MXLog.info("🔔 Notification permission request result: \(granted)")
+            
+            if granted {
+                // Register for remote notifications
+                // Note: NotificationManager access would need to be added to ServiceLocator
+                print("📱 Would register for remote notifications here")
+            }
+        } catch {
+            MXLog.error("🔔 Notification permission request failed: \(error)")
+            
+            await MainActor.run {
+                print("📱 Permission Request Failed: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
+// MARK: - Extensions
+
+extension UNAuthorizationStatus {
+    var description: String {
+        switch self {
+        case .notDetermined: return "Not Determined"
+        case .denied: return "Denied ❌"
+        case .authorized: return "Authorized ✅"
+        case .provisional: return "Provisional"
+        case .ephemeral: return "Ephemeral"
+        @unknown default: return "Unknown"
+        }
+    }
+}
+
+extension UNNotificationSetting {
+    var description: String {
+        switch self {
+        case .notSupported: return "Not Supported"
+        case .disabled: return "Disabled ❌"
+        case .enabled: return "Enabled ✅"
+        @unknown default: return "Unknown"
+        }
     }
 }

@@ -125,6 +125,7 @@ struct HomeScreenRecoveryKeyConfirmationBanner_Previews: PreviewProvider, Testab
                                    appSettings: ServiceLocator.shared.settings,
                                    analyticsService: ServiceLocator.shared.analytics,
                                    notificationManager: NotificationManagerMock(),
+                                   badgeCountService: BadgeCountService(appSettings: ServiceLocator.shared.settings),
                                    userIndicatorController: ServiceLocator.shared.userIndicatorController)
     }
 }

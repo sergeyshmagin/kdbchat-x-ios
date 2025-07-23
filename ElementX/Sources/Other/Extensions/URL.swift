@@ -19,12 +19,16 @@ extension URL: @retroactive ExpressibleByStringLiteral {
     /// The URL of the primary app group container.
     static var appGroupContainerDirectory: URL {
         guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: InfoPlistReader.main.appGroupIdentifier) else {
-            MXLog.error("Application Group unavailable, falling back to the application folder")
+            print("Application Group unavailable, falling back to the application folder")
             // Browserstack doesn't properly handle AppGroup entitlements so this fails, presumably because of the resigning happening on their side
             // Try using the normal app folder instead of the app group
             // https://www.browserstack.com/docs/app-automate/appium/troubleshooting/entitlements-error
             
-            return URL.applicationSupportDirectory.deletingLastPathComponent().deletingLastPathComponent()
+            // Use Documents directory as fallback which should always be available
+            guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                fatalError("Unable to access Documents directory")
+            }
+            return documentsURL.deletingLastPathComponent()
         }
         
         return url

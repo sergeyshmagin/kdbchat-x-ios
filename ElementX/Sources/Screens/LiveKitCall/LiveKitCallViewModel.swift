@@ -5,9 +5,12 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
+#if LIVEKIT_ENABLED
+import AVFoundation
 import Combine
 import Foundation
 import LiveKit
+import SwiftUI
 
 @MainActor
 final class LiveKitCallViewModel: ObservableObject {
@@ -20,6 +23,10 @@ final class LiveKitCallViewModel: ObservableObject {
     @Published var isVideoEnabled = true
     @Published var error: LiveKitCallError?
     @Published var isLoading = false
+    @Published var isSpeakerOn = false
+    @Published var isScreenSharing = false
+    @Published var cameraFlipAngle: Double = 0
+    @Published var callState: CallState = .idle
     
     // MARK: - Private Properties
 
@@ -119,6 +126,10 @@ final class LiveKitCallViewModel: ObservableObject {
         callService.$error
             .receive(on: DispatchQueue.main)
             .assign(to: &$error)
+            
+        callService.$callState
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$callState)
     }
 }
 
@@ -144,4 +155,45 @@ extension LiveKitCallViewModel {
             return "Disconnected"
         }
     }
+    
+    // MARK: - Enhanced UI Functions
+    
+    func toggleSpeaker() async {
+        // Toggle speaker/earpiece
+        isSpeakerOn.toggle()
+        
+        // Configure audio session through CallService
+        await callService.setSpeakerEnabled(isSpeakerOn)
+        MXLog.info("Audio output switched to: \(isSpeakerOn ? "speaker" : "earpiece")")
+    }
+    
+    func flipCamera() async {
+        // Animate camera flip
+        withAnimation(.easeInOut(duration: 0.3)) {
+            cameraFlipAngle += 180
+        }
+        
+        // Implement actual camera switching in LiveKit
+        await callService.switchCamera()
+        MXLog.info("Camera flipped successfully")
+    }
+    
+    func toggleScreenShare() async {
+        do {
+            if isScreenSharing {
+                // Stop screen sharing
+                await callService.stopScreenShare()
+                isScreenSharing = false
+            } else {
+                // Start screen sharing
+                try await callService.startScreenShare()
+                isScreenSharing = true
+            }
+        } catch {
+            MXLog.error("Failed to toggle screen share: \(error)")
+            // Revert state on error
+            isScreenSharing = !isScreenSharing
+        }
+    }
 }
+#endif

@@ -42,23 +42,29 @@ class NotificationHandler {
     func processEvent(_ eventID: String, roomID: String) async {
         MXLog.info("\(tag) Processing event: \(eventID) in room: \(roomID)")
         
-        // Copy over the unread information to the notification badge
-        notificationContent.badge = notificationContent.unreadCount as NSNumber?
-        
-        guard let notificationItemProxy = await userSession.notificationItemProxy(roomID: roomID, eventID: eventID) else {
-            MXLog.error("\(tag) Failed retrieving notification item")
-            discardNotification()
-            return
-        }
-        
-        switch await preprocessNotification(notificationItemProxy) {
-        case .processedShouldDiscard, .unsupportedShouldDiscard:
-            discardNotification()
-        case .shouldDisplay:
-            await notificationContentBuilder.process(notificationContent: &notificationContent,
-                                                     notificationItem: notificationItemProxy,
-                                                     mediaProvider: userSession.mediaProvider)
+        do {
+            // Copy over the unread information to the notification badge
+            notificationContent.badge = notificationContent.unreadCount as NSNumber?
             
+            guard let notificationItemProxy = await userSession.notificationItemProxy(roomID: roomID, eventID: eventID) else {
+                MXLog.error("\(tag) Failed retrieving notification item")
+                discardNotification()
+                return
+            }
+            
+            switch await preprocessNotification(notificationItemProxy) {
+            case .processedShouldDiscard, .unsupportedShouldDiscard:
+                discardNotification()
+            case .shouldDisplay:
+                await notificationContentBuilder.process(notificationContent: &notificationContent,
+                                                         notificationItem: notificationItemProxy,
+                                                         mediaProvider: userSession.mediaProvider)
+                
+                deliverNotification()
+            }
+        } catch {
+            MXLog.error("\(tag) Error processing notification: \(error)")
+            // Deliver a basic notification as fallback
             deliverNotification()
         }
     }
@@ -123,10 +129,17 @@ class NotificationHandler {
                 
                 return .processedShouldDiscard
             case .callNotify(let notifyType):
-                return await handleCallNotification(notifyType: notifyType,
-                                                    timestamp: event.timestamp(),
-                                                    roomID: itemProxy.roomID,
-                                                    roomDisplayName: itemProxy.roomDisplayName)
+                // Always trigger VoIP push for incoming calls
+                if notifyType == .ring {
+                    MXLog.info("Received ring notification, triggering VoIP push")
+                    return await handleCallNotification(notifyType: notifyType,
+                                                        timestamp: event.timestamp(),
+                                                        roomID: itemProxy.roomID,
+                                                        roomDisplayName: itemProxy.roomDisplayName)
+                } else {
+                    // For other call notifications, show as regular push
+                    return .shouldDisplay
+                }
             case .callAnswer,
                  .callInvite,
                  .callHangup,
@@ -208,9 +221,28 @@ class NotificationHandler {
         
         do {
             try await CXProvider.reportNewIncomingVoIPPushPayload(payload)
-            MXLog.info("Call notification delegated to CallKit")
+            MXLog.info("Call notification delegated to CallKit successfully")
+            
+            // Additionally ensure the main app is awakened
+            // This is critical for LiveKit calls
+            NotificationCenter.default.post(name: Notification.Name("io.element.call.incoming"), 
+                                          object: nil, 
+                                          userInfo: payload)
+        } catch let error as NSError {
+            MXLog.error("Failed reporting voip call with error: \(error.localizedDescription) (domain: \(error.domain), code: \(error.code))")
+            
+            // Fallback: Show notification with custom actions for calls
+            if #available(iOS 15.0, *) {
+                notificationContent.interruptionLevel = .timeSensitive
+            }
+            notificationContent.categoryIdentifier = "INCOMING_CALL"
+            notificationContent.title = "Incoming Call"
+            notificationContent.body = "Call from \(roomDisplayName)"
+            notificationContent.sound = UNNotificationSound(named: UNNotificationSoundName("ringtone.caf"))
+            
+            return .shouldDisplay
         } catch {
-            MXLog.error("Failed reporting voip call with error: \(error). Handling as push notification")
+            MXLog.error("Failed reporting voip call with unknown error: \(error)")
             return .shouldDisplay
         }
         

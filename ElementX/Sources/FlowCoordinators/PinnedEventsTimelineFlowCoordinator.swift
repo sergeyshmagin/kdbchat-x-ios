@@ -66,7 +66,8 @@ class PinnedEventsTimelineFlowCoordinator: FlowCoordinatorProtocol {
         let userID = userSession.clientProxy.userID
         let timelineItemFactory = RoomTimelineItemFactory(userID: userID,
                                                           attributedStringBuilder: AttributedStringBuilder(mentionBuilder: MentionBuilder()),
-                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userID))
+                                                          stateEventStringBuilder: RoomStateEventStringBuilder(userID: userID),
+                                                          roomID: roomProxy.id)
         
         guard case let .success(timelineController) = await timelineControllerFactory.buildPinnedEventsTimelineController(roomProxy: roomProxy,
                                                                                                                           timelineItemFactory: timelineItemFactory,

@@ -28,6 +28,10 @@ class DeveloperOptionsScreenViewModel: DeveloperOptionsScreenViewModelType, Deve
         switch viewAction {
         case .clearCache:
             actionsSubject.send(.clearCache)
+        case .checkNotificationPermissions:
+            actionsSubject.send(.checkNotificationPermissions)
+        case .requestNotificationPermissions:
+            actionsSubject.send(.requestNotificationPermissions)
         }
     }
 }

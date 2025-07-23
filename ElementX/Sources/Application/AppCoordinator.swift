@@ -15,6 +15,11 @@ import Sentry
 import SwiftUI
 import Version
 
+#if LIVEKIT_ENABLED
+import CallKit
+import LiveKit
+#endif
+
 /// Сервис для автоматического управления recovery keys
 protocol AutoRecoveryServiceProtocol {
     func setupAutoRecoveryForNewLogin(userSession: UserSessionProtocol) async
@@ -116,7 +121,12 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     private let appSettings: AppSettings
     private let appDelegate: AppDelegate
     private let appHooks: AppHooks
+    #if LIVEKIT_ENABLED
+    private let liveKitAuthService: LiveKitAuthServiceProtocol
+    private let liveKitCallKitService: LiveKitCallKitService
+    #else
     private let elementCallService: ElementCallServiceProtocol
+    #endif
     private let autoRecoveryService: AutoRecoveryServiceProtocol
 
     /// Common background task to continue long-running tasks in the background.
@@ -127,6 +137,9 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
             userSessionObserver?.cancel()
             if let userSession {
                 configureElementCallService()
+                #if LIVEKIT_ENABLED
+                configureLiveKitService(userSession: userSession)
+                #endif
                 configureNotificationManager()
                 observeUserSessionChanges()
                 startSync()
@@ -153,6 +166,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     
     let windowManager: SecureWindowManagerProtocol
     let notificationManager: NotificationManagerProtocol
+    private let badgeCountService: BadgeCountServiceProtocol
 
     private let appRouteURLParser: AppRouteURLParser
     
@@ -191,7 +205,12 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         self.appHooks = appHooks
         appRouteURLParser = AppRouteURLParser(appSettings: appSettings)
         
+        #if LIVEKIT_ENABLED
+        liveKitAuthService = LiveKitAuthService()
+        liveKitCallKitService = LiveKitCallKitService()
+        #else
         elementCallService = ElementCallService()
+        #endif
         autoRecoveryService = AutoRecoveryService()
         
         navigationRootCoordinator = NavigationRootCoordinator()
@@ -211,6 +230,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         
         notificationManager = NotificationManager(notificationCenter: UNUserNotificationCenter.current(),
                                                   appSettings: appSettings)
+        
+        badgeCountService = BadgeCountService(appSettings: appSettings)
         
         Self.setupServiceLocator(appSettings: appSettings, appHooks: appHooks)
         Self.setupSentry(appSettings: appSettings)
@@ -253,6 +274,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
             }
             .store(in: &cancellables)
         
+        #if !LIVEKIT_ENABLED
         elementCallService.actions
             .receive(on: DispatchQueue.main)
             .sink { [weak self] action in
@@ -270,6 +292,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                 }
             }
             .store(in: &cancellables)
+        #endif
     }
     
     func start() {
@@ -329,7 +352,9 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                 if let userSessionFlowCoordinator {
                     userSessionFlowCoordinator.handleAppRoute(route, animated: true)
                 } else {
+                    #if !LIVEKIT_ENABLED
                     presentCallScreen(genericCallLink: url)
+                    #endif
                 }
             case .userProfile(let userID):
                 if isExternalURL {
@@ -748,6 +773,22 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         
         MXLog.info("Creating UserSessionFlowCoordinator for user: \(userSession.clientProxy.userID)")
         
+        #if LIVEKIT_ENABLED
+        let userSessionFlowCoordinator = UserSessionFlowCoordinator(userSession: userSession,
+                                                                    navigationRootCoordinator: navigationRootCoordinator,
+                                                                    appLockService: appLockFlowCoordinator.appLockService,
+                                                                    bugReportService: ServiceLocator.shared.bugReportService,
+                                                                    liveKitAuthService: liveKitAuthService,
+                                                                    liveKitCallKitService: liveKitCallKitService,
+                                                                    timelineControllerFactory: TimelineControllerFactory(),
+                                                                    appMediator: appMediator,
+                                                                    appSettings: appSettings,
+                                                                    appHooks: appHooks,
+                                                                    analytics: ServiceLocator.shared.analytics,
+                                                                    notificationManager: notificationManager,
+                                                                    badgeCountService: badgeCountService,
+                                                                    isNewLogin: isNewLogin)
+        #else
         let userSessionFlowCoordinator = UserSessionFlowCoordinator(userSession: userSession,
                                                                     navigationRootCoordinator: navigationRootCoordinator,
                                                                     appLockService: appLockFlowCoordinator.appLockService,
@@ -759,7 +800,9 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                                                                     appHooks: appHooks,
                                                                     analytics: ServiceLocator.shared.analytics,
                                                                     notificationManager: notificationManager,
+                                                                    badgeCountService: badgeCountService,
                                                                     isNewLogin: isNewLogin)
+        #endif
         
         MXLog.info("UserSessionFlowCoordinator created successfully")
         
@@ -818,7 +861,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         // The user will log out, clear any existing notifications and unregister from receving new ones
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-        UNUserNotificationCenter.current().setBadgeCount(0)
+        badgeCountService.clearBadgeCount()
         
         unregisterForRemoteNotifications()
         
@@ -873,13 +916,112 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     
     private func configureElementCallService() {
         guard let userSession else {
+            #if LIVEKIT_ENABLED
+            MXLog.error("User session not setup for LiveKit configuration")
+            #else
             MXLog.error("User session not setup for ElementCall configuration")
+            #endif
             return
         }
         
+        #if LIVEKIT_ENABLED
+        // Configure LiveKit auth service with user session
+        liveKitAuthService.configure(userSession: userSession)
+        #else
         elementCallService.setClientProxy(userSession.clientProxy)
+        #endif
     }
     
+    #if LIVEKIT_ENABLED
+    private func configureLiveKitService(userSession: UserSessionProtocol) {
+        MXLog.info("Configuring LiveKit services with user session")
+        
+        // Configure LiveKit auth service
+        liveKitAuthService.configure(userSession: userSession)
+        
+        // Configure LiveKit CallKit service with client proxy for VoIP push registration
+        liveKitCallKitService.configureWithClientProxy(userSession.clientProxy)
+        
+        // Set up Matrix call event listener for incoming calls
+        setupMatrixCallEventListener(userSession: userSession)
+    }
+    
+    private func setupMatrixCallEventListener(userSession: UserSessionProtocol) {
+        MXLog.info("Setting up Matrix call event listener for LiveKit")
+        
+        // Listen for Matrix call invite notifications from the timeline
+        NotificationCenter.default.addObserver(
+            forName: .matrixCallInviteReceived,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleIncomingCallNotification(notification, userSession: userSession)
+        }
+        
+        // Listen for custom VoIP call notifications from NSE
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("io.element.call.incoming"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleVoIPCallFromNSE(notification, userSession: userSession)
+        }
+        
+        MXLog.info("Matrix call event listener configured")
+    }
+    
+    private func handleIncomingCallNotification(_ notification: Notification, userSession: UserSessionProtocol) {
+        guard let userInfo = notification.userInfo,
+              let roomId = userInfo["roomId"] as? String,
+              let eventId = userInfo["eventId"] as? String,
+              let senderId = userInfo["senderId"] as? String,
+              let senderDisplayName = userInfo["senderDisplayName"] as? String else {
+            MXLog.error("Invalid call notification userInfo")
+            return
+        }
+        
+        MXLog.info("Received Matrix call invite - Room: \(roomId), Caller: \(senderDisplayName)")
+        
+        // Trigger CallKit notification for incoming call
+        Task {
+            await liveKitCallKitService.handleIncomingCallFromMatrix(roomId: roomId,
+                                                                    callId: eventId,
+                                                                    callerName: senderDisplayName)
+        }
+    }
+    
+    /// Handle VoIP call notification from NSE
+    private func handleVoIPCallFromNSE(_ notification: Notification, userSession: UserSessionProtocol) {
+        guard let userInfo = notification.userInfo,
+              let roomId = userInfo[ElementCallServiceNotificationKey.roomID.rawValue] as? String,
+              let roomDisplayName = userInfo[ElementCallServiceNotificationKey.roomDisplayName.rawValue] as? String else {
+            MXLog.error("Invalid VoIP call notification data from NSE")
+            return
+        }
+        
+        MXLog.info("Received VoIP call notification from NSE for room: \(roomId), caller: \(roomDisplayName)")
+        
+        let callId = UUID().uuidString
+        
+        // Trigger CallKit notification for incoming call
+        Task {
+            await liveKitCallKitService.handleIncomingCallFromMatrix(roomId: roomId,
+                                                                    callId: callId,
+                                                                    callerName: roomDisplayName)
+        }
+    }
+    
+    /// Manually trigger an incoming call notification for testing
+    func triggerIncomingCallNotification(roomId: String, callId: String, callerName: String) {
+        Task {
+            await liveKitCallKitService.handleIncomingCallFromMatrix(roomId: roomId,
+                                                                    callId: callId,
+                                                                    callerName: callerName)
+        }
+    }
+    #endif
+    
+    #if !LIVEKIT_ENABLED
     private func presentCallScreen(genericCallLink url: URL) {
         let configuration = ElementCallConfiguration(genericCallLink: url)
         
@@ -906,6 +1048,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         
         navigationRootCoordinator.setOverlayCoordinator(callScreenCoordinator, animated: false)
     }
+    #endif
 
     private func configureNotificationManager() {
         notificationManager.setUserSession(userSession)

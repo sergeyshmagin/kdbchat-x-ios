@@ -6,6 +6,7 @@
 //
 
 import Combine
+import Foundation
 import SwiftUI
 
 struct HomeScreenCoordinatorParameters {
@@ -15,6 +16,7 @@ struct HomeScreenCoordinatorParameters {
     let appSettings: AppSettings
     let analyticsService: AnalyticsService
     let notificationManager: NotificationManagerProtocol
+    let badgeCountService: BadgeCountServiceProtocol
     let userIndicatorController: UserIndicatorControllerProtocol
 }
 
@@ -53,6 +55,7 @@ final class HomeScreenCoordinator: CoordinatorProtocol {
                                         appSettings: parameters.appSettings,
                                         analyticsService: parameters.analyticsService,
                                         notificationManager: parameters.notificationManager,
+                                        badgeCountService: parameters.badgeCountService,
                                         userIndicatorController: parameters.userIndicatorController)
         bugReportService = parameters.bugReportService
         

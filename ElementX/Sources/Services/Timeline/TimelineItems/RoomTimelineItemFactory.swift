@@ -9,6 +9,10 @@ import MatrixRustSDK
 import UIKit
 import UniformTypeIdentifiers
 
+extension Notification.Name {
+    static let matrixCallInviteReceived = Notification.Name("matrixCallInviteReceived")
+}
+
 struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     private let attributedStringBuilder: AttributedStringBuilderProtocol
     private let stateEventStringBuilder: RoomStateEventStringBuilder
@@ -16,12 +20,17 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     /// The Matrix ID of the current user.
     private let userID: String
     
+    /// The room ID for this timeline factory instance
+    private let roomID: String?
+    
     init(userID: String,
          attributedStringBuilder: AttributedStringBuilderProtocol,
-         stateEventStringBuilder: RoomStateEventStringBuilder) {
+         stateEventStringBuilder: RoomStateEventStringBuilder,
+         roomID: String? = nil) {
         self.userID = userID
         self.attributedStringBuilder = attributedStringBuilder
         self.stateEventStringBuilder = stateEventStringBuilder
+        self.roomID = roomID
     }
     
     func buildTimelineItem(for eventItemProxy: EventTimelineItemProxy, isDM: Bool) -> RoomTimelineItemProtocol? {
@@ -726,11 +735,27 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     }
     
     private func buildCallInviteTimelineItem(for eventItemProxy: EventTimelineItemProxy) -> RoomTimelineItemProtocol {
-        CallInviteRoomTimelineItem(id: eventItemProxy.id,
-                                   timestamp: eventItemProxy.timestamp,
-                                   isEditable: eventItemProxy.isEditable,
-                                   canBeRepliedTo: eventItemProxy.canBeRepliedTo,
-                                   sender: eventItemProxy.sender)
+        // Check if this is an incoming call event for LiveKit CallKit integration
+        if !eventItemProxy.isOwn, let roomID = self.roomID {
+            // Post notification for incoming call detection
+            NotificationCenter.default.post(
+                name: .matrixCallInviteReceived,
+                object: nil,
+                userInfo: [
+                    "eventId": eventItemProxy.id.eventID ?? "unknown",
+                    "roomId": roomID,
+                    "senderId": eventItemProxy.sender.id,
+                    "senderDisplayName": eventItemProxy.sender.displayName ?? eventItemProxy.sender.id,
+                    "timestamp": eventItemProxy.timestamp
+                ]
+            )
+        }
+        
+        return CallInviteRoomTimelineItem(id: eventItemProxy.id,
+                                          timestamp: eventItemProxy.timestamp,
+                                          isEditable: eventItemProxy.isEditable,
+                                          canBeRepliedTo: eventItemProxy.canBeRepliedTo,
+                                          sender: eventItemProxy.sender)
     }
     
     private func buildCallNotificationTimelineItem(for eventItemProxy: EventTimelineItemProxy) -> RoomTimelineItemProtocol {

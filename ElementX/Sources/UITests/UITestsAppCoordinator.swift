@@ -160,7 +160,7 @@ class MockScreen: Identifiable {
                 flowCoordinator.handleAppRoute(.accountProvisioningLink(.init(accountProvider: "example.com", loginHint: nil)), animated: false)
             }
             
-            return nil
+            return BlankFormCoordinator()
         case .appLockFlow, .appLockFlowDisabled:
             // The tested coordinator is setup below in the alternate window.
             // Here we just return a blank screen to snapshot as the unlocked app.
@@ -589,6 +589,23 @@ class MockScreen: Identifiable {
             let appMediator = AppMediatorMock.default
             appMediator.underlyingWindowManager = windowManager
             
+            #if LIVEKIT_ENABLED
+            let flowCoordinator = UserSessionFlowCoordinator(userSession: UserSessionMock(.init(clientProxy: clientProxy)),
+                                                             navigationRootCoordinator: navigationRootCoordinator,
+                                                             appLockService: AppLockService(keychainController: KeychainControllerMock(),
+                                                                                            appSettings: ServiceLocator.shared.settings),
+                                                             bugReportService: BugReportServiceMock(.init()),
+                                                             liveKitAuthService: MockLiveKitAuthService(),
+                                                             liveKitCallKitService: LiveKitCallKitService(),
+                                                             timelineControllerFactory: TimelineControllerFactoryMock(.init()),
+                                                             appMediator: appMediator,
+                                                             appSettings: appSettings,
+                                                             appHooks: AppHooks(),
+                                                             analytics: ServiceLocator.shared.analytics,
+                                                             notificationManager: NotificationManagerMock(),
+                                                             badgeCountService: BadgeCountService(appSettings: appSettings),
+                                                             isNewLogin: false)
+            #else
             let flowCoordinator = UserSessionFlowCoordinator(userSession: UserSessionMock(.init(clientProxy: clientProxy)),
                                                              navigationRootCoordinator: navigationRootCoordinator,
                                                              appLockService: AppLockService(keychainController: KeychainControllerMock(),
@@ -601,13 +618,15 @@ class MockScreen: Identifiable {
                                                              appHooks: AppHooks(),
                                                              analytics: ServiceLocator.shared.analytics,
                                                              notificationManager: NotificationManagerMock(),
+                                                             badgeCountService: BadgeCountService(appSettings: appSettings),
                                                              isNewLogin: false)
+            #endif
             
             flowCoordinator.start()
             
             retainedState.append(flowCoordinator)
             
-            return nil
+            return BlankFormCoordinator()
         case .roomMembersListScreenPendingInvites:
             let navigationStackCoordinator = NavigationStackCoordinator()
             let members: [RoomMemberProxyMock] = [.mockInvitedAlice, .mockBob, .mockCharlie]
@@ -739,10 +758,28 @@ class MockScreen: Identifiable {
                                                         initialFocussedEventID: nil,
                                                         timelineItemFactory: RoomTimelineItemFactory(userID: "@alice:matrix.org",
                                                                                                      attributedStringBuilder: AttributedStringBuilder(mentionBuilder: MentionBuilder()),
-                                                                                                     stateEventStringBuilder: RoomStateEventStringBuilder(userID: "@alice:matrix.org")),
+                                                                                                     stateEventStringBuilder: RoomStateEventStringBuilder(userID: "@alice:matrix.org"),
+                                                                                                     roomID: roomProxy.id),
                                                         mediaProvider: MediaProviderMock(configuration: .init()),
                                                         appSettings: ServiceLocator.shared.settings)
             
+            #if LIVEKIT_ENABLED
+            let flowCoordinator = UserSessionFlowCoordinator(userSession: UserSessionMock(.init(clientProxy: clientProxy)),
+                                                             navigationRootCoordinator: navigationRootCoordinator,
+                                                             appLockService: AppLockService(keychainController: KeychainControllerMock(),
+                                                                                            appSettings: ServiceLocator.shared.settings),
+                                                             bugReportService: BugReportServiceMock(.init()),
+                                                             liveKitAuthService: MockLiveKitAuthService(),
+                                                             liveKitCallKitService: LiveKitCallKitService(),
+                                                             timelineControllerFactory: TimelineControllerFactoryMock(.init(timelineController: timelineController)),
+                                                             appMediator: AppMediatorMock.default,
+                                                             appSettings: appSettings,
+                                                             appHooks: AppHooks(),
+                                                             analytics: ServiceLocator.shared.analytics,
+                                                             notificationManager: NotificationManagerMock(),
+                                                             badgeCountService: BadgeCountService(appSettings: appSettings),
+                                                             isNewLogin: false)
+            #else
             let flowCoordinator = UserSessionFlowCoordinator(userSession: UserSessionMock(.init(clientProxy: clientProxy)),
                                                              navigationRootCoordinator: navigationRootCoordinator,
                                                              appLockService: AppLockService(keychainController: KeychainControllerMock(),
@@ -755,13 +792,15 @@ class MockScreen: Identifiable {
                                                              appHooks: AppHooks(),
                                                              analytics: ServiceLocator.shared.analytics,
                                                              notificationManager: NotificationManagerMock(),
+                                                             badgeCountService: BadgeCountService(appSettings: appSettings),
                                                              isNewLogin: false)
+            #endif
             
             flowCoordinator.start()
             
             retainedState.append(flowCoordinator)
             
-            return nil
+            return BlankFormCoordinator()
         }
     }()
 }

@@ -62,14 +62,11 @@ enum Target: String {
         } catch {
             // Use print instead of MXLog since MXLog might not be configured yet
             print("ERROR: Failed configuring target \(self) with error: \(error)")
-            // Don't crash in production - just log the error and continue
-            #if DEBUG
-            fatalError("Failed configuring target \(self) with error: \(error)")
-            #else
-            // In production, mark as configured to avoid retry attempts
+            // Don't crash - just log the error and continue with fallback configuration
+            // Even in DEBUG mode, we want to continue running when logging fails
+            // The app can still function without file logging
             Self.isConfigured = true
             return
-            #endif
         }
         
         // Setup sentry above but disable it by default. It will be started

@@ -52,6 +52,16 @@ struct DeveloperOptionsScreen: View {
                 }
             }
             
+            Section("Notifications Debug") {
+                Button("Check Notification Permissions") {
+                    context.send(viewAction: .checkNotificationPermissions)
+                }
+                
+                Button("Request Notification Permissions") {
+                    context.send(viewAction: .requestNotificationPermissions)
+                }
+            }
+            
             Section("Join rules") {
                 Toggle(isOn: $context.knockingEnabled) {
                     Text("Knocking")

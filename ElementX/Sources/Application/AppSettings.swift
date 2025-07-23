@@ -234,8 +234,15 @@ final class AppSettings {
         #endif
     }
     
-    private(set) var pushGatewayBaseURL: URL = "https://matrix.org"
+    private(set) var pushGatewayBaseURL: URL = "https://sygnal.aibots.kz"
     var pushGatewayNotifyEndpoint: URL { pushGatewayBaseURL.appending(path: "_matrix/push/v1/notify") }
+    
+    // MARK: - VoIP Push Configuration
+    
+    /// App ID for VoIP push notifications
+    let voipAppId = "io.sergeyshmagin.kdbchat"
+    /// VoIP push topic for APNs
+    let voipPushTopic = "io.sergeyshmagin.kdbchat.voip"
     
     @UserPreference(key: UserDefaultsKeys.enableNotifications, defaultValue: true, storageType: .userDefaults(store))
     var enableNotifications
