@@ -27,6 +27,10 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
         actionsSubject.eraseToAnyPublisher()
     }
     
+    var userSessionForViews: UserSessionProtocol {
+        userSession
+    }
+    
     init(userSession: UserSessionProtocol,
          selectedRoomPublisher: CurrentValuePublisher<String?, Never>,
          appSettings: AppSettings,
@@ -323,6 +327,9 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
         // Update badge count with the latest room summaries
         let summaries = roomSummaryProvider.roomListPublisher.value
         badgeCountService.updateBadgeCountFromRoomSummaries(summaries)
+        
+        // Calculate total unread count for UI display
+        state.totalUnreadCount = calculateTotalUnreadCount(from: summaries)
     }
     
     /// Check whether we can inform the user about potential migrations
@@ -490,5 +497,19 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
         state.bindings.alertInfo = .init(id: UUID(),
                                          title: title ?? L10n.commonError,
                                          message: message ?? L10n.errorUnknown)
+    }
+    
+    private func calculateTotalUnreadCount(from summaries: [RoomSummary]) -> Int {
+        return summaries.reduce(0) { total, summary in
+            // Skip muted rooms
+            guard !summary.isMuted else { return total }
+            
+            // Count unread messages, mentions, and notifications
+            let roomUnreadCount = Int(summary.unreadMessagesCount) +
+                Int(summary.unreadMentionsCount) +
+                Int(summary.unreadNotificationsCount)
+            
+            return total + roomUnreadCount
+        }
     }
 }

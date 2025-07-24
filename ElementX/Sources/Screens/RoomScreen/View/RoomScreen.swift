@@ -195,7 +195,7 @@ struct RoomScreen: View {
     private var callButton: some View {
         if context.viewState.hasOngoingCall {
             Button {
-                context.send(viewAction: .displayCall)
+                context.send(viewAction: .displayCall(callType: .video))
             } label: {
                 Label(L10n.actionJoin, icon: \.videoCallSolid)
                     .labelStyle(.titleAndIcon)
@@ -204,8 +204,18 @@ struct RoomScreen: View {
             .accessibilityLabel(L10n.a11yJoinCall)
             .accessibilityIdentifier(A11yIdentifiers.roomScreen.joinCall)
         } else {
-            Button {
-                context.send(viewAction: .displayCall)
+            Menu {
+                Button {
+                    context.send(viewAction: .displayCall(callType: .video))
+                } label: {
+                    Label("Видеозвонок", systemImage: "video.fill")
+                }
+                
+                Button {
+                    context.send(viewAction: .displayCall(callType: .audio))
+                } label: {
+                    Label("Аудиозвонок", systemImage: "phone.fill")
+                }
             } label: {
                 CompoundIcon(\.videoCallSolid)
             }

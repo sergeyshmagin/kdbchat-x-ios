@@ -736,19 +736,17 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     
     private func buildCallInviteTimelineItem(for eventItemProxy: EventTimelineItemProxy) -> RoomTimelineItemProtocol {
         // Check if this is an incoming call event for LiveKit CallKit integration
-        if !eventItemProxy.isOwn, let roomID = self.roomID {
+        if !eventItemProxy.isOwn, let roomID = roomID {
             // Post notification for incoming call detection
-            NotificationCenter.default.post(
-                name: .matrixCallInviteReceived,
-                object: nil,
-                userInfo: [
-                    "eventId": eventItemProxy.id.eventID ?? "unknown",
-                    "roomId": roomID,
-                    "senderId": eventItemProxy.sender.id,
-                    "senderDisplayName": eventItemProxy.sender.displayName ?? eventItemProxy.sender.id,
-                    "timestamp": eventItemProxy.timestamp
-                ]
-            )
+            NotificationCenter.default.post(name: .matrixCallInviteReceived,
+                                            object: nil,
+                                            userInfo: [
+                                                "eventId": eventItemProxy.id.eventID ?? "unknown",
+                                                "roomId": roomID,
+                                                "senderId": eventItemProxy.sender.id,
+                                                "senderDisplayName": eventItemProxy.sender.displayName ?? eventItemProxy.sender.id,
+                                                "timestamp": eventItemProxy.timestamp
+                                            ])
         }
         
         return CallInviteRoomTimelineItem(id: eventItemProxy.id,

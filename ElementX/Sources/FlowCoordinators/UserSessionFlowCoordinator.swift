@@ -78,7 +78,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     /// For testing purposes.
     var statePublisher: AnyPublisher<UserSessionFlowCoordinatorStateMachine.State, Never> { stateMachine.statePublisher }
     
-#if LIVEKIT_ENABLED
+    #if LIVEKIT_ENABLED
     init(userSession: UserSessionProtocol,
          navigationRootCoordinator: NavigationRootCoordinator,
          appLockService: AppLockServiceProtocol,
@@ -818,9 +818,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             guard let self else { return }
             
             switch action {
-            case .presentCallScreen(let roomProxy):
+            case .presentCallScreen(let roomProxy, let callType):
                 // Here we assume that the app is running and the call state is already up to date
-                presentCallScreen(roomProxy: roomProxy, notifyOtherParticipants: !roomProxy.infoPublisher.value.hasRoomCall)
+                presentCallScreen(roomProxy: roomProxy, callType: callType, notifyOtherParticipants: !roomProxy.infoPublisher.value.hasRoomCall)
             case .verifyUser(let userID):
                 presentSessionVerificationScreen(flow: .userIntiator(userID: userID))
             case .finished:
@@ -914,9 +914,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         presentCallScreen(roomProxy: roomProxy, notifyOtherParticipants: notifyOtherParticipants)
     }
     
-    private func presentCallScreen(roomProxy: JoinedRoomProxyProtocol, notifyOtherParticipants: Bool) {
+    private func presentCallScreen(roomProxy: JoinedRoomProxyProtocol, callType: CallType = .video, notifyOtherParticipants: Bool) {
         #if LIVEKIT_ENABLED
-        presentLiveKitCallScreen(roomProxy: roomProxy)
+        presentLiveKitCallScreen(roomProxy: roomProxy, callType: callType)
         #else
         let colorScheme: ColorScheme = appMediator.windowManager.mainWindow.traitCollection.userInterfaceStyle == .light ? .light : .dark
         presentCallScreen(configuration: .init(roomProxy: roomProxy,
@@ -930,11 +930,11 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     #if LIVEKIT_ENABLED
-    private func presentLiveKitCallScreen(roomProxy: JoinedRoomProxyProtocol) {
-        MXLog.info("Presenting LiveKit call screen for room: \(roomProxy.id)")
+    private func presentLiveKitCallScreen(roomProxy: JoinedRoomProxyProtocol, callType: CallType = .video) {
+        MXLog.info("Presenting LiveKit call screen for room: \(roomProxy.id) with call type: \(callType)")
         
         let authService = LiveKitAuthService(clientProxy: userSession.clientProxy)
-        let liveKitCallCoordinator = LiveKitCallCoordinator(roomId: roomProxy.id, authService: authService)
+        let liveKitCallCoordinator = LiveKitCallCoordinator(roomId: roomProxy.id, authService: authService, callType: callType)
         
         liveKitCallCoordinator.actionsPublisher
             .sink { [weak self] action in

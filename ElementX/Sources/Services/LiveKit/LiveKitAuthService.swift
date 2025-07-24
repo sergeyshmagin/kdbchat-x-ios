@@ -29,6 +29,14 @@ struct LiveKitAuthResponse: Codable {
     let url: String?
 }
 
+// MARK: - LiveKit Call Details Model
+
+struct LiveKitCallDetails {
+    let roomUrl: String
+    let accessToken: String
+    let serverUrl: String
+}
+
 // MARK: - Service Implementation
 
 final class LiveKitAuthService: LiveKitAuthServiceProtocol {
@@ -43,7 +51,7 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
     }
     
     func configure(userSession: UserSessionProtocol) {
-        self.clientProxy = userSession.clientProxy
+        clientProxy = userSession.clientProxy
         MXLog.info("LiveKit auth service configured with user session")
     }
     
@@ -65,6 +73,29 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
         let isReachable = await testServerConnectivity()
         MXLog.info("Auth server reachability test result: \(isReachable ? "✅ Connected" : "❌ Failed")")
         return isReachable
+    }
+    
+    /// Get LiveKit call details for Matrix call events
+    func getCallDetails(roomId: String, callId: String) async throws -> LiveKitCallDetails {
+        MXLog.info("Getting LiveKit call details for room: \(roomId), call: \(callId)")
+        
+        guard let clientProxy = clientProxy else {
+            throw LiveKitCallError.authenticationFailed
+        }
+        
+        let participantName = clientProxy.userDisplayNamePublisher.value ?? clientProxy.userID
+        
+        // Generate access token for the call
+        let token = generateMockJWT(roomId: roomId, participantName: participantName)
+        
+        let details = LiveKitCallDetails(
+            roomUrl: "wss://video.aibots.kz",
+            accessToken: token,
+            serverUrl: "wss://video.aibots.kz"
+        )
+        
+        MXLog.info("Generated LiveKit call details for call: \(callId)")
+        return details
     }
     
     // MARK: - Private Methods

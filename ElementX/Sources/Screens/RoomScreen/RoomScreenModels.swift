@@ -12,7 +12,7 @@ enum RoomScreenViewModelAction: Equatable {
     case focusEvent(eventID: String)
     case displayPinnedEventsTimeline
     case displayRoomDetails
-    case displayCall
+    case displayCall(callType: CallType)
     case removeComposerFocus
     case displayKnockRequests
     case displayRoom(roomID: String)
@@ -22,7 +22,7 @@ enum RoomScreenViewAction {
     case tappedPinnedEventsBanner
     case viewAllPins
     case displayRoomDetails
-    case displayCall
+    case displayCall(callType: CallType)
     case footerViewAction(RoomScreenFooterViewAction)
     case acceptKnock(eventID: String)
     case dismissKnockRequests

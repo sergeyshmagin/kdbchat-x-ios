@@ -12,6 +12,8 @@ struct TimelineDeliveryStatusView: View {
     enum Status {
         case sending
         case sent
+        case delivered
+        case read
     }
 
     let deliveryStatus: Status
@@ -21,13 +23,30 @@ struct TimelineDeliveryStatusView: View {
         case .sending:
             return CompoundIcon(\.circle, size: .xSmall, relativeTo: .compound.bodyMD)
         case .sent:
+            return CompoundIcon(\.check, size: .xSmall, relativeTo: .compound.bodyMD)
+        case .delivered:
             return CompoundIcon(\.checkCircle, size: .xSmall, relativeTo: .compound.bodyMD)
+        case .read:
+            return CompoundIcon(\.checkCircle, size: .xSmall, relativeTo: .compound.bodyMD)
+        }
+    }
+    
+    private var iconColor: Color {
+        switch deliveryStatus {
+        case .sending:
+            return .compound.iconSecondary
+        case .sent:
+            return .compound.iconSecondary
+        case .delivered:
+            return .compound.iconSecondary
+        case .read:
+            return .compound.iconPrimary // Blue for read
         }
     }
     
     var body: some View {
         icon
-            .foregroundColor(.compound.iconSecondary)
+            .foregroundColor(iconColor)
             .accessibilityLabel(accessibilityLabel)
     }
     
@@ -37,6 +56,10 @@ struct TimelineDeliveryStatusView: View {
             return L10n.commonSending
         case .sent:
             return L10n.commonSent
+        case .delivered:
+            return "Delivered"
+        case .read:
+            return "Read"
         }
     }
 }
@@ -46,6 +69,8 @@ struct TimelineDeliveryStatusView_Previews: PreviewProvider, TestablePreview {
         VStack(spacing: 8) {
             TimelineDeliveryStatusView(deliveryStatus: .sending)
             TimelineDeliveryStatusView(deliveryStatus: .sent)
+            TimelineDeliveryStatusView(deliveryStatus: .delivered)
+            TimelineDeliveryStatusView(deliveryStatus: .read)
         }
     }
 }

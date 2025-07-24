@@ -86,8 +86,8 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
         
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
-            let message = granted ? 
-                "✅ Notification permissions granted!" : 
+            let message = granted ?
+                "✅ Notification permissions granted!" :
                 "❌ Notification permissions denied. Check iOS Settings → [App] → Notifications"
                 
             await MainActor.run {

@@ -110,6 +110,6 @@ final class HomeScreenCoordinator: CoordinatorProtocol {
     }
     
     func toPresentable() -> AnyView {
-        AnyView(HomeScreen(context: viewModel.context))
+        AnyView(HomeScreen(context: viewModel.context, userSession: (viewModel as! HomeScreenViewModel).userSessionForViews))
     }
 }

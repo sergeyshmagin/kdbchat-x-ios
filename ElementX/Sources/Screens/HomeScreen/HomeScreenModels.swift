@@ -8,6 +8,124 @@
 import Combine
 import Foundation
 import UIKit
+import SwiftUI
+import Compound
+
+// MARK: - Call Type
+
+enum CallType: String, CaseIterable, Codable, Equatable {
+    case audio = "audio"
+    case video = "video"
+    
+    var icon: KeyPath<CompoundIcons, Image> {
+        switch self {
+        case .audio:
+            return \.voiceCall
+        case .video:
+            return \.videoCall
+        }
+    }
+    
+    var iconSolid: KeyPath<CompoundIcons, Image> {
+        switch self {
+        case .audio:
+            return \.voiceCallSolid
+        case .video:
+            return \.videoCallSolid
+        }
+    }
+}
+
+// MARK: - Call Direction
+
+enum CallDirection: String, CaseIterable, Codable {
+    case incoming = "incoming"
+    case outgoing = "outgoing"
+    case missed = "missed"
+    
+    var displayName: String {
+        switch self {
+        case .incoming:
+            return "Входящий"
+        case .outgoing:
+            return "Исходящий"
+        case .missed:
+            return "Пропущенный"
+        }
+    }
+}
+
+// MARK: - Call Status
+
+enum CallStatus: String, CaseIterable, Codable {
+    case answered = "answered"
+    case declined = "declined"
+    case missed = "missed"
+    case cancelled = "cancelled"
+    case busy = "busy"
+    case failed = "failed"
+    
+    var displayName: String {
+        switch self {
+        case .answered:
+            return "Отвечен"
+        case .declined:
+            return "Отклонен"
+        case .missed:
+            return "Пропущен"
+        case .cancelled:
+            return "Отменен"
+        case .busy:
+            return "Занято"
+        case .failed:
+            return "Не удался"
+        }
+    }
+}
+
+// MARK: - Tab Navigation
+
+enum HomeScreenTab: String, CaseIterable, Identifiable {
+    case actual = "actual"
+    case calls = "calls"
+    case communities = "communities"
+    case chats = "chats"
+    case settings = "settings"
+    
+    var id: String {
+        rawValue
+    }
+    
+    var title: String {
+        switch self {
+        case .actual:
+            return "Актуальное"
+        case .calls:
+            return "Звонки"
+        case .communities:
+            return "Сообщества"
+        case .chats:
+            return "Чаты"
+        case .settings:
+            return "Настройки"
+        }
+    }
+    
+    var icon: KeyPath<CompoundIcons, Image> {
+        switch self {
+        case .actual:
+            return \.threads
+        case .calls:
+            return \.voiceCall
+        case .communities:
+            return \.public
+        case .chats:
+            return \.chat
+        case .settings:
+            return \.settings
+        }
+    }
+}
 
 enum HomeScreenViewModelAction: Equatable {
     case presentRoom(roomIdentifier: String)
@@ -104,6 +222,8 @@ struct HomeScreenViewState: BindableState {
     var hideInviteAvatars = false
     
     var reportRoomEnabled = false
+    
+    var totalUnreadCount: Int = 0
     
     var visibleRooms: [HomeScreenRoom] {
         if roomListMode == .skeletons {

@@ -117,6 +117,19 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
             MXLog.info("🎯 App hideUnreadMessagesBadge: \(appSettings.hideUnreadMessagesBadge)")
         }
     }
+    
+    // MARK: - Force re-registration
+    
+    func forceReRegisterPushers() async {
+        guard let userSession else { return }
+        
+        MXLog.info("[NotificationManager] Force re-registering pushers with updated payload")
+        
+        // Re-register for remote notifications to get fresh token
+        await MainActor.run { [weak self] in
+            self?.delegate?.registerForRemoteNotifications()
+        }
+    }
 
     func registrationFailed(with error: Error) {
         MXLog.error("[NotificationManager] device token registration failed with error: \(error)")
@@ -172,7 +185,7 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
     private func setPusher(with deviceToken: Data, clientProxy: ClientProxyProtocol) async -> Bool {
         do {
             let defaultPayload = APNSPayload(aps: APSInfo(mutableContent: 1,
-                                                          alert: APSAlert(locKey: "Notification",
+                                                          alert: APSAlert(locKey: "%@ sent a message",
                                                                           locArgs: [])),
                                              pusherNotificationClientIdentifier: clientProxy.pusherNotificationClientIdentifier)
 
@@ -303,12 +316,12 @@ final class BadgeCountService: BadgeCountServiceProtocol {
             }
             
             // Count unread messages, mentions, and notifications
-            let roomUnreadCount = Int(summary.unreadMessagesCount) +
-                Int(summary.unreadMentionsCount) +
-                Int(summary.unreadNotificationsCount)
+            // Fix: Use unreadNotificationsCount only to avoid double counting
+            let roomUnreadCount = max(Int(summary.unreadNotificationsCount), 
+                                    Int(summary.unreadMessagesCount))
             
-            // Also count marked unread rooms
-            let markedUnreadCount = summary.isMarkedUnread ? 1 : 0
+            // Also count marked unread rooms (but not if already has unread)
+            let markedUnreadCount = summary.isMarkedUnread && roomUnreadCount == 0 ? 1 : 0
             
             return total + roomUnreadCount + markedUnreadCount
         }

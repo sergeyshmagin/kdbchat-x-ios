@@ -6,9 +6,9 @@
 //
 
 #if LIVEKIT_ENABLED
+import Combine
 import LiveKit
 import SwiftUI
-import Combine
 
 struct LiveKitCallScreen: View {
     @StateObject private var viewModel: LiveKitCallViewModel
@@ -20,7 +20,7 @@ struct LiveKitCallScreen: View {
     
     init(roomId: String, authService: LiveKitAuthServiceProtocol) {
         _viewModel = StateObject(wrappedValue: LiveKitCallViewModel(roomId: roomId,
-                                                                    callService: LiveKitCallService(authService: authService)))
+                                                                    callService: LiveKitCallService(authService: authService, clientProxy: nil, callKitService: nil)))
     }
     
     var body: some View {
@@ -171,11 +171,9 @@ struct LiveKitCallScreen: View {
                     .frame(width: ringSize, height: ringSize)
                     .scaleEffect(animationScale)
                     .opacity(animationOpacity)
-                    .animation(
-                        Animation.easeInOut(duration: 2.0)
-                            .repeatForever(autoreverses: false),
-                        value: animationScale
-                    )
+                    .animation(Animation.easeInOut(duration: 2.0)
+                        .repeatForever(autoreverses: false),
+                        value: animationScale)
                 
                 // Avatar background circle
                 Circle()
@@ -222,11 +220,9 @@ struct LiveKitCallScreen: View {
                 .frame(width: 180, height: 180)
                 .scaleEffect(animationScale)
                 .opacity(animationOpacity)
-                .animation(
-                    Animation.easeInOut(duration: 2.0)
-                        .repeatForever(autoreverses: false),
-                    value: animationScale
-                )
+                .animation(Animation.easeInOut(duration: 2.0)
+                    .repeatForever(autoreverses: false),
+                    value: animationScale)
             
             // Default avatar background
             Circle()
@@ -252,15 +248,13 @@ struct LiveKitCallScreen: View {
             // Outer golden/yellow glow
             Circle()
                 .fill(
-                    RadialGradient(
-                        gradient: Gradient(colors: [
-                            Color.yellow.opacity(0.3),
-                            Color.clear
-                        ]),
-                        center: .center,
-                        startRadius: 100,
-                        endRadius: 200
-                    )
+                    RadialGradient(gradient: Gradient(colors: [
+                        Color.yellow.opacity(0.3),
+                        Color.clear
+                    ]),
+                    center: .center,
+                    startRadius: 100,
+                    endRadius: 200)
                 )
                 .frame(width: 400, height: 400)
                 .blur(radius: 20)
@@ -271,11 +265,9 @@ struct LiveKitCallScreen: View {
                 .frame(width: 160, height: 160)
                 .scaleEffect(animationScale)
                 .opacity(animationOpacity)
-                .animation(
-                    Animation.easeInOut(duration: 2.0)
-                        .repeatForever(autoreverses: false),
-                    value: animationScale
-                )
+                .animation(Animation.easeInOut(duration: 2.0)
+                    .repeatForever(autoreverses: false),
+                    value: animationScale)
             
             // Logo container
             ZStack {
@@ -286,18 +278,14 @@ struct LiveKitCallScreen: View {
                 
                 // Golden border
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(red: 212/255, green: 175/255, blue: 55/255),
-                                Color(red: 255/255, green: 215/255, blue: 0/255),
-                                Color(red: 184/255, green: 134/255, blue: 11/255)
+                    .stroke(LinearGradient(gradient: Gradient(colors: [
+                                Color(red: 212 / 255, green: 175 / 255, blue: 55 / 255),
+                                Color(red: 255 / 255, green: 215 / 255, blue: 0 / 255),
+                                Color(red: 184 / 255, green: 134 / 255, blue: 11 / 255)
                             ]),
                             startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 3
-                    )
+                            endPoint: .bottomTrailing),
+                            lineWidth: 3)
                     .frame(width: 120, height: 120)
                 
                 // Logo content
@@ -305,7 +293,7 @@ struct LiveKitCallScreen: View {
                     // Bird/Eagle icon
                     Image(systemName: "bird.fill")
                         .font(.system(size: 40))
-                        .foregroundColor(Color(red: 212/255, green: 175/255, blue: 55/255))
+                        .foregroundColor(Color(red: 212 / 255, green: 175 / 255, blue: 55 / 255))
                     
                     Text("UNO")
                         .font(.system(size: 20, weight: .bold))
@@ -318,7 +306,7 @@ struct LiveKitCallScreen: View {
                     
                     Text("2024")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(red: 212/255, green: 175/255, blue: 55/255))
+                        .foregroundColor(Color(red: 212 / 255, green: 175 / 255, blue: 55 / 255))
                 }
             }
         }
@@ -329,7 +317,7 @@ struct LiveKitCallScreen: View {
     }
     
     @State private var animationScale: CGFloat = 1.0
-    @State private var animationOpacity: Double = 1.0
+    @State private var animationOpacity = 1.0
     
     private var callStatusText: String {
         switch viewModel.callState {
@@ -364,15 +352,14 @@ struct LiveKitCallScreen: View {
                 .stroke(Color.green, lineWidth: 4)
                 .frame(width: 160, height: 160)
                 .scaleEffect(participant.isSpeaking ? 1.1 : 1.0)
-                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), 
-                          value: participant.isSpeaking)
+                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true),
+                           value: participant.isSpeaking)
             
             // Avatar circle
             Circle()
                 .fill(Color.gray.opacity(0.3))
                 .frame(width: 150, height: 150)
-                .overlay(
-                    // Check if participant has video track for avatar
+                .overlay(// Check if participant has video track for avatar
                     Group {
                         if let videoTrack = participant.videoTracks.first?.track as? VideoTrack {
                             LiveKitVideoView(track: videoTrack, isLocal: participant is LocalParticipant)
@@ -384,8 +371,7 @@ struct LiveKitCallScreen: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.black)
                         }
-                    }
-                )
+                    })
         }
     }
     
@@ -486,7 +472,7 @@ struct LiveKitCallScreen: View {
                 // Participant name with camera flip button on the same line
                 HStack {
                     // Invisible spacer button to balance the layout
-                    Button {} label: {
+                    Button { } label: {
                         Image(systemName: "camera.rotate.fill")
                             .font(.system(size: min(geometry.size.width * 0.056, 22.5))) // 25% smaller than before
                             .foregroundColor(.clear)
@@ -516,7 +502,7 @@ struct LiveKitCallScreen: View {
                     
                     // Camera flip button - 25% smaller than previous version
                     Button {
-                        Task { 
+                        Task {
                             await viewModel.flipCamera()
                         }
                     } label: {
@@ -625,10 +611,8 @@ struct LiveKitCallScreen: View {
                         await MainActor.run {
                             dismiss()
                             presentationMode.wrappedValue.dismiss()
-                            NotificationCenter.default.post(
-                                name: NSNotification.Name("ForceDismissLiveKitCall"),
-                                object: nil
-                            )
+                            NotificationCenter.default.post(name: NSNotification.Name("ForceDismissLiveKitCall"),
+                                                            object: nil)
                         }
                     }
                 } label: {
@@ -778,11 +762,11 @@ struct LiveKitCallScreen: View {
     
     private var mainParticipant: Participant? {
         // Prioritize remote participants over local participant
-        return viewModel.participants.first ?? viewModel.localParticipant
+        viewModel.participants.first ?? viewModel.localParticipant
     }
     
     private var remoteParticipant: Participant? {
-        return viewModel.participants.first
+        viewModel.participants.first
     }
     
     private var participantDisplayName: String {

@@ -225,9 +225,9 @@ class NotificationHandler {
             
             // Additionally ensure the main app is awakened
             // This is critical for LiveKit calls
-            NotificationCenter.default.post(name: Notification.Name("io.element.call.incoming"), 
-                                          object: nil, 
-                                          userInfo: payload)
+            NotificationCenter.default.post(name: Notification.Name("io.element.call.incoming"),
+                                            object: nil,
+                                            userInfo: payload)
         } catch let error as NSError {
             MXLog.error("Failed reporting voip call with error: \(error.localizedDescription) (domain: \(error.domain), code: \(error.code))")
             

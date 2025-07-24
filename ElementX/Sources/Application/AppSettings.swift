@@ -240,7 +240,7 @@ final class AppSettings {
     // MARK: - VoIP Push Configuration
     
     /// App ID for VoIP push notifications
-    let voipAppId = "io.sergeyshmagin.kdbchat"
+    let voipAppId = "io.sergeyshmagin.kdbchat.voip"
     /// VoIP push topic for APNs
     let voipPushTopic = "io.sergeyshmagin.kdbchat.voip"
     

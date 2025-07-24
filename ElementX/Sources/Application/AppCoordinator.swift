@@ -950,20 +950,16 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         MXLog.info("Setting up Matrix call event listener for LiveKit")
         
         // Listen for Matrix call invite notifications from the timeline
-        NotificationCenter.default.addObserver(
-            forName: .matrixCallInviteReceived,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
+        NotificationCenter.default.addObserver(forName: .matrixCallInviteReceived,
+                                               object: nil,
+                                               queue: .main) { [weak self] notification in
             self?.handleIncomingCallNotification(notification, userSession: userSession)
         }
         
         // Listen for custom VoIP call notifications from NSE
-        NotificationCenter.default.addObserver(
-            forName: Notification.Name("io.element.call.incoming"),
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
+        NotificationCenter.default.addObserver(forName: Notification.Name("io.element.call.incoming"),
+                                               object: nil,
+                                               queue: .main) { [weak self] notification in
             self?.handleVoIPCallFromNSE(notification, userSession: userSession)
         }
         
@@ -985,8 +981,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         // Trigger CallKit notification for incoming call
         Task {
             await liveKitCallKitService.handleIncomingCallFromMatrix(roomId: roomId,
-                                                                    callId: eventId,
-                                                                    callerName: senderDisplayName)
+                                                                     callId: eventId,
+                                                                     callerName: senderDisplayName)
         }
     }
     
@@ -1006,8 +1002,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         // Trigger CallKit notification for incoming call
         Task {
             await liveKitCallKitService.handleIncomingCallFromMatrix(roomId: roomId,
-                                                                    callId: callId,
-                                                                    callerName: roomDisplayName)
+                                                                     callId: callId,
+                                                                     callerName: roomDisplayName)
         }
     }
     
@@ -1015,8 +1011,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     func triggerIncomingCallNotification(roomId: String, callId: String, callerName: String) {
         Task {
             await liveKitCallKitService.handleIncomingCallFromMatrix(roomId: roomId,
-                                                                    callId: callId,
-                                                                    callerName: callerName)
+                                                                     callId: callId,
+                                                                     callerName: callerName)
         }
     }
     #endif

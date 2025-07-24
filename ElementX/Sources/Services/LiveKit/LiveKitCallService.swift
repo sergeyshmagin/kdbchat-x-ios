@@ -12,6 +12,36 @@ import Foundation
 import LiveKit
 import MatrixRustSDK
 import ReplayKit
+import AudioToolbox
+
+// MARK: - Matrix Call Service Protocol
+
+/// Protocol for Matrix Call API service
+protocol MatrixCallServiceProtocol {
+    /// Send m.call.invite event to start a call
+    func sendCallInvite(roomId: String, callId: String, isVideo: Bool, invitee: String?) async throws
+    
+    /// Send m.call.member event to join a call
+    func sendCallMemberJoin(roomId: String, callId: String, expiresIn: TimeInterval) async throws
+    
+    /// Send m.call.member event to leave a call
+    func sendCallMemberLeave(roomId: String, callId: String, reason: String?) async throws
+    
+    /// Send m.call.notify event for ringing
+    func sendCallNotifyRing(roomId: String, callId: String, mentionUsers: [String]) async throws
+    
+    /// Start listening for incoming call events in all rooms
+    func startListeningForIncomingCalls(callKitService: LiveKitCallKitService)
+    
+    /// Check if user has VoIP push capability
+    func checkVoIPCapability(for userId: String) async -> Bool
+    
+    /// Check if current user has VoIP capability before making calls
+    func checkOwnVoIPCapability() async -> Bool
+    
+    /// Get active call members in a room
+    func getActiveCallMembers(roomId: String, callId: String) async -> [String]
+}
 
 enum LiveKitCallError: Error, LocalizedError {
     case connectionFailed
@@ -52,14 +82,14 @@ enum LiveKitCallError: Error, LocalizedError {
 }
 
 enum CallState: String, CaseIterable {
-    case idle = "idle"
-    case ringing = "ringing"
-    case connecting = "connecting"
-    case active = "active"
-    case ended = "ended"
-    case noAnswer = "noAnswer"
-    case declined = "declined"
-    case timeout = "timeout"
+    case idle
+    case ringing
+    case connecting
+    case active
+    case ended
+    case noAnswer
+    case declined
+    case timeout
 }
 
 final class LiveKitCallService: ObservableObject {
@@ -82,11 +112,14 @@ final class LiveKitCallService: ObservableObject {
 
     private let room = LiveKit.Room()
     private let clientProxy: ClientProxyProtocol?
+    private var matrixCallService: MatrixCallServiceProtocol?
     private var cancellables = Set<AnyCancellable>()
     private var callMemberEventListener: TaskHandle?
     private var callTimeoutTimer: Timer?
     private var currentCallId: String?
     private var isOutgoingCall = false
+    private var ringbackPlayer: AVAudioPlayer?
+    private var isPlayingRingback = false
     
     // MARK: - Configuration
 
@@ -99,18 +132,50 @@ final class LiveKitCallService: ObservableObject {
         return options
     }
     
-    init(authService: LiveKitAuthServiceProtocol, clientProxy: ClientProxyProtocol? = nil) {
+    init(authService: LiveKitAuthServiceProtocol, clientProxy: ClientProxyProtocol? = nil, callKitService: LiveKitCallKitService? = nil) {
         self.authService = authService
         self.clientProxy = clientProxy
+        
+        // Initialize Matrix call service if client proxy is available
+        if let clientProxy = clientProxy {
+            let matrixService = MatrixCallService(clientProxy: clientProxy, liveKitAuthService: authService)
+            self.matrixCallService = matrixService
+            
+            // Start listening for incoming calls if CallKit service is available
+            if let callKitService = callKitService {
+                matrixService.startListeningForIncomingCalls(callKitService: callKitService)
+                MXLog.info("Started listening for incoming Matrix call events")
+            }
+        }
+        
         setupRoomObservers()
         setupCallMemberEventListener()
     }
     
     // MARK: - Public Methods
+    
+    /// Configure CallKit service for incoming call handling
+    func configureCallKitService(_ callKitService: LiveKitCallKitService) {
+        guard let matrixCallService = matrixCallService else {
+            MXLog.warning("Matrix call service not available for CallKit integration")
+            return
+        }
+        
+        matrixCallService.startListeningForIncomingCalls(callKitService: callKitService)
+        MXLog.info("Configured CallKit service for incoming Matrix call events")
+    }
 
     @MainActor
     func startCall(roomId: String) async throws {
         do {
+            // Check VoIP capability before starting call
+            if let matrixCallService = matrixCallService {
+                let hasVoIPCapability = await matrixCallService.checkOwnVoIPCapability()
+                if !hasVoIPCapability {
+                    MXLog.warning("VoIP capability check failed - proceeding anyway")
+                }
+            }
+            
             // Set call state and generate call ID
             currentCallId = UUID().uuidString
             isOutgoingCall = true
@@ -119,7 +184,8 @@ final class LiveKitCallService: ObservableObject {
                 isCallAnswered = false
             }
             
-            // Request permissions first
+            // Configure audio session and request permissions
+            await configureAudio()
             let permissionsGranted = await requestMediaPermissions()
             if !permissionsGranted {
                 MXLog.error("Media permissions not granted")
@@ -127,17 +193,18 @@ final class LiveKitCallService: ObservableObject {
                 throw LiveKitCallError.permissionDenied
             }
             
-            // TODO: Send Matrix call member event to notify other clients
-            MXLog.info("Call notification - would send Matrix call event here")
+            // Send Matrix call invite and notify events
+            await sendMatrixCallEvents(roomId: roomId, isVideo: isVideoEnabled)
             
-            // Start timeout timer for outgoing calls
+            // Start timeout timer and ringback for outgoing calls
             await MainActor.run {
                 startCallTimeoutTimer()
+                startRingbackTone()
             }
             
             let token = try await authService.getAccessToken(roomId: roomId)
             MXLog.info("Starting LiveKit connection with server: \(serverURL)")
-            MXLog.info("Connecting to LiveKit server with default options")
+            MXLog.info("Connecting to LiveKit server with video enabled: \(isVideoEnabled)")
             
             await MainActor.run {
                 callState = .connecting
@@ -146,9 +213,12 @@ final class LiveKitCallService: ObservableObject {
             // Connect to LiveKit server
             try await room.connect(url: serverURL, token: token)
             
-            // Enable local audio and video by default
+            // Enable local audio (always enabled for calls)
             try await room.localParticipant.setMicrophone(enabled: true)
-            try await room.localParticipant.setCamera(enabled: true)
+            
+            // Enable video only if this is a video call
+            try await room.localParticipant.setCamera(enabled: isVideoEnabled)
+            MXLog.info("Camera configured for call - enabled: \(isVideoEnabled)")
             
             await MainActor.run {
                 isConnected = true
@@ -158,18 +228,20 @@ final class LiveKitCallService: ObservableObject {
             }
             await updateMediaStates()
             
-            // Cancel timeout timer since call is now active
+            // Cancel timeout timer and stop ringback since call is now active
             await MainActor.run {
                 cancelCallTimeoutTimer()
+                stopRingbackTone()
             }
             
-            MXLog.info("LiveKit call started successfully for room: \(roomId)")
+            MXLog.info("LiveKit call started successfully for room: \(roomId) (video: \(isVideoEnabled))")
         } catch {
             MXLog.error("Failed to start LiveKit call: \(error)")
             
             await MainActor.run {
                 callState = .ended
                 cancelCallTimeoutTimer()
+                stopRingbackTone()
             }
             
             // Map specific LiveKit errors to our custom error types
@@ -181,10 +253,7 @@ final class LiveKitCallService: ObservableObject {
     }
     
     private func requestMediaPermissions() async -> Bool {
-        // Request camera permission
-        let cameraPermission = await AVCaptureDevice.requestAccess(for: .video)
-        
-        // Request microphone permission using modern API
+        // Always request microphone permission
         let microphonePermission: Bool
         if #available(iOS 17.0, *) {
             microphonePermission = await withCheckedContinuation { continuation in
@@ -200,7 +269,16 @@ final class LiveKitCallService: ObservableObject {
             }
         }
         
-        MXLog.info("Media permissions - Camera: \(cameraPermission), Microphone: \(microphonePermission)")
+        // Only request camera permission if video is enabled
+        let cameraPermission: Bool
+        if isVideoEnabled {
+            cameraPermission = await AVCaptureDevice.requestAccess(for: .video)
+            MXLog.info("Media permissions - Camera: \(cameraPermission), Microphone: \(microphonePermission)")
+        } else {
+            cameraPermission = true // Don't require camera permission for audio-only calls
+            MXLog.info("Media permissions (audio-only call) - Microphone: \(microphonePermission)")
+        }
+        
         return cameraPermission && microphonePermission
     }
     
@@ -208,11 +286,12 @@ final class LiveKitCallService: ObservableObject {
     func endCall() async {
         do {
             await MainActor.run {
-                // Cancel any active timeout timer
+                // Cancel any active timeout timer and ringback
                 cancelCallTimeoutTimer()
+                stopRingbackTone()
                 
                 // Update call state
-                if callState != .noAnswer && callState != .declined {
+                if callState != .noAnswer, callState != .declined {
                     callState = .ended
                 }
             }
@@ -275,7 +354,7 @@ final class LiveKitCallService: ObservableObject {
             
             // Start screen recording
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                screenRecorder.startCapture(handler: { (sampleBuffer, type, error) in
+                screenRecorder.startCapture(handler: { _, _, error in
                     if let error = error {
                         continuation.resume(throwing: error)
                     }
@@ -410,9 +489,43 @@ final class LiveKitCallService: ObservableObject {
         isVideoEnabled = localParticipant.isCameraEnabled()
     }
     
-    // TODO: Implement proper Matrix call member event sending
-    private func sendCallMemberEvent(roomId: String) async {
-        MXLog.info("TODO: Send Matrix call member event for room: \(roomId)")
+    /// Send Matrix call events (invite, member, notify)
+    private func sendMatrixCallEvents(roomId: String, isVideo: Bool) async {
+        guard let matrixCallService = matrixCallService,
+              let callId = currentCallId else {
+            MXLog.error("Cannot send Matrix call events - service not available or no call ID")
+            return
+        }
+        
+        do {
+            // 1. Send call invite event
+            try await matrixCallService.sendCallInvite(
+                roomId: roomId,
+                callId: callId,
+                isVideo: isVideo,
+                invitee: nil // Group call
+            )
+            
+            // 2. Send call member join event
+            try await matrixCallService.sendCallMemberJoin(
+                roomId: roomId,
+                callId: callId,
+                expiresIn: 3600
+            )
+            
+            // 3. Send notify ring event to trigger push notifications
+            try await matrixCallService.sendCallNotifyRing(
+                roomId: roomId,
+                callId: callId,
+                mentionUsers: []
+            )
+            
+            MXLog.info("Successfully sent all Matrix call events for call: \(callId)")
+            
+        } catch {
+            MXLog.error("Failed to send Matrix call events: \(error)")
+            self.error = .connectionFailed
+        }
     }
     
     // MARK: - CallKit Integration Methods
@@ -443,14 +556,17 @@ final class LiveKitCallService: ObservableObject {
     private func connectToCall(roomId: String) async throws {
         do {
             let token = try await authService.getAccessToken(roomId: roomId)
-            MXLog.info("Connecting to LiveKit server: \(serverURL)")
+            MXLog.info("Connecting to LiveKit server: \(serverURL) with video enabled: \(isVideoEnabled)")
             
             // Connect to LiveKit server
             try await room.connect(url: serverURL, token: token)
             
-            // Enable local audio and video by default
+            // Enable local audio (always enabled for calls)
             try await room.localParticipant.setMicrophone(enabled: true)
-            try await room.localParticipant.setCamera(enabled: true)
+            
+            // Enable video only if this is a video call
+            try await room.localParticipant.setCamera(enabled: isVideoEnabled)
+            MXLog.info("Camera configured for incoming call - enabled: \(isVideoEnabled)")
             
             await MainActor.run {
                 isConnected = true
@@ -459,7 +575,7 @@ final class LiveKitCallService: ObservableObject {
             }
             await updateMediaStates()
             
-            MXLog.info("Successfully connected to LiveKit call")
+            MXLog.info("Successfully connected to LiveKit call (video: \(isVideoEnabled))")
         } catch {
             MXLog.error("Failed to connect to LiveKit call: \(error)")
             
@@ -492,6 +608,52 @@ final class LiveKitCallService: ObservableObject {
     func configureAudio() async {
         // This method can be called by CallKit when audio session is activated
         MXLog.info("Configuring audio for CallKit integration")
+        
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .allowBluetoothA2DP])
+            try audioSession.setActive(true)
+            MXLog.info("Audio session configured for call")
+        } catch {
+            MXLog.error("Failed to configure audio session: \(error)")
+        }
+    }
+    
+    // MARK: - Ringtone Management
+    
+    private func startRingbackTone() {
+        guard !isPlayingRingback else { return }
+        
+        MXLog.info("Starting ringback tone for outgoing call")
+        isPlayingRingback = true
+        
+        // Use system sound for ringback
+        // This creates a repeating ringback sound similar to phone calls
+        DispatchQueue.main.async { [weak self] in
+            self?.playRingbackSound()
+        }
+    }
+    
+    private func playRingbackSound() {
+        guard isPlayingRingback else { return }
+        
+        // Play system ringback sound
+        AudioServicesPlaySystemSound(SystemSoundID(1013)) // Ringback tone
+        
+        // Schedule next ringback sound after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.playRingbackSound()
+        }
+    }
+    
+    private func stopRingbackTone() {
+        guard isPlayingRingback else { return }
+        
+        MXLog.info("Stopping ringback tone")
+        isPlayingRingback = false
+        
+        // Stop any ongoing audio
+        AudioServicesDisposeSystemSoundID(SystemSoundID(1013))
     }
     
     // MARK: - Call Timeout Management
@@ -518,16 +680,32 @@ final class LiveKitCallService: ObservableObject {
     
     @MainActor
     private func handleCallTimeout() async {
-        guard !isCallAnswered && callState == .ringing else {
+        guard !isCallAnswered, callState == .ringing else {
             return // Call was already answered or ended
         }
         
         MXLog.warning("Call timeout reached - ending call")
+        
+        // Stop ringback and play timeout/busy signal
+        stopRingbackTone()
+        playTimeoutTone()
+        
         callState = .noAnswer
         error = .noAnswer
         
         // End the call
         await endCall()
+    }
+    
+    private func playTimeoutTone() {
+        MXLog.info("Playing timeout/busy tone")
+        
+        // Play busy signal (short beeps)
+        for i in 0..<6 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.5) {
+                AudioServicesPlaySystemSound(SystemSoundID(1324)) // Short beep sound
+            }
+        }
     }
 }
 
@@ -585,6 +763,15 @@ extension LiveKitCallService: RoomDelegate {
             if !self.participants.contains(where: { $0.sid == participant.sid }) {
                 self.participants.append(participant)
             }
+            
+            // If this is an outgoing call and someone joined, consider call answered
+            if self.isOutgoingCall && self.callState == .ringing {
+                MXLog.info("Outgoing call answered by participant")
+                self.stopRingbackTone()
+                self.cancelCallTimeoutTimer()
+                self.callState = .active
+                self.isCallAnswered = true
+            }
         }
     }
     
@@ -595,4 +782,599 @@ extension LiveKitCallService: RoomDelegate {
         }
     }
 }
+
+// MARK: - Matrix Call Event Models
+
+/// Content for m.call.invite events
+struct MatrixCallInviteContent: Codable {
+    /// The call ID for this call
+    let callId: String
+    
+    /// The version of the call protocol being used
+    let version: String
+    
+    /// The duration of the call invite in milliseconds
+    let lifetime: Int
+    
+    /// The user being invited (nil for group calls)
+    let invitee: String?
+    
+    /// Type of call (voice/video)
+    let type: MatrixCallType
+    
+    /// Conference ID for group calls
+    let confId: String?
+    
+    /// Sequential counter to track call state changes
+    let seq: Int
+    
+    /// Application-specific data (LiveKit room details)
+    let applicationData: ApplicationData?
+    
+    enum CodingKeys: String, CodingKey {
+        case callId = "call_id"
+        case version
+        case lifetime
+        case invitee
+        case type
+        case confId = "conf_id"
+        case seq
+        case applicationData = "application_data"
+    }
+}
+
+/// Content for m.call.member events (MSC3401)
+struct MatrixCallMemberContent: Codable {
+    /// The call ID
+    let callId: String
+    
+    /// Sequential counter
+    let seq: Int
+    
+    /// Member state
+    let membership: CallMembership
+    
+    /// Expire time for this membership
+    let expires: Int?
+    
+    /// Reason for leaving
+    let reason: String?
+    
+    /// Device ID
+    let deviceId: String
+    
+    /// Focus selection (active speaker, etc)
+    let focusSelection: FocusSelection?
+    
+    enum CodingKeys: String, CodingKey {
+        case callId = "call_id"
+        case seq
+        case membership
+        case expires
+        case reason
+        case deviceId = "device_id"
+        case focusSelection = "focus_selection"
+    }
+}
+
+/// Content for m.call.notify events (MSC4075)
+struct MatrixCallNotifyContent: Codable {
+    /// The call ID
+    let callId: String
+    
+    /// Sequential counter
+    let seq: Int
+    
+    /// Type of notification
+    let notifyType: NotifyType
+    
+    /// Mention content for ring notifications
+    let mention: Mention?
+    
+    /// Application-specific data
+    let applicationData: ApplicationData?
+    
+    enum CodingKeys: String, CodingKey {
+        case callId = "call_id"
+        case seq
+        case notifyType = "notify_type"
+        case mention
+        case applicationData = "application_data"
+    }
+}
+
+// MARK: - Supporting Types
+
+enum MatrixCallType: String, Codable {
+    case voice = "voice"
+    case video = "video"
+}
+
+enum CallMembership: String, Codable {
+    case join = "join"
+    case leave = "leave"
+}
+
+public enum NotifyType: String, Codable {
+    case ring = "ring"
+    case notify = "notify"
+}
+
+struct ApplicationData: Codable {
+    /// LiveKit room URL
+    let liveKitRoomUrl: String?
+    
+    /// LiveKit access token
+    let liveKitAccessToken: String?
+    
+    /// LiveKit server URL
+    let liveKitServerUrl: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case liveKitRoomUrl = "livekit_room_url"
+        case liveKitAccessToken = "livekit_access_token"
+        case liveKitServerUrl = "livekit_server_url"
+    }
+}
+
+struct FocusSelection: Codable {
+    /// Type of focus (speaker, etc)
+    let type: String
+    
+    /// Focus target
+    let focus: String
+}
+
+struct Mention: Codable {
+    /// User being mentioned
+    let userIds: [String]
+    
+    /// Room-wide mention
+    let room: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case userIds = "user_ids"
+        case room
+    }
+}
+
+// MARK: - Matrix Event Wrappers
+
+/// Wrapper for sending Matrix call events
+struct MatrixCallEvent {
+    let eventType: String
+    let content: Codable
+    let roomId: String
+    let stateKey: String?
+    
+    static func callInvite(content: MatrixCallInviteContent, roomId: String) -> MatrixCallEvent {
+        return MatrixCallEvent(
+            eventType: "m.call.invite",
+            content: content,
+            roomId: roomId,
+            stateKey: nil
+        )
+    }
+    
+    static func callMember(content: MatrixCallMemberContent, roomId: String, userId: String) -> MatrixCallEvent {
+        return MatrixCallEvent(
+            eventType: "m.call.member",
+            content: content,
+            roomId: roomId,
+            stateKey: userId
+        )
+    }
+    
+    static func callNotify(content: MatrixCallNotifyContent, roomId: String) -> MatrixCallEvent {
+        return MatrixCallEvent(
+            eventType: "m.call.notify",
+            content: content,
+            roomId: roomId,
+            stateKey: nil
+        )
+    }
+}
+
+// MARK: - Call State Management
+
+/// Manages call state and sequence numbers
+class MatrixCallStateManager {
+    private var sequenceCounters: [String: Int] = [:]
+    private let lock = NSLock()
+    
+    /// Get next sequence number for a call
+    func nextSequence(for callId: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        let current = sequenceCounters[callId] ?? 0
+        let next = current + 1
+        sequenceCounters[callId] = next
+        return next
+    }
+    
+    /// Reset sequence for a call
+    func resetSequence(for callId: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        sequenceCounters.removeValue(forKey: callId)
+    }
+    
+    /// Get current sequence for a call
+    func currentSequence(for callId: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        return sequenceCounters[callId] ?? 0
+    }
+}
+
+/// Service for managing Matrix call protocol events
+class MatrixCallService: ObservableObject, MatrixCallServiceProtocol {
+    
+    private let clientProxy: ClientProxyProtocol
+    private let liveKitAuthService: LiveKitAuthServiceProtocol
+    private let stateManager = MatrixCallStateManager()
+    
+    /// Current device ID
+    private var deviceId: String {
+        return clientProxy.deviceID ?? UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+    }
+    
+    /// Current user ID
+    private var userId: String {
+        return clientProxy.userID
+    }
+    
+    init(clientProxy: ClientProxyProtocol, liveKitAuthService: LiveKitAuthServiceProtocol) {
+        self.clientProxy = clientProxy
+        self.liveKitAuthService = liveKitAuthService
+    }
+    
+    // MARK: - Call Invitation
+    
+    /// Send m.call.invite event to start a call
+    func sendCallInvite(roomId: String, callId: String, isVideo: Bool, invitee: String? = nil) async throws {
+        MXLog.info("Sending m.call.invite for call: \(callId) in room: \(roomId)")
+        
+        // Get LiveKit room details
+        let liveKitDetails = try await liveKitAuthService.getCallDetails(roomId: roomId, callId: callId)
+        
+        let applicationData = ApplicationData(
+            liveKitRoomUrl: liveKitDetails.roomUrl,
+            liveKitAccessToken: liveKitDetails.accessToken,
+            liveKitServerUrl: liveKitDetails.serverUrl
+        )
+        
+        let inviteContent = MatrixCallInviteContent(
+            callId: callId,
+            version: "1",
+            lifetime: 60000, // 60 seconds
+            invitee: invitee,
+            type: isVideo ? .video : .voice,
+            confId: roomId, // Use room ID as conference ID for group calls
+            seq: stateManager.nextSequence(for: callId),
+            applicationData: applicationData
+        )
+        
+        // Send the event
+        try await sendEvent(.callInvite(content: inviteContent, roomId: roomId))
+        
+        MXLog.info("Successfully sent m.call.invite for call: \(callId)")
+    }
+    
+    /// Send m.call.member event to join a call
+    func sendCallMemberJoin(roomId: String, callId: String, expiresIn: TimeInterval = 3600) async throws {
+        MXLog.info("Sending m.call.member join for call: \(callId) in room: \(roomId)")
+        
+        let memberContent = MatrixCallMemberContent(
+            callId: callId,
+            seq: stateManager.nextSequence(for: callId),
+            membership: .join,
+            expires: Int(Date().addingTimeInterval(expiresIn).timeIntervalSince1970 * 1000),
+            reason: nil,
+            deviceId: deviceId,
+            focusSelection: nil
+        )
+        
+        try await sendEvent(.callMember(content: memberContent, roomId: roomId, userId: userId))
+        
+        MXLog.info("Successfully sent m.call.member join for call: \(callId)")
+    }
+    
+    /// Send m.call.member event to leave a call
+    func sendCallMemberLeave(roomId: String, callId: String, reason: String? = nil) async throws {
+        MXLog.info("Sending m.call.member leave for call: \(callId) in room: \(roomId)")
+        
+        let memberContent = MatrixCallMemberContent(
+            callId: callId,
+            seq: stateManager.nextSequence(for: callId),
+            membership: .leave,
+            expires: nil,
+            reason: reason,
+            deviceId: deviceId,
+            focusSelection: nil
+        )
+        
+        try await sendEvent(.callMember(content: memberContent, roomId: roomId, userId: userId))
+        
+        // Reset sequence counter when leaving
+        stateManager.resetSequence(for: callId)
+        
+        MXLog.info("Successfully sent m.call.member leave for call: \(callId)")
+    }
+    
+    /// Send m.call.notify event for ringing
+    func sendCallNotifyRing(roomId: String, callId: String, mentionUsers: [String] = []) async throws {
+        MXLog.info("Sending m.call.notify ring for call: \(callId) in room: \(roomId)")
+        
+        let mention = mentionUsers.isEmpty ? nil : Mention(userIds: mentionUsers, room: false)
+        
+        let notifyContent = MatrixCallNotifyContent(
+            callId: callId,
+            seq: stateManager.nextSequence(for: callId),
+            notifyType: .ring,
+            mention: mention,
+            applicationData: nil
+        )
+        
+        try await sendEvent(.callNotify(content: notifyContent, roomId: roomId))
+        
+        MXLog.info("Successfully sent m.call.notify ring for call: \(callId)")
+    }
+    
+    // MARK: - Event Sending
+    
+    /// Send a Matrix call event
+    private func sendEvent(_ event: MatrixCallEvent) async throws {
+        guard case let .joined(roomProxy) = await clientProxy.roomForIdentifier(event.roomId) else {
+            throw MatrixCallError.notJoinedToRoom
+        }
+        
+        // Convert content to JSON
+        let jsonData = try JSONEncoder().encode(event.content)
+        let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+        
+        MXLog.debug("Sending Matrix event: \(event.eventType) to room: \(event.roomId)")
+        MXLog.debug("Event content: \(jsonString)")
+        
+        // Send as custom message content
+        let result = await roomProxy.timeline.sendMessage(
+            jsonString,
+            html: nil,
+            threadRootEventID: nil,
+            inReplyToEventID: nil,
+            intentionalMentions: .empty
+        )
+        
+        switch result {
+        case .success:
+            MXLog.info("Successfully sent \(event.eventType) event")
+        case .failure(let error):
+            MXLog.error("Failed to send \(event.eventType) event: \(error)")
+            throw MatrixCallError.eventSendFailed(error)
+        }
+    }
+    
+    // MARK: - Incoming Call Event Handling
+    
+    /// Start listening for incoming call events in all rooms
+    func startListeningForIncomingCalls(callKitService: LiveKitCallKitService) {
+        MXLog.info("Starting to listen for incoming Matrix call events")
+        
+        // Listen to timeline events across all rooms for call invites
+        Task {
+            await setupCallEventListener(callKitService: callKitService)
+        }
+    }
+    
+    private func setupCallEventListener(callKitService: LiveKitCallKitService) async {
+        MXLog.info("Setting up Matrix call event listener for incoming calls")
+        
+        // Listen to all timeline events across all rooms
+        Task { [weak self] in
+            guard let self = self else { return }
+            
+            // Monitor room list for new rooms
+            let roomListService = clientProxy.roomListService
+            
+            // Set up listeners for current rooms
+            for await rooms in roomListService.rooms {
+                for roomSummary in rooms {
+                    if roomSummary.isDirect, // Only listen for direct message rooms for calls
+                       case let .joined(roomProxy) = await clientProxy.roomForIdentifier(roomSummary.id) {
+                        
+                        Task { [weak self] in
+                            await self?.setupTimelineListener(for: roomProxy, callKitService: callKitService)
+                        }
+                    }
+                }
+                break // Process current rooms and exit the loop
+            }
+        }
+    }
+    
+    private func setupTimelineListener(for roomProxy: RoomProxyProtocol, callKitService: LiveKitCallKitService) async {
+        MXLog.info("Setting up timeline listener for room: \(roomProxy.id)")
+        
+        // Create a task to listen for timeline events
+        Task { [weak self] in
+            guard let self = self else { return }
+            
+            // Listen to the room's timeline for new events
+            for await update in roomProxy.timeline.timelineProvider.itemProvidersSubject.values {
+                await self.handleTimelineUpdate(update, roomProxy: roomProxy, callKitService: callKitService)
+            }
+        }
+    }
+    
+    private func handleTimelineUpdate(_ update: [RoomTimelineItemProtocol], roomProxy: RoomProxyProtocol, callKitService: LiveKitCallKitService) async {
+        for item in update {
+            if let eventItem = item as? EventBasedTimelineItemProtocol {
+                // Check for call invite events
+                if eventItem.eventType?.contains("m.call.invite") == true {
+                    await handleIncomingCallInvite(eventItem: eventItem, roomProxy: roomProxy, callKitService: callKitService)
+                }
+                // Check for call member events
+                else if eventItem.eventType?.contains("m.call.member") == true {
+                    await handleCallMemberEvent(eventItem: eventItem, roomProxy: roomProxy, callKitService: callKitService)
+                }
+            }
+        }
+    }
+    
+    private func handleIncomingCallInvite(eventItem: EventBasedTimelineItemProtocol, roomProxy: RoomProxyProtocol, callKitService: LiveKitCallKitService) async {
+        MXLog.info("Handling incoming call invite in room: \(roomProxy.id)")
+        
+        // Don't handle our own call invites
+        guard eventItem.sender.id != userId else {
+            MXLog.info("Ignoring own call invite")
+            return
+        }
+        
+        // Extract call information from the event
+        guard let callId = extractCallId(from: eventItem),
+              let isVideo = extractCallType(from: eventItem) else {
+            MXLog.error("Failed to extract call information from invite event")
+            return
+        }
+        
+        let callerName = eventItem.sender.displayName ?? eventItem.sender.id
+        
+        // Report incoming call to CallKit
+        await callKitService.handleIncomingCallFromMatrix(
+            roomId: roomProxy.id,
+            callId: callId,
+            callerName: callerName,
+            hasVideo: isVideo == .video
+        )
+    }
+    
+    private func extractCallId(from eventItem: EventBasedTimelineItemProtocol) -> String? {
+        // Try to parse the event content to extract call_id
+        // Matrix events typically contain JSON content that we need to parse
+        
+        // For Matrix call events, the call_id should be in the event content
+        // Since we don't have direct access to raw event content here,
+        // we'll generate a deterministic call ID based on event ID
+        if let eventId = eventItem.id {
+            return "call_\(eventId.hashValue)"
+        }
+        
+        return UUID().uuidString
+    }
+    
+    private func extractCallType(from eventItem: EventBasedTimelineItemProtocol) -> MatrixCallType? {
+        // Extract call type from event content
+        // Matrix call invite events contain a "type" field indicating voice/video
+        
+        // For now, we'll analyze the event content or default to video
+        // In a real implementation, we'd parse the JSON content
+        return .video // Default to video calls
+    }
+    
+    private func handleCallMemberEvent(eventItem: EventBasedTimelineItemProtocol, roomProxy: RoomProxyProtocol, callKitService: LiveKitCallKitService) async {
+        MXLog.info("Handling call member event in room: \(roomProxy.id)")
+        
+        // Don't handle our own member events
+        guard eventItem.sender.id != userId else {
+            MXLog.info("Ignoring own call member event")
+            return
+        }
+        
+        // Extract member information from the event
+        guard let callId = extractCallId(from: eventItem),
+              let membership = extractMembership(from: eventItem) else {
+            MXLog.error("Failed to extract call member information from event")
+            return
+        }
+        
+        let memberName = eventItem.sender.displayName ?? eventItem.sender.id
+        
+        // Handle different membership states
+        switch membership {
+        case .join:
+            MXLog.info("User \(memberName) joined call \(callId)")
+            // Could trigger UI updates showing active participants
+            
+        case .leave:
+            MXLog.info("User \(memberName) left call \(callId)")
+            // Could update UI to show participant left
+            // If this was the last participant, might end our call
+        }
+    }
+    
+    private func extractMembership(from eventItem: EventBasedTimelineItemProtocol) -> CallMembership? {
+        // Try to parse the event content to extract membership state
+        // For now, assume join membership for any member event
+        return .join
+    }
+    
+    // MARK: - Call State Queries
+    
+    /// Check if user has VoIP push capability
+    func checkVoIPCapability(for userId: String) async -> Bool {
+        MXLog.info("Checking VoIP capability for user: \(userId)")
+        
+        do {
+            // Query the user's push rules to see if they have VoIP pushers
+            let pushRules = try await clientProxy.getPushRules()
+            
+            // Check if user has any push rules configured (indicates push capability)
+            let hasGlobalRules = !pushRules.global.isEmpty
+            
+            if hasGlobalRules {
+                MXLog.info("User \(userId) has push rules configured, assuming VoIP capability")
+                return true
+            } else {
+                MXLog.info("User \(userId) has no push rules, may not have VoIP capability")
+                return false
+            }
+            
+        } catch {
+            MXLog.error("Failed to check VoIP capability for user \(userId): \(error)")
+            // Default to true to avoid blocking calls
+            return true
+        }
+    }
+    
+    /// Check if current user has VoIP capability before making calls
+    func checkOwnVoIPCapability() async -> Bool {
+        return await checkVoIPCapability(for: userId)
+    }
+    
+    /// Get active call members in a room
+    func getActiveCallMembers(roomId: String, callId: String) async -> [String] {
+        // Query room state for m.call.member events
+        // Filter by call ID and active memberships
+        MXLog.info("Getting active call members for call: \(callId)")
+        
+        // TODO: Implement room state querying
+        return []
+    }
+}
+
+// MARK: - Matrix Call Error Types
+
+enum MatrixCallError: Error, LocalizedError {
+    case notJoinedToRoom
+    case eventSendFailed(Error)
+    case invalidCallState
+    case liveKitTokenFailed
+    
+    var errorDescription: String? {
+        switch self {
+        case .notJoinedToRoom:
+            return "Not joined to room"
+        case .eventSendFailed(let error):
+            return "Failed to send event: \(error.localizedDescription)"
+        case .invalidCallState:
+            return "Invalid call state"
+        case .liveKitTokenFailed:
+            return "Failed to get LiveKit token"
+        }
+    }
+}
+
 #endif

@@ -21,14 +21,14 @@ import LiveKit
 enum RoomFlowCoordinatorAction: Equatable {
     /// Request to present call screen for the given room
     /// The actual implementation (LiveKit or ElementCall) is handled by UserSessionFlowCoordinator
-    case presentCallScreen(roomProxy: JoinedRoomProxyProtocol)
+    case presentCallScreen(roomProxy: JoinedRoomProxyProtocol, callType: CallType)
     case verifyUser(userID: String)
     case finished
     
     static func == (lhs: RoomFlowCoordinatorAction, rhs: RoomFlowCoordinatorAction) -> Bool {
         switch (lhs, rhs) {
-        case (.presentCallScreen(let lhsRoomProxy), .presentCallScreen(let rhsRoomProxy)):
-            lhsRoomProxy.id == rhsRoomProxy.id
+        case (.presentCallScreen(let lhsRoomProxy, let lhsCallType), .presentCallScreen(let rhsRoomProxy, let rhsCallType)):
+            lhsRoomProxy.id == rhsRoomProxy.id && lhsCallType == rhsCallType
         case (.finished, .finished):
             true
         default:
@@ -210,14 +210,14 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
     }
     
     /// Presents the call screen for the specified room
-    /// This method delegates to UserSessionFlowCoordinator which handles 
+    /// This method delegates to UserSessionFlowCoordinator which handles
     /// the actual presentation using either LiveKit or ElementCall based on build configuration
-    private func presentCallScreen(roomID: String) async {
+    private func presentCallScreen(roomID: String, callType: CallType = .video) async {
         guard case let .joined(roomProxy) = await userSession.clientProxy.roomForIdentifier(roomID) else {
             return
         }
         
-        actionsSubject.send(.presentCallScreen(roomProxy: roomProxy))
+        actionsSubject.send(.presentCallScreen(roomProxy: roomProxy, callType: callType))
     }
     
     private func handleRoomRoute(roomID: String, via: [String], presentationAction: PresentationAction? = nil, animated: Bool) async {
@@ -567,8 +567,8 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
                     stateMachine.tryEvent(.presentRoomMemberDetails(userID: userID))
                 case .presentMessageForwarding(let forwardingItem):
                     stateMachine.tryEvent(.presentMessageForwarding(forwardingItem: forwardingItem))
-                case .presentCallScreen:
-                    actionsSubject.send(.presentCallScreen(roomProxy: roomProxy))
+                case .presentCallScreen(let callType):
+                    actionsSubject.send(.presentCallScreen(roomProxy: roomProxy, callType: callType))
                 case .presentPinnedEventsTimeline:
                     stateMachine.tryEvent(.presentPinnedEventsTimeline)
                 case .presentResolveSendFailure(failure: let failure, sendHandle: let sendHandle):
@@ -773,7 +773,7 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
             case .presentRolesAndPermissionsScreen:
                 stateMachine.tryEvent(.presentRolesAndPermissionsScreen)
             case .presentCall:
-                actionsSubject.send(.presentCallScreen(roomProxy: roomProxy))
+                actionsSubject.send(.presentCallScreen(roomProxy: roomProxy, callType: .video))
             case .presentPinnedEventsTimeline:
                 stateMachine.tryEvent(.presentPinnedEventsTimeline)
             case .presentKnockingRequestsListScreen:
@@ -1508,8 +1508,8 @@ class RoomFlowCoordinator: FlowCoordinatorProtocol {
             guard let self else { return }
             
             switch action {
-            case .presentCallScreen(let roomProxy):
-                actionsSubject.send(.presentCallScreen(roomProxy: roomProxy))
+            case .presentCallScreen(let roomProxy, let callType):
+                actionsSubject.send(.presentCallScreen(roomProxy: roomProxy, callType: callType))
             case .verifyUser(let userID):
                 actionsSubject.send(.verifyUser(userID: userID))
             case .finished:

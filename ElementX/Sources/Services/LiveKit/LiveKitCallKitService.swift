@@ -93,7 +93,12 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
         self.clientProxy = clientProxy
         MXLog.info("LiveKitCallKitService configured with client proxy")
         
-        // Immediately register VoIP push token if available
+        // Register any previously stored VoIP push token
+        Task {
+            await registerStoredVoIPTokenIfNeeded()
+        }
+        
+        // Also check for current push token
         if let existingToken = pushRegistry.pushToken(for: .voIP) {
             MXLog.info("Found existing VoIP push token, registering immediately")
             Task {
@@ -102,16 +107,26 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
         }
     }
     
+    private func registerStoredVoIPTokenIfNeeded() async {
+        // Check if we have a stored token from before login
+        if let storedTokenData = UserDefaults.standard.data(forKey: "voip_push_token") {
+            MXLog.info("Found stored VoIP push token, registering with Matrix after login")
+            await registerVoIPPushToken(storedTokenData)
+            // Clean up stored token after successful registration
+            UserDefaults.standard.removeObject(forKey: "voip_push_token")
+        }
+    }
+    
     /// Report an incoming call to CallKit
-    func reportIncomingCall(roomId: String, callId: String, callerName: String) async throws {
+    func reportIncomingCall(roomId: String, callId: String, callerName: String, hasVideo: Bool = true) async throws {
         let callUUID = UUID()
         
-        MXLog.info("Reporting incoming call: \(callId) from \(callerName)")
+        MXLog.info("Reporting incoming call: \(callId) from \(callerName) (video: \(hasVideo))")
         
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: roomId)
         update.localizedCallerName = callerName
-        update.hasVideo = true
+        update.hasVideo = hasVideo
         update.supportsHolding = false
         update.supportsGrouping = false
         update.supportsUngrouping = false
@@ -121,7 +136,8 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
                                roomId: roomId,
                                callUUID: callUUID,
                                isIncoming: true,
-                               callerName: callerName)
+                               callerName: callerName,
+                               hasVideo: hasVideo)
         
         activeCalls[callUUID] = call
         
@@ -139,21 +155,22 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
     }
     
     /// Start an outgoing call through CallKit
-    func startOutgoingCall(roomId: String, callId: String, participantName: String) async throws {
+    func startOutgoingCall(roomId: String, callId: String, participantName: String, isVideo: Bool = true) async throws {
         let callUUID = UUID()
         
-        MXLog.info("Starting outgoing call: \(callId) to \(participantName)")
+        MXLog.info("Starting outgoing call: \(callId) to \(participantName) (video: \(isVideo))")
         
         let handle = CXHandle(type: .generic, value: roomId)
         let startCallAction = CXStartCallAction(call: callUUID, handle: handle)
-        startCallAction.isVideo = true
+        startCallAction.isVideo = isVideo
         startCallAction.contactIdentifier = participantName
         
         let call = LiveKitCall(id: callId,
                                roomId: roomId,
                                callUUID: callUUID,
                                isIncoming: false,
-                               callerName: participantName)
+                               callerName: participantName,
+                               hasVideo: isVideo)
         
         activeCalls[callUUID] = call
         
@@ -240,7 +257,7 @@ extension LiveKitCallKitService: CXProviderDelegate {
     }
     
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
-        MXLog.info("CallKit: Starting call \(action.callUUID)")
+        MXLog.info("CallKit: Starting call \(action.callUUID) (video: \(action.isVideo))")
         
         guard let call = activeCalls[action.callUUID] else {
             MXLog.error("Call not found for UUID: \(action.callUUID)")
@@ -251,6 +268,10 @@ extension LiveKitCallKitService: CXProviderDelegate {
         Task {
             do {
                 try configureAudioSession()
+                
+                // Configure video enabled state before starting call
+                liveKitCallService?.isVideoEnabled = action.isVideo
+                MXLog.info("LiveKit configured for video enabled: \(action.isVideo)")
                 
                 // Start the LiveKit call
                 try await liveKitCallService?.startCall(roomId: call.roomId, callId: call.id)
@@ -279,6 +300,12 @@ extension LiveKitCallKitService: CXProviderDelegate {
         Task {
             do {
                 try configureAudioSession()
+                
+                // Check if this was a video call based on the original call info
+                // We need to store this information when the call is created
+                let hasVideo = call.hasVideo ?? true // Default to video for backward compatibility
+                liveKitCallService?.isVideoEnabled = hasVideo
+                MXLog.info("LiveKit configured for answering call with video enabled: \(hasVideo)")
                 
                 // Answer the LiveKit call
                 try await liveKitCallService?.answerCall(roomId: call.roomId, callId: call.id)
@@ -369,13 +396,15 @@ struct LiveKitCall: Identifiable {
     let isIncoming: Bool
     let callerName: String
     let startTime: Date
+    let hasVideo: Bool?
     
-    init(id: String, roomId: String, callUUID: UUID, isIncoming: Bool, callerName: String) {
+    init(id: String, roomId: String, callUUID: UUID, isIncoming: Bool, callerName: String, hasVideo: Bool? = nil) {
         self.id = id
         self.roomId = roomId
         self.callUUID = callUUID
         self.isIncoming = isIncoming
         self.callerName = callerName
+        self.hasVideo = hasVideo
         startTime = Date()
     }
 }
@@ -386,7 +415,10 @@ extension LiveKitCallKitService: PKPushRegistryDelegate {
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         MXLog.info("LiveKit VoIP push credentials updated")
         
-        // Register VoIP push token with Matrix
+        // Store the token for later registration when client becomes available
+        UserDefaults.standard.set(pushCredentials.token, forKey: "voip_push_token")
+        
+        // Register VoIP push token with Matrix if client is available
         Task {
             await registerVoIPPushToken(pushCredentials.token)
         }
@@ -422,8 +454,8 @@ extension LiveKitCallKitService: PKPushRegistryDelegate {
     }
     
     /// Handle incoming call from Matrix call member event
-    func handleIncomingCallFromMatrix(roomId: String, callId: String, callerName: String) async {
-        MXLog.info("Handling incoming call from Matrix event - Room: \(roomId), Caller: \(callerName)")
+    func handleIncomingCallFromMatrix(roomId: String, callId: String, callerName: String, hasVideo: Bool = true) async {
+        MXLog.info("Handling incoming call from Matrix event - Room: \(roomId), Caller: \(callerName), Video: \(hasVideo)")
         
         // Check if we already have an active call for this room
         guard activeCall?.roomId != roomId else {
@@ -432,7 +464,7 @@ extension LiveKitCallKitService: PKPushRegistryDelegate {
         }
         
         do {
-            try await reportIncomingCall(roomId: roomId, callId: callId, callerName: callerName)
+            try await reportIncomingCall(roomId: roomId, callId: callId, callerName: callerName, hasVideo: hasVideo)
             MXLog.info("Successfully reported incoming call from Matrix event")
         } catch {
             MXLog.error("Failed to report incoming call from Matrix event: \(error)")
@@ -443,7 +475,7 @@ extension LiveKitCallKitService: PKPushRegistryDelegate {
     
     private func registerVoIPPushToken(_ token: Data) async {
         guard let clientProxy = clientProxy else {
-            MXLog.warning("No client proxy available for VoIP push token registration")
+            MXLog.info("Client proxy not available yet - VoIP token will be registered after login")
             return
         }
         
@@ -451,7 +483,7 @@ extension LiveKitCallKitService: PKPushRegistryDelegate {
         
         do {
             let defaultPayload = APNSPayload(aps: APSInfo(mutableContent: 1,
-                                                          alert: APSAlert(locKey: "Incoming Call",
+                                                          alert: APSAlert(locKey: "Incoming call from %@",
                                                                           locArgs: [])),
                                              pusherNotificationClientIdentifier: clientProxy.pusherNotificationClientIdentifier)
             

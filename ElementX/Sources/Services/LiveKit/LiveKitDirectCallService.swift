@@ -68,16 +68,14 @@ final class LiveKitDirectCallService: ObservableObject {
     func startCall(roomId: String, isVideoCall: Bool) async throws {
         let callId = UUID().uuidString
         
-        currentCall = DirectCall(
-            callId: callId,
-            roomId: roomId,
-            direction: .outgoing,
-            otherParticipantId: "@unknown:example.com",
-            otherParticipantName: "Unknown User",
-            isVideoCall: isVideoCall,
-            state: .ringing(callId: callId),
-            createdAt: Date()
-        )
+        currentCall = DirectCall(callId: callId,
+                                 roomId: roomId,
+                                 direction: .outgoing,
+                                 otherParticipantId: "@unknown:example.com",
+                                 otherParticipantName: "Unknown User",
+                                 isVideoCall: isVideoCall,
+                                 state: .ringing(callId: callId),
+                                 createdAt: Date())
         
         updateCallState(.ringing(callId: callId))
         startCallTimeout(callId: callId)

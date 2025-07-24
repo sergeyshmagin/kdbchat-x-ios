@@ -15,6 +15,7 @@ import SwiftUI
 struct LiveKitCallCoordinatorParameters {
     let roomId: String
     let authService: LiveKitAuthServiceProtocol
+    let callType: CallType
 }
 
 enum LiveKitCallCoordinatorAction {
@@ -34,19 +35,17 @@ final class LiveKitCallCoordinator: CoordinatorProtocol {
         self.parameters = parameters
     }
     
-    convenience init(roomId: String, authService: LiveKitAuthServiceProtocol) {
-        self.init(parameters: LiveKitCallCoordinatorParameters(roomId: roomId, authService: authService))
+    convenience init(roomId: String, authService: LiveKitAuthServiceProtocol, callType: CallType = .video) {
+        self.init(parameters: LiveKitCallCoordinatorParameters(roomId: roomId, authService: authService, callType: callType))
     }
     
     func start() {
         // Coordinator started
         
         // Listen for force dismiss notifications
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("ForceDismissLiveKitCall"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("ForceDismissLiveKitCall"),
+                                               object: nil,
+                                               queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.actionsSubject.send(.dismiss)
             }
@@ -61,7 +60,7 @@ final class LiveKitCallCoordinator: CoordinatorProtocol {
     
     func toPresentable() -> AnyView {
         let viewModel = LiveKitCallViewModel(roomId: parameters.roomId,
-                                           callService: LiveKitCallService(authService: parameters.authService))
+                                             callService: LiveKitCallService(authService: parameters.authService, clientProxy: nil, callKitService: nil))
         
         self.viewModel = viewModel
         
