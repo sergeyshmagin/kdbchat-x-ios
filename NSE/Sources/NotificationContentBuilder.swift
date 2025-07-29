@@ -111,10 +111,8 @@ struct NotificationContentBuilder {
     private func processMessageLike(notificationContent: inout UNMutableNotificationContent,
                                     notificationItem: NotificationItemProxyProtocol,
                                     mediaProvider: MediaProviderProtocol) async {
-        notificationContent.title = notificationItem.senderDisplayName ?? notificationItem.roomDisplayName
-        if notificationContent.title != notificationItem.roomDisplayName {
-            notificationContent.subtitle = notificationItem.roomDisplayName
-        }
+        // Use the room name as title for group context
+        notificationContent.title = notificationItem.roomDisplayName
         notificationContent.categoryIdentifier = NotificationConstants.Category.message
         
         let senderName = if let displayName = notificationItem.senderDisplayName {
@@ -144,7 +142,11 @@ struct NotificationContentBuilder {
                                     messageType: MessageType,
                                     mediaProvider: MediaProviderProtocol) async {
         let displayName = notificationItem.senderDisplayName ?? notificationItem.roomDisplayName
-        notificationContent.body = String(messageEventStringBuilder.buildAttributedString(for: messageType, senderDisplayName: displayName, isOutgoing: false).characters)
+        let messageContent = String(messageEventStringBuilder.buildAttributedString(for: messageType, senderDisplayName: displayName, isOutgoing: false).characters)
+        
+        // Format as "Sender Name: Message Content" (up to 100 characters total)
+        let formattedMessage = "\(displayName): \(messageContent)"
+        notificationContent.body = String(formattedMessage.prefix(100))
         
         let timelineMediaVisibility = await userSession.mediaPreviewVisibility
         guard timelineMediaVisibility == .on ||

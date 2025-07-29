@@ -116,8 +116,8 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
     }
     
     private func showComprehensivePushDiagnostics() async {
-        let pushManager = PushNotificationManager.shared
-        let report = await pushManager.generateComprehensiveDiagnosticsReport()
+        // Removed PushNotificationManager reference - this functionality has been removed
+        let report = "Push diagnostics not available - PushNotificationManager has been removed"
         
         await MainActor.run {
             print("🩺 \(report)")

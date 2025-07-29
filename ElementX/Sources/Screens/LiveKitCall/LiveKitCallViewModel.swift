@@ -26,7 +26,7 @@ final class LiveKitCallViewModel: ObservableObject {
     @Published var isSpeakerOn = false
     @Published var isScreenSharing = false
     @Published var cameraFlipAngle: Double = 0
-    @Published var callState: CallState = .idle
+    @Published var callState: LiveKitCallState = .idle
     
     // MARK: - Private Properties
 

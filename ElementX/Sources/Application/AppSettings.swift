@@ -256,8 +256,8 @@ final class AppSettings {
         #endif
     }
     
-    var pushGatewayNotifyEndpoint: URL { 
-        pushGatewayBaseURL.appendingPathComponent("_matrix/push/v1/notify") 
+    var pushGatewayNotifyEndpoint: URL {
+        pushGatewayBaseURL.appendingPathComponent("_matrix/push/v1/notify")
     }
     
     // MARK: - VoIP Push Configuration

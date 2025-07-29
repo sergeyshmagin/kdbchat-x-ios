@@ -10,17 +10,16 @@ import MatrixRustSDK
 
 /// Система проверки здоровья VoIP pusher и автоматического восстановления
 final class VoIPPusherHealthCheck {
-    
     // MARK: - Properties
     
     private let clientProxy: ClientProxyProtocol
-    private let pushNotificationManager: PushNotificationManager
+    // private let pushNotificationManager: PushNotificationManager // Removed
     
     // MARK: - Initialization
     
-    init(clientProxy: ClientProxyProtocol, pushNotificationManager: PushNotificationManager) {
+    init(clientProxy: ClientProxyProtocol) {
         self.clientProxy = clientProxy
-        self.pushNotificationManager = pushNotificationManager
+        // self.pushNotificationManager = pushNotificationManager // Removed
     }
     
     // MARK: - Health Check Methods
@@ -94,8 +93,8 @@ final class VoIPPusherHealthCheck {
             // 3. Ждем получения токена
             try await Task.sleep(nanoseconds: 3_000_000_000) // 3 секунды
             
-            // 4. Принудительно регистрируем pusher
-            await pushNotificationManager.registerPendingTokens(clientProxy: clientProxy)
+            // 4. Принудительно регистрируем pusher (now handled by NotificationManager)
+            // await pushNotificationManager.registerPendingTokens(clientProxy: clientProxy) // Removed
             
             // 5. Проверяем результат
             try await Task.sleep(nanoseconds: 2_000_000_000) // 2 секунды
@@ -122,13 +121,11 @@ final class VoIPPusherHealthCheck {
         if let voipRegistration = UserDefaults.standard.string(forKey: "last_push_registration_voip") {
             let components = voipRegistration.components(separatedBy: "_")
             if components.count >= 3 {
-                pushers.append(LocalPusherInfo(
-                    appId: "io.sergeyshmagin.kdbchat.voip",
-                    pushkey: components[0],
-                    profileTag: components[2],
-                    kind: "voip",
-                    isActive: true
-                ))
+                pushers.append(LocalPusherInfo(appId: "io.sergeyshmagin.kdbchat.voip",
+                                               pushkey: components[0],
+                                               profileTag: components[2],
+                                               kind: "voip",
+                                               isActive: true))
             }
         }
         
@@ -136,13 +133,11 @@ final class VoIPPusherHealthCheck {
         if let alertRegistration = UserDefaults.standard.string(forKey: "last_push_registration_alert") {
             let components = alertRegistration.components(separatedBy: "_")
             if components.count >= 3 {
-                pushers.append(LocalPusherInfo(
-                    appId: "io.sergeyshmagin.kdbchat",
-                    pushkey: components[0],
-                    profileTag: components[2],
-                    kind: "alert",
-                    isActive: true
-                ))
+                pushers.append(LocalPusherInfo(appId: "io.sergeyshmagin.kdbchat",
+                                               pushkey: components[0],
+                                               profileTag: components[2],
+                                               kind: "alert",
+                                               isActive: true))
             }
         }
         
@@ -151,25 +146,26 @@ final class VoIPPusherHealthCheck {
     }
     
     private func hasStoredVoIPToken() -> Bool {
-        return UserDefaults.standard.data(forKey: "pending_voip_token") != nil ||
-               UserDefaults.standard.data(forKey: "voip_push_token") != nil
+        UserDefaults.standard.data(forKey: "pending_voip_token") != nil ||
+            UserDefaults.standard.data(forKey: "voip_push_token") != nil
     }
     
     private func checkPKPushRegistryStatus() -> Bool {
-        // Проверяем статус PKPushRegistry через PushNotificationManager
-        return pushNotificationManager.isPKPushRegistryActive
+        // Проверяем статус PKPushRegistry через // PushNotificationManager removed
+        // pushNotificationManager.isPKPushRegistryActive // Removed
+        false
     }
     
     private func validateAppConfiguration() -> Bool {
         let buildConfig = BuildConfiguration.shared
-        return buildConfig.shouldRegisterVoIP && 
-               buildConfig.voipAppId == "io.sergeyshmagin.kdbchat.voip"
+        return buildConfig.shouldRegisterVoIP &&
+            buildConfig.voipAppId == "io.sergeyshmagin.kdbchat.voip"
     }
     
     private func determineOverallHealth(_ status: VoIPHealthStatus) -> VoIPHealthStatus.Health {
-        if status.hasVoIPToken && status.isPusherRegistered && status.isPKPushRegistryActive && status.isAppConfigurationValid {
+        if status.hasVoIPToken, status.isPusherRegistered, status.isPKPushRegistryActive, status.isAppConfigurationValid {
             return .healthy
-        } else if status.hasVoIPToken && status.isPKPushRegistryActive {
+        } else if status.hasVoIPToken, status.isPKPushRegistryActive {
             return .degraded
         } else {
             return .unhealthy
@@ -190,17 +186,17 @@ final class VoIPPusherHealthCheck {
     
     private func restartPKPushRegistry() async {
         MXLog.info("🔄 [VoIPHealthCheck] Restarting PKPushRegistry")
-        await pushNotificationManager.refreshVoIPToken()
+        // await pushNotificationManager.refreshVoIPToken() // Removed - now handled by NotificationManager
     }
 }
 
 // MARK: - Supporting Types
 
 struct VoIPHealthStatus: CustomStringConvertible {
-    var hasVoIPToken: Bool = false
-    var isPusherRegistered: Bool = false
-    var isPKPushRegistryActive: Bool = false
-    var isAppConfigurationValid: Bool = false
+    var hasVoIPToken = false
+    var isPusherRegistered = false
+    var isPKPushRegistryActive = false
+    var isAppConfigurationValid = false
     var overallHealth: Health = .unhealthy
     
     enum Health {
@@ -218,7 +214,7 @@ struct VoIPHealthStatus: CustomStringConvertible {
     }
     
     var description: String {
-        return """
+        """
         VoIP Health Status:
         - Token: \(hasVoIPToken ? "✅" : "❌")
         - Pusher: \(isPusherRegistered ? "✅" : "❌")  

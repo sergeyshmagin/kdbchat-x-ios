@@ -81,7 +81,7 @@ enum LiveKitCallError: Error, LocalizedError {
     }
 }
 
-enum CallState: String, CaseIterable {
+enum LiveKitCallState: String, CaseIterable {
     case idle
     case ringing
     case connecting
@@ -101,7 +101,7 @@ final class LiveKitCallService: ObservableObject {
     @Published var isMuted = false
     @Published var isVideoEnabled = true
     @Published var error: LiveKitCallError?
-    @Published var callState: CallState = .idle
+    @Published var callState: LiveKitCallState = .idle
     @Published var isCallAnswered = false
     
     // MARK: - Public Properties
@@ -125,6 +125,7 @@ final class LiveKitCallService: ObservableObject {
         }
         return _matrixCallService
     }
+
     private var cancellables = Set<AnyCancellable>()
     private var callMemberEventListener: TaskHandle?
     private var callTimeoutTimer: Timer?
@@ -182,7 +183,7 @@ final class LiveKitCallService: ObservableObject {
     /// Update client proxy for Matrix call service
     func updateClientProxy(_ newClientProxy: ClientProxyProtocol) {
         MXLog.info("Updating LiveKitCallService client proxy for user: \(newClientProxy.userID)")
-        self.clientProxy = newClientProxy
+        clientProxy = newClientProxy
         // Force recreate Matrix call service with new client proxy
         _matrixCallService = nil
         // The lazy property will recreate it with the new client proxy
@@ -581,6 +582,41 @@ final class LiveKitCallService: ObservableObject {
         try await connectToCall(roomId: roomId)
     }
     
+    /// Answer an incoming call with pre-provided LiveKit credentials (for VoIP push auto-connect)
+    @MainActor
+    func answerCallWithCredentials(roomId: String, callId: String, accessToken: String, serverURL: String, roomURL: String?) async throws {
+        MXLog.info("🎬 Answering LiveKit call with pre-provided credentials - callId: \(callId)")
+        MXLog.info("🔑 Server: \(serverURL), Token: [PRESENT], Room URL: \(roomURL ?? "nil")")
+        
+        // CRITICAL: Validate credentials before proceeding
+        guard !accessToken.isEmpty, !serverURL.isEmpty else {
+            MXLog.error("❌ CRITICAL: Invalid LiveKit credentials provided")
+            MXLog.error("❌ AccessToken empty: \(accessToken.isEmpty), ServerURL empty: \(serverURL.isEmpty)")
+            throw LiveKitCallError.invalidToken
+        }
+        
+        // Basic JWT token validation (should start with ey)
+        if !accessToken.hasPrefix("ey") {
+            MXLog.warning("⚠️ WARNING: Access token doesn't look like a valid JWT (should start with 'ey')")
+            MXLog.warning("⚠️ Token: \(accessToken.prefix(20))...")
+        }
+        
+        // Validate server URL format
+        if !serverURL.hasPrefix("wss://") && !serverURL.hasPrefix("ws://") {
+            MXLog.warning("⚠️ WARNING: Server URL should start with ws:// or wss://")
+            MXLog.warning("⚠️ Server URL: \(serverURL)")
+        }
+        
+        // Set up for incoming call
+        currentCallId = callId
+        isOutgoingCall = false
+        callState = .connecting
+        isCallAnswered = true
+        
+        // Start the call connection using provided credentials
+        try await connectToCallWithCredentials(accessToken: accessToken, serverURL: serverURL, roomId: roomId)
+    }
+    
     /// Connect to an existing call (used for both incoming and outgoing)
     private func connectToCall(roomId: String) async throws {
         do {
@@ -607,6 +643,61 @@ final class LiveKitCallService: ObservableObject {
             MXLog.info("Successfully connected to LiveKit call (video: \(isVideoEnabled))")
         } catch {
             MXLog.error("Failed to connect to LiveKit call: \(error)")
+            
+            await MainActor.run {
+                callState = .ended
+            }
+            
+            let mappedError = mapLiveKitError(error)
+            self.error = mappedError
+            throw mappedError
+        }
+    }
+    
+    /// Connect to LiveKit call using pre-provided credentials (for VoIP push auto-connect)
+    private func connectToCallWithCredentials(accessToken: String, serverURL: String, roomId: String? = nil) async throws {
+        do {
+            MXLog.info("🎬 Connecting to LiveKit server using VoIP push credentials")
+            MXLog.info("🔗 Server: \(serverURL), Video enabled: \(isVideoEnabled)")
+            
+            // Validate credentials before attempting connection
+            guard !accessToken.isEmpty, !serverURL.isEmpty else {
+                MXLog.warning("⚠️ Invalid credentials provided, falling back to standard auth")
+                throw LiveKitCallError.invalidToken
+            }
+            
+            // Connect to LiveKit server using provided credentials
+            try await room.connect(url: serverURL, token: accessToken)
+            
+            // Enable local audio (always enabled for calls)  
+            try await room.localParticipant.setMicrophone(enabled: true)
+            
+            // Enable video only if this is a video call
+            try await room.localParticipant.setCamera(enabled: isVideoEnabled)
+            MXLog.info("🎥 Camera configured for auto-connect call - enabled: \(isVideoEnabled)")
+            
+            await MainActor.run {
+                isConnected = true
+                localParticipant = room.localParticipant
+                callState = .active
+            }
+            await updateMediaStates()
+            
+            MXLog.info("✅ Successfully auto-connected to LiveKit call using VoIP push credentials")
+        } catch {
+            MXLog.error("❌ Failed to auto-connect to LiveKit call: \(error)")
+            
+            // If credentials failed and we have roomId, try fallback to standard auth
+            if let roomId = roomId {
+                MXLog.info("🔄 Attempting fallback to standard auth for room: \(roomId)")
+                do {
+                    try await connectToCall(roomId: roomId)
+                    MXLog.info("✅ Fallback connection successful")
+                    return
+                } catch {
+                    MXLog.error("❌ Fallback connection also failed: \(error)")
+                }
+            }
             
             await MainActor.run {
                 callState = .ended
@@ -1189,7 +1280,6 @@ class MatrixCallService: ObservableObject, MatrixCallServiceProtocol {
             // TODO: Monitor room list for new rooms when API is available
             // Currently the Matrix SDK doesn't expose roomListService directly
             MXLog.info("Room monitoring not yet implemented - waiting for SDK API support")
-            return
         }
     }
     
@@ -1241,7 +1331,7 @@ class MatrixCallService: ObservableObject, MatrixCallServiceProtocol {
         // we'll generate a deterministic call ID based on event ID
         // TODO: Extract actual call_id from event content when SDK supports it
         
-        return UUID().uuidString
+        UUID().uuidString
     }
     
     private func extractCallType(from eventItem: EventBasedTimelineItemProtocol) -> MatrixCallType? {

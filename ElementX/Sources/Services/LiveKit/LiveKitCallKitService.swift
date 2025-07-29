@@ -99,17 +99,13 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
             await registerStoredVoIPTokenIfNeeded()
         }
         
-        // VoIP push token registration is now handled by PushNotificationManager
+        // VoIP push token registration is now handled by NotificationManager
     }
     
-    /// Register VoIP push token via PushNotificationManager
+    /// Register VoIP push token via NotificationManager (removed - now handled elsewhere)
     private func registerVoIPPushToken(_ tokenData: Data) async {
-        do {
-            try await PushNotificationManager.shared.registerPusher(pushToken: tokenData, isVoIP: true)
-            MXLog.info("✅ Successfully registered VoIP push token")
-        } catch {
-            MXLog.error("❌ Failed to register VoIP push token: \(error)")
-        }
+        // This functionality has been moved to NotificationManager
+        MXLog.info("VoIP push token registration now handled by NotificationManager")
     }
     
     private func registerStoredVoIPTokenIfNeeded() async {
@@ -214,6 +210,49 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
         }
     }
     
+    /// Report an incoming call with LiveKit credentials from VoIP push payload
+    func reportIncomingCallWithCredentials(roomId: String, callId: String, callerName: String, hasVideo: Bool = true,
+                                          liveKitAccessToken: String?, liveKitServerURL: String?, liveKitRoomURL: String?) async throws {
+        let callUUID = UUID()
+        
+        MXLog.info("📞 Reporting incoming call with LiveKit credentials: \(callId) from \(callerName)")
+        MXLog.info("🎬 LiveKit Server: \(liveKitServerURL ?? "nil"), Token: \(liveKitAccessToken != nil ? "[PRESENT]" : "[MISSING]")")
+        
+        let update = CXCallUpdate()
+        update.remoteHandle = CXHandle(type: .generic, value: roomId)
+        update.localizedCallerName = callerName
+        update.hasVideo = hasVideo
+        update.supportsHolding = false
+        update.supportsGrouping = false
+        update.supportsUngrouping = false
+        update.supportsDTMF = false
+        
+        let call = LiveKitCall(id: callId,
+                               roomId: roomId,
+                               callUUID: callUUID,
+                               isIncoming: true,
+                               callerName: callerName,
+                               hasVideo: hasVideo,
+                               liveKitAccessToken: liveKitAccessToken,
+                               liveKitServerURL: liveKitServerURL,
+                               liveKitRoomURL: liveKitRoomURL)
+        
+        activeCalls[callUUID] = call
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            provider.reportNewIncomingCall(with: callUUID, update: update) { error in
+                if let error = error {
+                    MXLog.error("❌ Failed to report incoming call with credentials: \(error)")
+                    self.activeCalls.removeValue(forKey: callUUID)
+                    continuation.resume(throwing: error)
+                } else {
+                    MXLog.info("✅ Successfully reported incoming call with LiveKit credentials")
+                    continuation.resume()
+                }
+            }
+        }
+    }
+    
     /// Update call with new information
     func updateCall(callUUID: UUID, update: CXCallUpdate) {
         provider.reportCall(with: callUUID, updated: update)
@@ -307,13 +346,74 @@ extension LiveKitCallKitService: CXProviderDelegate {
                 try configureAudioSession()
                 
                 // Check if this was a video call based on the original call info
-                // We need to store this information when the call is created
                 let hasVideo = call.hasVideo ?? true // Default to video for backward compatibility
                 liveKitCallService?.isVideoEnabled = hasVideo
                 MXLog.info("LiveKit configured for answering call with video enabled: \(hasVideo)")
                 
-                // Answer the LiveKit call
-                try await liveKitCallService?.answerCall(roomId: call.roomId, callId: call.id)
+                // CRITICAL: Check multiple sources for LiveKit credentials
+                var finalAccessToken: String?
+                var finalServerURL: String?
+                var finalRoomURL: String?
+                
+                // Priority 1: Stored credentials from VoIP push
+                if let accessToken = call.liveKitAccessToken,
+                   let serverURL = call.liveKitServerURL,
+                   !accessToken.isEmpty,
+                   !serverURL.isEmpty {
+                    finalAccessToken = accessToken
+                    finalServerURL = serverURL
+                    finalRoomURL = call.liveKitRoomURL
+                    MXLog.info("🎬 Found stored LiveKit credentials from VoIP push")
+                }
+                
+                // Priority 2: Check App Group for credentials from NSE
+                if finalAccessToken == nil {
+                    let appGroupCredentials = extractCredentialsFromAppGroup()
+                    if let accessToken = appGroupCredentials.accessToken,
+                       let serverURL = appGroupCredentials.serverURL,
+                       !accessToken.isEmpty,
+                       !serverURL.isEmpty {
+                        finalAccessToken = accessToken
+                        finalServerURL = serverURL
+                        finalRoomURL = appGroupCredentials.roomURL
+                        MXLog.info("🎬 Found LiveKit credentials from App Group storage")
+                    }
+                }
+                
+                // Use auto-connect if credentials are available
+                if let accessToken = finalAccessToken,
+                   let serverURL = finalServerURL,
+                   !accessToken.isEmpty,
+                   !serverURL.isEmpty {
+                    MXLog.info("🎬 Using LiveKit credentials for auto-connect")
+                    MXLog.info("🔑 Server: \(serverURL), Token: [PRESENT]")
+                    
+                    do {
+                        // Use credentials directly to connect to LiveKit room
+                        try await liveKitCallService?.answerCallWithCredentials(
+                            roomId: call.roomId,
+                            callId: call.id,
+                            accessToken: accessToken,
+                            serverURL: serverURL,
+                            roomURL: finalRoomURL
+                        )
+                        MXLog.info("✅ Auto-connect with credentials successful")
+                    } catch {
+                        MXLog.error("❌ Auto-connect with credentials failed: \(error)")
+                        MXLog.info("🔄 Falling back to standard auth flow")
+                        
+                        // Fallback to standard flow if credentials failed
+                        try await liveKitCallService?.answerCall(roomId: call.roomId, callId: call.id)
+                    }
+                } else {
+                    MXLog.warning("⚠️ CRITICAL: No LiveKit credentials found!")
+                    MXLog.warning("⚠️ Check Matrix homeserver configuration - application_data may be missing from push notifications")
+                    MXLog.warning("⚠️ See MATRIX_HOMESERVER_CONFIG.md for configuration details")
+                    MXLog.info("🔄 Using standard auth flow as fallback")
+                    
+                    // Standard answer flow - generate token on demand
+                    try await liveKitCallService?.answerCall(roomId: call.roomId, callId: call.id)
+                }
                 
                 // Send Matrix call answer event
                 do {
@@ -327,7 +427,7 @@ extension LiveKitCallKitService: CXProviderDelegate {
                 isCallActive = true
                 
                 action.fulfill()
-                MXLog.info("CallKit: Successfully answered call")
+                MXLog.info("CallKit: Successfully answered call with auto-connect")
             } catch {
                 MXLog.error("Failed to answer LiveKit call: \(error)")
                 action.fail()
@@ -419,13 +519,22 @@ struct LiveKitCall: Identifiable {
     let startTime: Date
     let hasVideo: Bool?
     
-    init(id: String, roomId: String, callUUID: UUID, isIncoming: Bool, callerName: String, hasVideo: Bool? = nil) {
+    // LiveKit credentials from push payload
+    let liveKitAccessToken: String?
+    let liveKitServerURL: String?
+    let liveKitRoomURL: String?
+    
+    init(id: String, roomId: String, callUUID: UUID, isIncoming: Bool, callerName: String, hasVideo: Bool? = nil,
+         liveKitAccessToken: String? = nil, liveKitServerURL: String? = nil, liveKitRoomURL: String? = nil) {
         self.id = id
         self.roomId = roomId
         self.callUUID = callUUID
         self.isIncoming = isIncoming
         self.callerName = callerName
         self.hasVideo = hasVideo
+        self.liveKitAccessToken = liveKitAccessToken
+        self.liveKitServerURL = liveKitServerURL
+        self.liveKitRoomURL = liveKitRoomURL
         startTime = Date()
     }
 }
@@ -436,7 +545,16 @@ extension LiveKitCallKitService {
     /// Handle VoIP push notification (can be called from PushNotificationManager)
     func handleVoIPPush(payload: PKPushPayload, completion: @escaping () -> Void) {
         MXLog.info("📞 LiveKit received incoming VoIP push notification")
+        MXLog.info("📞 VoIP push payload keys: \(payload.dictionaryPayload.keys.map { String(describing: $0) }.joined(separator: ", "))")
         MXLog.info("📞 VoIP push payload: \(payload.dictionaryPayload)")
+        
+        // Log specific fields we're looking for
+        if let applicationData = payload.dictionaryPayload["application_data"] {
+            MXLog.info("📞 Found application_data in payload: \(applicationData)")
+        }
+        if let content = payload.dictionaryPayload["content"] {
+            MXLog.info("📞 Found content in payload: \(content)")
+        }
         
         // Check for error messages in payload that might indicate token issues
         if let errorMessage = payload.dictionaryPayload["error"] as? String {
@@ -444,7 +562,7 @@ extension LiveKitCallKitService {
             if errorMessage.lowercased().contains("invalid") || errorMessage.lowercased().contains("token") {
                 MXLog.warning("🔄 VoIP error indicates token issue - requesting refresh")
                 Task {
-                    await PushNotificationManager.shared.refreshVoIPToken()
+                    // await PushNotificationManager.shared.refreshVoIPToken() // Removed - now handled by NotificationManager
                 }
             }
             completion()
@@ -464,7 +582,15 @@ extension LiveKitCallKitService {
             let roomDisplayName = payload.dictionaryPayload[ElementCallServiceNotificationKey.roomDisplayName.rawValue] as? String ?? "Unknown"
             let callId = UUID().uuidString
             
-            processIncomingCall(roomId: roomID, callId: callId, callerName: roomDisplayName, completion: completion)
+            // Extract LiveKit credentials from CallKit payload
+            let liveKitCredentials = extractLiveKitCredentialsFromCallKitPayload(payload.dictionaryPayload)
+            
+            processIncomingCallWithCredentials(roomId: roomID, 
+                                             callId: callId, 
+                                             callerName: roomDisplayName, 
+                                             hasVideo: true,
+                                             liveKitCredentials: liveKitCredentials,
+                                             completion: completion)
             return
         }
         
@@ -486,7 +612,15 @@ extension LiveKitCallKitService {
             return
         }
         
-        processIncomingCall(roomId: roomId, callId: eventId, callerName: callerInfo.displayName, hasVideo: isVideoCall, completion: completion)
+        // Extract LiveKit credentials from payload
+        let liveKitCredentials = extractLiveKitCredentialsFromPayload(payload)
+        
+        processIncomingCallWithCredentials(roomId: roomId, 
+                                          callId: eventId, 
+                                          callerName: callerInfo.displayName, 
+                                          hasVideo: isVideoCall,
+                                          liveKitCredentials: liveKitCredentials,
+                                          completion: completion)
     }
     
     /// Структура для информации о звонящем
@@ -514,7 +648,7 @@ extension LiveKitCallKitService {
             MXLog.info("✅ Extracted caller name from content.sender_display_name: \(displayName)")
         }
         // 3. Пытаемся использовать room_name если это не room ID
-        else if let roomName = roomName, !roomName.isEmpty && roomName != payload["room_id"] as? String {
+        else if let roomName = roomName, !roomName.isEmpty, roomName != payload["room_id"] as? String {
             displayName = roomName
             MXLog.info("✅ Using room name as caller name: \(displayName)")
         }
@@ -537,18 +671,157 @@ extension LiveKitCallKitService {
                 let senderDisplayName = callContent["sender_display_name"] as? String, !senderDisplayName.isEmpty {
             displayName = senderDisplayName
             MXLog.info("✅ Extracted caller name from call content: \(displayName)")
-        }
-        else {
+        } else {
             MXLog.warning("⚠️ Could not extract caller name, using fallback: \(displayName)")
         }
         
         return CallerInfo(senderId: senderId, displayName: displayName, roomName: roomName)
     }
     
-    private func processIncomingCall(roomId: String, callId: String, callerName: String, hasVideo: Bool = true, completion: @escaping () -> Void) {
+    /// LiveKit credentials from VoIP push payload
+    private struct LiveKitCredentials {
+        let accessToken: String?
+        let serverURL: String?
+        let roomURL: String?
+    }
+    
+    /// Extract LiveKit credentials from CallKit payload (from NSE)
+    private func extractLiveKitCredentialsFromCallKitPayload(_ payload: [AnyHashable: Any]) -> LiveKitCredentials {
+        MXLog.info("[CALLKIT-CREDENTIALS] Extracting LiveKit credentials from CallKit payload")
+        
+        let accessToken = payload["livekit_access_token"] as? String
+        let serverURL = payload["livekit_server_url"] as? String ?? "wss://video.aibots.kz"
+        let roomURL = payload["livekit_room_url"] as? String
+        
+        MXLog.info("[CALLKIT-CREDENTIALS] Found credentials - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL)")
+        
+        return LiveKitCredentials(
+            accessToken: accessToken,
+            serverURL: serverURL,
+            roomURL: roomURL
+        )
+    }
+    
+    /// Extract LiveKit credentials from VoIP push payload
+    private func extractLiveKitCredentialsFromPayload(_ payload: [AnyHashable: Any]) -> LiveKitCredentials {
+        // Try to extract LiveKit credentials from various payload locations
+        let accessToken = payload["livekit_access_token"] as? String ??
+                         (payload["application_data"] as? [String: Any])?["livekit_access_token"] as? String ??
+                         extractFromApplicationDataString(payload, key: "livekit_access_token")
+        
+        let serverURL = payload["livekit_server_url"] as? String ??
+                       (payload["application_data"] as? [String: Any])?["livekit_server_url"] as? String ??
+                       extractFromApplicationDataString(payload, key: "livekit_server_url") ??
+                       "wss://video.aibots.kz" // Default server URL
+        
+        let roomURL = payload["livekit_room_url"] as? String ??
+                     (payload["application_data"] as? [String: Any])?["livekit_room_url"] as? String ??
+                     extractFromApplicationDataString(payload, key: "livekit_room_url")
+        
+        MXLog.info("[VOIP-LIVEKIT] Extracted credentials - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL ?? "[MISSING]"), Room: \(roomURL ?? "[MISSING]")")
+        
+        // Also check App Group for stored credentials from NSE
+        if accessToken == nil {
+            let appGroupCredentials = extractCredentialsFromAppGroup()
+            return LiveKitCredentials(
+                accessToken: appGroupCredentials.accessToken,
+                serverURL: serverURL ?? appGroupCredentials.serverURL,
+                roomURL: roomURL ?? appGroupCredentials.roomURL
+            )
+        }
+        
+        return LiveKitCredentials(
+            accessToken: accessToken,
+            serverURL: serverURL,
+            roomURL: roomURL
+        )
+    }
+    
+    /// Extract credentials from App Group storage (from NSE) - Enhanced version
+    private func extractCredentialsFromAppGroup() -> LiveKitCredentials {
+        guard let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") else {
+            MXLog.warning("[APP-GROUP-LIVEKIT] Failed to access App Group UserDefaults")
+            return LiveKitCredentials(accessToken: nil, serverURL: nil, roomURL: nil)
+        }
+        
+        // Try multiple keys for reliability
+        var voipEventData: [String: Any]?
+        
+        // Check for current event data
+        if let currentData = appGroupDefaults.dictionary(forKey: "pending_voip_event") {
+            voipEventData = currentData
+            MXLog.info("[APP-GROUP-LIVEKIT] Found data in 'pending_voip_event'")
+        }
+        // Check for latest event data (fallback)
+        else if let latestData = appGroupDefaults.dictionary(forKey: "latest_voip_event") {
+            voipEventData = latestData
+            MXLog.info("[APP-GROUP-LIVEKIT] Found data in 'latest_voip_event' (fallback)")
+        }
+        
+        guard let eventData = voipEventData else {
+            MXLog.warning("[APP-GROUP-LIVEKIT] No VoIP event data found in App Group")
+            return LiveKitCredentials(accessToken: nil, serverURL: nil, roomURL: nil)
+        }
+        
+        let accessToken = eventData["livekit_access_token"] as? String
+        let serverURL = eventData["livekit_server_url"] as? String
+        let roomURL = eventData["livekit_room_url"] as? String
+        
+        // Check timestamp for freshness (only use data from last 2 minutes)
+        if let processedAt = eventData["processed_at"] as? TimeInterval {
+            let age = Date().timeIntervalSince1970 - processedAt
+            if age > 120 { // 2 minutes
+                MXLog.warning("[APP-GROUP-LIVEKIT] VoIP event data is stale (\(age)s old), ignoring")
+                return LiveKitCredentials(accessToken: nil, serverURL: nil, roomURL: nil)
+            }
+        }
+        
+        MXLog.info("[APP-GROUP-LIVEKIT] Found stored credentials - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL ?? "[MISSING]")")
+        
+        // Clean up used data to prevent reuse
+        appGroupDefaults.removeObject(forKey: "pending_voip_event")
+        appGroupDefaults.synchronize()
+        
+        return LiveKitCredentials(
+            accessToken: accessToken?.isEmpty == false ? accessToken : nil,
+            serverURL: serverURL?.isEmpty == false ? serverURL : nil,
+            roomURL: roomURL?.isEmpty == false ? roomURL : nil
+        )
+    }
+    
+    /// Extract value from application_data JSON string
+    private func extractFromApplicationDataString(_ payload: [AnyHashable: Any], key: String) -> String? {
+        // Try to parse application_data if it exists as a JSON string
+        if let applicationDataString = payload["application_data"] as? String,
+           let data = applicationDataString.data(using: .utf8),
+           let applicationData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return applicationData[key] as? String
+        }
+        return nil
+    }
+    
+    private func processIncomingCallWithCredentials(roomId: String, callId: String, callerName: String, hasVideo: Bool = true, liveKitCredentials: LiveKitCredentials, completion: @escaping () -> Void) {
         Task {
             do {
-                try await reportIncomingCall(roomId: roomId, callId: callId, callerName: callerName, hasVideo: hasVideo)
+                // Use new method that accepts credentials
+                if let accessToken = liveKitCredentials.accessToken,
+                   let serverURL = liveKitCredentials.serverURL,
+                   !accessToken.isEmpty,
+                   !serverURL.isEmpty {
+                    MXLog.info("🎬 Using LiveKit credentials for auto-connect call")
+                    try await reportIncomingCallWithCredentials(
+                        roomId: roomId, 
+                        callId: callId, 
+                        callerName: callerName, 
+                        hasVideo: hasVideo,
+                        liveKitAccessToken: accessToken,
+                        liveKitServerURL: serverURL,
+                        liveKitRoomURL: liveKitCredentials.roomURL
+                    )
+                } else {
+                    MXLog.info("🔄 No LiveKit credentials available, using standard flow")
+                    try await reportIncomingCall(roomId: roomId, callId: callId, callerName: callerName, hasVideo: hasVideo)
+                }
                 MXLog.info("✅ Successfully reported incoming call for room: \(roomId)")
             } catch {
                 MXLog.error("❌ Failed to report incoming call: \(error)")
@@ -557,6 +830,12 @@ extension LiveKitCallKitService {
             }
             completion()
         }
+    }
+    
+    private func processIncomingCall(roomId: String, callId: String, callerName: String, hasVideo: Bool = true, completion: @escaping () -> Void) {
+        // Fallback method for backward compatibility
+        let credentials = LiveKitCredentials(accessToken: nil, serverURL: nil, roomURL: nil)
+        processIncomingCallWithCredentials(roomId: roomId, callId: callId, callerName: callerName, hasVideo: hasVideo, liveKitCredentials: credentials, completion: completion)
     }
     
     private func reportFakeCallForAPNsCompliance(completion: (() -> Void)? = nil) {
@@ -620,11 +899,9 @@ extension LiveKitCallKitService {
         
         do {
             // Send m.call.invite Matrix event
-            try await sendMatrixCallInvite(
-                roomId: roomId,
-                callId: callId,
-                isVideo: isVideo
-            )
+            try await sendMatrixCallInvite(roomId: roomId,
+                                           callId: callId,
+                                           isVideo: isVideo)
             MXLog.info("✅ m.call.invite sent successfully")
         } catch {
             MXLog.error("❌ Failed to send m.call.invite: \(error)")
@@ -634,18 +911,89 @@ extension LiveKitCallKitService {
     /// Force refresh VoIP token (public method for manual refresh)
     func refreshVoIPToken() async {
         MXLog.info("🔄 Manual VoIP token refresh requested")
-        await PushNotificationManager.shared.refreshVoIPToken()
+        // await PushNotificationManager.shared.refreshVoIPToken() // Removed - now handled by NotificationManager
     }
     
     /// Clear all VoIP tokens and force complete refresh (more aggressive than refresh)
     func clearAllVoIPTokens() async {
         MXLog.info("🗑️ Clearing ALL VoIP tokens and forcing complete refresh")
-        await PushNotificationManager.shared.clearAllVoIPTokens()
+        // await PushNotificationManager.shared.clearAllVoIPTokens() // Removed - now handled by NotificationManager
     }
     
     /// Get current VoIP diagnostics information
     func getVoIPDiagnostics() -> String {
-        return PushNotificationManager.shared.getDiagnosticsInfo()
+        // PushNotificationManager.shared.getDiagnosticsInfo() // Removed - now handled by NotificationManager
+        return "VoIP diagnostics not available - PushNotificationManager has been removed"
+    }
+    
+    /// Test method for simulating Matrix events with LiveKit credentials
+    func testMatrixCallEventWithLiveKitData() async {
+        MXLog.info("🧪 [TEST] Simulating Matrix call event with LiveKit credentials")
+        
+        // Create test payload simulating a real Matrix m.call.invite with application_data
+        let testPayload: [AnyHashable: Any] = [
+            "event_id": "$test_event_\(UUID().uuidString)",
+            "room_id": "!test_room:matrix.org",
+            "sender": "@testuser:matrix.org",
+            "sender_display_name": "Test User",
+            "is_video": true,
+            "notify_type": "ring",
+            "content": [
+                "call_id": UUID().uuidString,
+                "version": "1",
+                "lifetime": 60000,
+                "type": "video",
+                "application_data": [
+                    "livekit_access_token": "test_token_\(UUID().uuidString.prefix(16))",
+                    "livekit_server_url": "wss://test.livekit.server",
+                    "livekit_room_url": "test_room_url"
+                ]
+            ],
+            "application_data": [
+                "lk_token": "fallback_token_\(UUID().uuidString.prefix(16))",
+                "lk_url": "wss://fallback.livekit.server",
+                "lk_room": "fallback_room"
+            ]
+        ]
+        
+        let testLiveKitCredentials = extractLiveKitCredentialsFromPayload(testPayload)
+        
+        MXLog.info("🧪 [TEST] Extracted test credentials:")
+        MXLog.info("🧪 [TEST] - Access Token: \(testLiveKitCredentials.accessToken ?? "[MISSING]")")
+        MXLog.info("🧪 [TEST] - Server URL: \(testLiveKitCredentials.serverURL ?? "[MISSING]")")
+        MXLog.info("🧪 [TEST] - Room URL: \(testLiveKitCredentials.roomURL ?? "[MISSING]")")
+        
+        // Test App Group storage
+        if let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") {
+            let testEventData: [String: Any] = [
+                "event_id": testPayload["event_id"] as Any,
+                "room_id": testPayload["room_id"] as Any,
+                "sender_display_name": testPayload["sender_display_name"] as Any,
+                "is_video": true,
+                "event_type": "m.call.invite",
+                "timestamp": Date().timeIntervalSince1970 * 1000,
+                "processed_at": Date().timeIntervalSince1970,
+                "livekit_access_token": testLiveKitCredentials.accessToken ?? "",
+                "livekit_server_url": testLiveKitCredentials.serverURL ?? "",
+                "livekit_room_url": testLiveKitCredentials.roomURL ?? "",
+                "test_mode": true
+            ]
+            
+            appGroupDefaults.set(testEventData, forKey: "test_voip_event")
+            if appGroupDefaults.synchronize() {
+                MXLog.info("🧪 [TEST] Successfully stored test data in App Group")
+                
+                // Test extraction from App Group
+                let extractedCredentials = extractCredentialsFromAppGroup()
+                MXLog.info("🧪 [TEST] Re-extracted from App Group:")
+                MXLog.info("🧪 [TEST] - Access Token: \(extractedCredentials.accessToken ?? "[MISSING]")")
+                MXLog.info("🧪 [TEST] - Server URL: \(extractedCredentials.serverURL ?? "[MISSING]")")
+            } else {
+                MXLog.error("🧪 [TEST] Failed to store test data in App Group")
+            }
+        } else {
+            MXLog.error("🧪 [TEST] Failed to access App Group UserDefaults")
+        }
     }
     
     // MARK: - Matrix Call Events
@@ -696,11 +1044,9 @@ extension LiveKitCallKitService {
             
             // MATRIX RUST SDK: Send as custom message event content
             // Use buildMessageContentFor to create proper RoomMessageEventContentWithoutRelation
-            let messageContent = roomProxy.timeline.buildMessageContentFor(
-                "📞 Incoming call", // Fallback text
-                html: "📞 <b>Incoming call</b>", 
-                intentionalMentions: IntentionalMentions.empty.toRustMentions()
-            )
+            let messageContent = roomProxy.timeline.buildMessageContentFor("📞 Incoming call", // Fallback text
+                                                                           html: "📞 <b>Incoming call</b>",
+                                                                           intentionalMentions: IntentionalMentions.empty.toRustMentions())
             
             let result = await roomProxy.timeline.sendMessageEventContent(messageContent)
             
@@ -759,11 +1105,9 @@ extension LiveKitCallKitService {
             MXLog.info("📋 [MATRIX-RUST-SDK] Call answer content: \(contentString)")
             
             // MATRIX RUST SDK: Send call answer as message event content
-            let messageContent = roomProxy.timeline.buildMessageContentFor(
-                "📞 Call answered", // Fallback text
-                html: "📞 <b>Call answered</b>",
-                intentionalMentions: IntentionalMentions.empty.toRustMentions()
-            )
+            let messageContent = roomProxy.timeline.buildMessageContentFor("📞 Call answered", // Fallback text
+                                                                           html: "📞 <b>Call answered</b>",
+                                                                           intentionalMentions: IntentionalMentions.empty.toRustMentions())
             
             let result = await roomProxy.timeline.sendMessageEventContent(messageContent)
             
@@ -834,11 +1178,9 @@ extension LiveKitCallKitService {
             MXLog.info("📋 [MATRIX-RUST-SDK] Call hangup content: \(contentString)")
             
             // MATRIX RUST SDK: Send call hangup as message event content
-            let messageContent = roomProxy.timeline.buildMessageContentFor(
-                "📞 Call ended (\(reason))", // Fallback text
-                html: "📞 <b>Call ended</b> (\(reason))",
-                intentionalMentions: IntentionalMentions.empty.toRustMentions()
-            )
+            let messageContent = roomProxy.timeline.buildMessageContentFor("📞 Call ended (\(reason))", // Fallback text
+                                                                           html: "📞 <b>Call ended</b> (\(reason))",
+                                                                           intentionalMentions: IntentionalMentions.empty.toRustMentions())
             
             let result = await roomProxy.timeline.sendMessageEventContent(messageContent)
             
@@ -861,8 +1203,5 @@ extension LiveKitCallKitService {
             throw error
         }
     }
-    
-    
-    
 }
 #endif

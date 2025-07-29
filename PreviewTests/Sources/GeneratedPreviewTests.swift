@@ -371,6 +371,12 @@ extension PreviewTests {
         }
     }
 
+    func testLiveKitCallRoomTimelineView() async throws {
+        for (index, preview) in LiveKitCallRoomTimelineView_Previews._allPreviews.enumerated() {
+            try await assertSnapshots(matching: preview, step: index)
+        }
+    }
+
     func testLoadableImage() async throws {
         for (index, preview) in LoadableImage_Previews._allPreviews.enumerated() {
             try await assertSnapshots(matching: preview, step: index)

@@ -27,8 +27,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         NSTextAttachment.registerViewProviderClass(PillAttachmentViewProvider.self, forFileType: InfoPlistReader.main.pillsUTType)
         
-        // Initialize VoIP push registration early
-        _ = PushNotificationManager.shared
+        // PushNotificationManager removed - functionality integrated into NotificationManager
         
         return true
     }
@@ -36,14 +35,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         callbacks.send(.registeredNotifications(deviceToken: deviceToken))
         
-        Task {
-            do {
-                try await PushNotificationManager.shared.registerPusher(pushToken: deviceToken, isVoIP: false)
-                MXLog.info("✅ Successfully registered alert push notifications")
-            } catch {
-                MXLog.error("❌ Failed to register alert push notifications: \(error)")
-            }
-        }
+        // PushNotificationManager removed - push registration now handled by NotificationManager
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {

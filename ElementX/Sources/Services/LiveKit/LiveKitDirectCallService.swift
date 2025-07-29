@@ -11,7 +11,7 @@ import Foundation
 
 // MARK: - Call States
 
-enum CallState {
+enum DirectCallState {
     case idle
     case ringing(callId: String)
     case connecting(callId: String)
@@ -24,10 +24,7 @@ enum CallState {
 
 // MARK: - Call Direction
 
-enum CallDirection {
-    case outgoing
-    case incoming
-}
+// Use existing CallDirection from HomeScreenModels.swift
 
 // MARK: - Call Information
 
@@ -38,7 +35,7 @@ struct DirectCall {
     let otherParticipantId: String
     let otherParticipantName: String?
     let isVideoCall: Bool
-    var state: CallState
+    var state: DirectCallState
     let createdAt: Date
 }
 
@@ -46,12 +43,12 @@ struct DirectCall {
 
 final class LiveKitDirectCallService: ObservableObject {
     @Published var currentCall: DirectCall?
-    @Published private var callState: CallState = .idle
+    @Published private var callState: DirectCallState = .idle
     
     private var callTimer: Timer?
     private let callTimeout: TimeInterval = 60.0
     
-    var callStatePublisher: AnyPublisher<CallState, Never> {
+    var callStatePublisher: AnyPublisher<DirectCallState, Never> {
         $callState.eraseToAnyPublisher()
     }
     
@@ -121,7 +118,7 @@ final class LiveKitDirectCallService: ObservableObject {
         await endCallInternal(reason: .noAnswer)
     }
     
-    private func endCallInternal(reason: CallState) async {
+    private func endCallInternal(reason: DirectCallState) async {
         stopCallTimeout()
         updateCallState(reason)
         
@@ -131,7 +128,7 @@ final class LiveKitDirectCallService: ObservableObject {
         }
     }
     
-    private func updateCallState(_ newState: CallState) {
+    private func updateCallState(_ newState: DirectCallState) {
         callState = newState
         currentCall?.state = newState
     }

@@ -722,16 +722,67 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
                                               _ eventType: String,
                                               _ error: String,
                                               _ isOutgoing: Bool) -> RoomTimelineItemProtocol {
-        UnsupportedRoomTimelineItem(id: eventItemProxy.id,
-                                    body: L10n.commonUnsupportedEvent,
-                                    eventType: eventType,
-                                    error: error,
-                                    timestamp: eventItemProxy.timestamp,
-                                    isOutgoing: isOutgoing,
-                                    isEditable: eventItemProxy.isEditable,
-                                    canBeRepliedTo: eventItemProxy.canBeRepliedTo,
-                                    sender: eventItemProxy.sender,
-                                    properties: .init())
+        // Check if this is a LiveKit call event with application_data
+        if let liveKitCallItem = tryBuildLiveKitCallTimelineItem(eventItemProxy, eventType, error) {
+            return liveKitCallItem
+        }
+        
+        return UnsupportedRoomTimelineItem(id: eventItemProxy.id,
+                                           body: L10n.commonUnsupportedEvent,
+                                           eventType: eventType,
+                                           error: error,
+                                           timestamp: eventItemProxy.timestamp,
+                                           isOutgoing: isOutgoing,
+                                           isEditable: eventItemProxy.isEditable,
+                                           canBeRepliedTo: eventItemProxy.canBeRepliedTo,
+                                           sender: eventItemProxy.sender,
+                                           properties: .init())
+    }
+    
+    /// Attempts to build a LiveKit call timeline item from unsupported events
+    private func tryBuildLiveKitCallTimelineItem(_ eventItemProxy: EventTimelineItemProxy,
+                                                 _ eventType: String,
+                                                 _ error: String) -> LiveKitCallRoomTimelineItem? {
+        // Check if the error message contains LiveKit-specific content
+        let lowerError = error.lowercased()
+        let lowerEventType = eventType.lowercased()
+        
+        // Look for patterns that indicate this is a LiveKit call event
+        let isLiveKitEvent = lowerError.contains("application_data") ||
+                           lowerError.contains("livekit") ||
+                           lowerError.contains("notify_type") ||
+                           lowerError.contains("ring") ||
+                           lowerEventType.contains("call") ||
+                           lowerEventType.contains("voip")
+        
+        guard isLiveKitEvent else { return nil }
+        
+        // Determine call type - default to video for LiveKit calls
+        let callType: LiveKitCallRoomTimelineItem.CallType = .video
+        
+        // Determine call state based on event context
+        let callState: LiveKitCallRoomTimelineItem.CallState
+        
+        if lowerError.contains("ring") || lowerEventType.contains("invite") {
+            callState = .started
+        } else if lowerError.contains("hangup") || lowerError.contains("end") {
+            callState = .ended
+        } else if lowerError.contains("declined") || lowerError.contains("reject") {
+            callState = .declined
+        } else {
+            callState = .started // Default to started for LiveKit events
+        }
+        
+        MXLog.info("🎬 Detected LiveKit call event - Type: \(callType), State: \(callState), EventType: \(eventType)")
+        
+        return LiveKitCallRoomTimelineItem(id: eventItemProxy.id,
+                                          timestamp: eventItemProxy.timestamp,
+                                          isEditable: false,
+                                          canBeRepliedTo: false,
+                                          isOutgoing: eventItemProxy.isOwn,
+                                          sender: eventItemProxy.sender,
+                                          callType: callType,
+                                          callState: callState)
     }
     
     private func buildCallInviteTimelineItem(for eventItemProxy: EventTimelineItemProxy) -> RoomTimelineItemProtocol {

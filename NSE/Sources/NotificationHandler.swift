@@ -41,6 +41,7 @@ class NotificationHandler {
     
     func processEvent(_ eventID: String, roomID: String) async {
         MXLog.info("\(tag) Processing event: \(eventID) in room: \(roomID)")
+        MXLog.info("\(tag) Notification userInfo: \(notificationContent.userInfo)")
         
         // Copy over the unread information to the notification badge
         notificationContent.badge = notificationContent.unreadCount as NSNumber?
@@ -129,7 +130,8 @@ class NotificationHandler {
                     return await handleCallNotification(notifyType: notifyType,
                                                         timestamp: event.timestamp(),
                                                         roomID: itemProxy.roomID,
-                                                        roomDisplayName: itemProxy.roomDisplayName)
+                                                        roomDisplayName: itemProxy.roomDisplayName,
+                                                        notificationItemProxy: itemProxy)
                 } else {
                     // For other call notifications, show as regular push
                     return .shouldDisplay
@@ -141,18 +143,19 @@ class NotificationHandler {
                 MXLog.info("Received VoIP call event: \(content), discarding regular notification")
                 
                 // Передаем событие в основное приложение через App Group
-                sendVoIPEventToMainApp(eventType: "\(content)", 
-                                     roomId: itemProxy.roomID,
-                                     eventId: event.eventId())
+                sendVoIPEventToMainApp(eventType: "\(content)",
+                                       roomId: itemProxy.roomID,
+                                       eventId: event.eventId())
                 
                 return .processedShouldDiscard
             case .callInvite:
                 // m.call.invite should trigger VoIP push, not regular notification
                 MXLog.info("Received m.call.invite, should be handled by VoIP push")
                 return await handleVoIPCallEvent(eventId: event.eventId(),
-                                               timestamp: event.timestamp(),
-                                               roomID: itemProxy.roomID,
-                                               roomDisplayName: itemProxy.roomDisplayName)
+                                                 timestamp: event.timestamp(),
+                                                 roomID: itemProxy.roomID,
+                                                 roomDisplayName: itemProxy.roomDisplayName,
+                                                 notificationItemProxy: itemProxy)
             case .keyVerificationReady,
                  .keyVerificationStart,
                  .keyVerificationCancel,
@@ -175,7 +178,8 @@ class NotificationHandler {
     private func handleCallNotification(notifyType: NotifyType,
                                         timestamp: Timestamp,
                                         roomID: String,
-                                        roomDisplayName: String) async -> NotificationProcessingResult {
+                                        roomDisplayName: String,
+                                        notificationItemProxy: NotificationItemProxyProtocol) async -> NotificationProcessingResult {
         // Handle incoming VoIP calls, show the native OS call screen
         // https://developer.apple.com/documentation/callkit/sending-end-to-end-encrypted-voip-calls
         //
@@ -225,8 +229,24 @@ class NotificationHandler {
             }
         }
         
-        let payload = [ElementCallServiceNotificationKey.roomID.rawValue: roomID,
+        // Create enhanced payload with LiveKit credentials for auto-connect
+        var payload = [ElementCallServiceNotificationKey.roomID.rawValue: roomID,
                        ElementCallServiceNotificationKey.roomDisplayName.rawValue: roomDisplayName]
+        
+        // Add LiveKit credentials to payload if available
+        let liveKitCredentials = await extractLiveKitCredentialsFromMatrixEvent(notificationItemProxy)
+        if let accessToken = liveKitCredentials.accessToken, !accessToken.isEmpty {
+            payload["livekit_access_token"] = accessToken
+            MXLog.info("[NSE-CREDENTIALS] Added LiveKit access token to CallKit payload")
+        }
+        if let serverURL = liveKitCredentials.serverURL, !serverURL.isEmpty {
+            payload["livekit_server_url"] = serverURL
+            MXLog.info("[NSE-CREDENTIALS] Added LiveKit server URL to CallKit payload: \(serverURL)")
+        }
+        if let roomURL = liveKitCredentials.roomURL, !roomURL.isEmpty {
+            payload["livekit_room_url"] = roomURL
+            MXLog.info("[NSE-CREDENTIALS] Added LiveKit room URL to CallKit payload")
+        }
         
         do {
             try await CXProvider.reportNewIncomingVoIPPushPayload(payload)
@@ -245,8 +265,8 @@ class NotificationHandler {
                 notificationContent.interruptionLevel = .timeSensitive
             }
             notificationContent.categoryIdentifier = "INCOMING_CALL"
-            notificationContent.title = "Incoming Call"
-            notificationContent.body = "Call from \(roomDisplayName)"
+            notificationContent.title = "Входящий вызов от \(roomDisplayName.isEmpty ? "Unknown" : roomDisplayName)"
+            notificationContent.body = "Коснитесь для ответа"
             notificationContent.sound = UNNotificationSound(named: UNNotificationSoundName("ringtone.caf"))
             
             return .shouldDisplay
@@ -260,108 +280,262 @@ class NotificationHandler {
     
     /// Handle VoIP call events (m.call.invite, etc.) with improved error handling
     private func handleVoIPCallEvent(eventId: String,
-                                   timestamp: Timestamp,
-                                   roomID: String,
-                                   roomDisplayName: String) async -> NotificationProcessingResult {
+                                     timestamp: Timestamp,
+                                     roomID: String,
+                                     roomDisplayName: String,
+                                     notificationItemProxy: NotificationItemProxyProtocol) async -> NotificationProcessingResult {
         MXLog.info("[NSE-RESILIENT] Handling VoIP call event in room: \(roomID)")
         
-        do {
-            // Check if this is a recent call invite (within 30 seconds)
-            let eventDate = Date(timeIntervalSince1970: TimeInterval(timestamp / 1000))
-            let maxAge: TimeInterval = 30.0 // 30 seconds
-            
-            if abs(eventDate.timeIntervalSinceNow) > maxAge {
-                MXLog.info("[NSE-RESILIENT] VoIP call event is too old (\(abs(eventDate.timeIntervalSinceNow))s), showing as regular notification")
-                return .shouldDisplay
-            }
-            
-            // Robust payload creation with error handling
-            guard !eventId.isEmpty, !roomID.isEmpty else {
-                MXLog.error("[NSE-RESILIENT] Invalid VoIP event data - eventId: '\(eventId)', roomID: '\(roomID)'")
-                return .shouldDisplay // Fallback to regular notification
-            }
-            
-            let payload = [
-                "event_id": eventId,
-                "room_id": roomID,
-                "sender_display_name": roomDisplayName.isEmpty ? "Unknown Caller" : roomDisplayName,
-                "is_video": true, // Default to video call
-                "event_type": "m.call.invite"
-            ] as [String: Any]
-            
-            // Robust App Group communication with fallback
-            let success = storeVoIPEventSafely(eventId: eventId, 
-                                             roomID: roomID, 
-                                             roomDisplayName: roomDisplayName, 
-                                             timestamp: timestamp)
-            
-            if !success {
-                MXLog.error("[NSE-RESILIENT] Failed to store VoIP event, falling back to regular notification")
-                return .shouldDisplay
-            }
-            
-            // Try to wake up main app with local notification (with error handling)
-            do {
-                try await sendWakeupNotification(payload: payload, roomDisplayName: roomDisplayName)
-            } catch {
-                MXLog.error("[NSE-RESILIENT] Failed to send wakeup notification: \(error)")
-                // Continue anyway - the stored event should still work
-            }
-            
-            MXLog.info("[NSE-RESILIENT] VoIP call event processed successfully, discarding NSE notification")
-            return .processedShouldDiscard
-            
-        } catch {
-            MXLog.error("[NSE-RESILIENT] Unexpected error handling VoIP event: \(error)")
-            // Ultimate fallback - show as regular notification
+        // Check if this is a recent call invite (within 30 seconds)
+        let eventDate = Date(timeIntervalSince1970: TimeInterval(timestamp / 1000))
+        let maxAge: TimeInterval = 30.0 // 30 seconds
+        
+        if abs(eventDate.timeIntervalSinceNow) > maxAge {
+            MXLog.info("[NSE-RESILIENT] VoIP call event is too old (\(abs(eventDate.timeIntervalSinceNow))s), showing as regular notification")
             return .shouldDisplay
         }
+        
+        // Robust payload creation with error handling
+        guard !eventId.isEmpty, !roomID.isEmpty else {
+            MXLog.error("[NSE-RESILIENT] Invalid VoIP event data - eventId: '\(eventId)', roomID: '\(roomID)'")
+            return .shouldDisplay // Fallback to regular notification
+        }
+        
+        // Extract LiveKit credentials from Matrix event 
+        let liveKitCredentials = await extractLiveKitCredentialsFromMatrixEvent(notificationItemProxy)
+        
+        let payload = [
+            "event_id": eventId,
+            "room_id": roomID,
+            "sender_display_name": roomDisplayName.isEmpty ? "Unknown Caller" : roomDisplayName,
+            "is_video": true, // Default to video call
+            "event_type": "m.call.invite",
+            // Include LiveKit credentials if available
+            "livekit_access_token": liveKitCredentials.accessToken ?? "",
+            "livekit_server_url": liveKitCredentials.serverURL ?? "",
+            "livekit_room_url": liveKitCredentials.roomURL ?? ""
+        ] as [String: Any]
+        
+        // Robust App Group communication with fallback
+        let success = storeVoIPEventSafely(eventId: eventId,
+                                           roomID: roomID,
+                                           roomDisplayName: roomDisplayName,
+                                           timestamp: timestamp,
+                                           liveKitCredentials: liveKitCredentials)
+        
+        if !success {
+            MXLog.error("[NSE-RESILIENT] Failed to store VoIP event, falling back to regular notification")
+            return .shouldDisplay
+        }
+        
+        // Try to wake up main app with local notification (with error handling)
+        do {
+            try await sendWakeupNotification(payload: payload, roomDisplayName: roomDisplayName)
+        } catch {
+            MXLog.error("[NSE-RESILIENT] Failed to send wakeup notification: \(error)")
+            // Continue anyway - the stored event should still work
+        }
+        
+        MXLog.info("[NSE-RESILIENT] VoIP call event processed successfully, discarding NSE notification")
+        return .processedShouldDiscard
+    }
+    
+    /// LiveKit credentials structure
+    private struct LiveKitCredentials {
+        let accessToken: String?
+        let serverURL: String?
+        let roomURL: String?
+    }
+    
+    /// Extract LiveKit credentials from Matrix event via NotificationItemProxy
+    /// CRITICAL FIX: ElementX NSE doesn't provide direct access to raw Matrix JSON,
+    /// so we need to extract from the push notification payload instead
+    private func extractLiveKitCredentialsFromMatrixEvent(_ itemProxy: NotificationItemProxyProtocol) async -> LiveKitCredentials {
+        MXLog.info("[NSE-MATRIX-PARSE] CRITICAL: ElementX NSE has limited access to Matrix event data")
+        MXLog.info("[NSE-MATRIX-PARSE] Using push notification payload as primary source")
+        
+        // The primary and most reliable source is the push notification payload itself
+        // Matrix homeserver/Sygnal should include application_data in the push payload
+        let credentialsFromPush = extractLiveKitCredentialsFromPushPayload(notificationContent.userInfo)
+        
+        if credentialsFromPush.accessToken != nil {
+            MXLog.info("[NSE-MATRIX-PARSE] Successfully extracted credentials from push payload")
+            return credentialsFromPush
+        }
+        
+        // Secondary approach: Try to infer from event properties
+        guard case let .timeline(event) = itemProxy.event else {
+            MXLog.warning("[NSE-MATRIX-PARSE] Not a timeline event, falling back to push payload only")
+            return credentialsFromPush
+        }
+        
+        // Log event information for debugging
+        let eventId = event.eventId()
+        let timestamp = event.timestamp()
+        MXLog.info("[NSE-MATRIX-PARSE] Event ID: \(eventId), Timestamp: \(timestamp)")
+        
+        // Since ElementX doesn't expose raw event content in NSE,
+        // we rely on the homeserver/Sygnal to include application_data in push payload
+        MXLog.warning("[NSE-MATRIX-PARSE] ElementX limitation: Cannot access application_data directly from event")
+        MXLog.info("[NSE-MATRIX-PARSE] Ensure your Matrix homeserver/Sygnal includes application_data in push notifications")
+        
+        return credentialsFromPush
+    }
+    
+    
+    /// Extract LiveKit credentials from notification userInfo (enhanced version)
+    private func extractLiveKitCredentialsFromNotificationUserInfo() -> LiveKitCredentials {
+        // Get userInfo from the current notification content
+        let userInfo = notificationContent.userInfo
+        
+        MXLog.info("[NSE-MATRIX-PARSE] Using enhanced push payload extraction")
+        
+        // Use the enhanced extraction method
+        return extractLiveKitCredentialsFromPushPayload(userInfo)
+    }
+    
+    /// Extract value from nested application_data JSON (enhanced version)
+    private func extractFromApplicationData(_ userInfo: [AnyHashable: Any], key: String) -> String? {
+        MXLog.info("[NSE-APPLICATION-DATA] Searching for key '\(key)' in application_data")
+        
+        // Method 1: Try to parse application_data if it exists as a JSON string
+        if let applicationDataString = userInfo["application_data"] as? String {
+            MXLog.info("[NSE-APPLICATION-DATA] Found application_data as string, parsing JSON")
+            if let data = applicationDataString.data(using: .utf8),
+               let applicationData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let value = applicationData[key] as? String
+                MXLog.info("[NSE-APPLICATION-DATA] Extracted '\(key)' from JSON string: \(value != nil ? "[FOUND]" : "[NOT FOUND]")")
+                return value
+            }
+        }
+        
+        // Method 2: Try to access application_data as a dictionary
+        if let applicationData = userInfo["application_data"] as? [String: Any] {
+            MXLog.info("[NSE-APPLICATION-DATA] Found application_data as dictionary")
+            let value = applicationData[key] as? String
+            MXLog.info("[NSE-APPLICATION-DATA] Extracted '\(key)' from dictionary: \(value != nil ? "[FOUND]" : "[NOT FOUND]")")
+            return value
+        }
+        
+        // Method 3: Look for Matrix event structure
+        if let content = userInfo["content"] as? [String: Any],
+           let applicationData = content["application_data"] as? [String: Any] {
+            MXLog.info("[NSE-APPLICATION-DATA] Found application_data in content structure")
+            let value = applicationData[key] as? String
+            MXLog.info("[NSE-APPLICATION-DATA] Extracted '\(key)' from content.application_data: \(value != nil ? "[FOUND]" : "[NOT FOUND]")")
+            return value
+        }
+        
+        // Method 4: Deep search in nested structures
+        if let eventContent = userInfo["event"] as? [String: Any],
+           let content = eventContent["content"] as? [String: Any],
+           let applicationData = content["application_data"] as? [String: Any] {
+            MXLog.info("[NSE-APPLICATION-DATA] Found application_data in event.content structure")
+            let value = applicationData[key] as? String
+            MXLog.info("[NSE-APPLICATION-DATA] Extracted '\(key)' from event.content.application_data: \(value != nil ? "[FOUND]" : "[NOT FOUND]")")
+            return value
+        }
+        
+        MXLog.warning("[NSE-APPLICATION-DATA] Key '\(key)' not found in any application_data structure")
+        return nil
+    }
+    
+    /// Enhanced method to extract LiveKit credentials from Matrix push payload
+    private func extractLiveKitCredentialsFromPushPayload(_ userInfo: [AnyHashable: Any]) -> LiveKitCredentials {
+        MXLog.info("[NSE-PUSH-EXTRACT] Starting enhanced extraction from push payload")
+        MXLog.info("[NSE-PUSH-EXTRACT] Available keys: \(userInfo.keys.map { String(describing: $0) }.joined(separator: ", "))")
+        
+        // Look for LiveKit data patterns
+        let liveKitKeys = ["lk_token", "livekit_access_token", "access_token"]
+        let serverKeys = ["lk_url", "livekit_server_url", "server_url", "url"]
+        let roomKeys = ["lk_room", "livekit_room_url", "room_url"]
+        
+        var accessToken: String?
+        var serverURL: String?
+        var roomURL: String?
+        
+        // Try different key patterns
+        for key in liveKitKeys {
+            if let token = userInfo[key] as? String ?? extractFromApplicationData(userInfo, key: key) {
+                accessToken = token
+                MXLog.info("[NSE-PUSH-EXTRACT] Found access token with key '\(key)'")
+                break
+            }
+        }
+        
+        for key in serverKeys {
+            if let url = userInfo[key] as? String ?? extractFromApplicationData(userInfo, key: key) {
+                serverURL = url
+                MXLog.info("[NSE-PUSH-EXTRACT] Found server URL with key '\(key)': \(url)")
+                break
+            }
+        }
+        
+        for key in roomKeys {
+            if let url = userInfo[key] as? String ?? extractFromApplicationData(userInfo, key: key) {
+                roomURL = url
+                MXLog.info("[NSE-PUSH-EXTRACT] Found room URL with key '\(key)'")
+                break
+            }
+        }
+        
+        // Default server URL if none found
+        if serverURL == nil || serverURL?.isEmpty == true {
+            serverURL = "wss://video.aibots.kz"
+            MXLog.info("[NSE-PUSH-EXTRACT] Using default server URL: \(serverURL!)")
+        }
+        
+        MXLog.info("[NSE-PUSH-EXTRACT] Final extraction result - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL ?? "[MISSING]"), Room: \(roomURL ?? "[MISSING]")")
+        
+        return LiveKitCredentials(
+            accessToken: accessToken,
+            serverURL: serverURL,
+            roomURL: roomURL
+        )
     }
     
     /// Safely store VoIP event data with error handling
-    private func storeVoIPEventSafely(eventId: String, roomID: String, roomDisplayName: String, timestamp: Timestamp) -> Bool {
-        do {
-            guard let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") else {
-                MXLog.error("[NSE-RESILIENT] Failed to access App Group UserDefaults")
-                return false
-            }
-            
-            let voipEventData: [String: Any] = [
-                "event_id": eventId,
-                "room_id": roomID,
-                "sender_display_name": roomDisplayName.isEmpty ? "Unknown Caller" : roomDisplayName,
-                "is_video": true,
-                "event_type": "m.call.invite",
-                "timestamp": timestamp,
-                "processed_at": Date().timeIntervalSince1970,
-                "nse_version": "1.0", // For debugging
-                "processing_attempt": 1
-            ]
-            
-            appGroupDefaults.set(voipEventData, forKey: "pending_voip_event")
-            
-            // Multiple synchronization attempts for reliability
-            var syncSuccess = false
-            for attempt in 1...3 {
-                if appGroupDefaults.synchronize() {
-                    syncSuccess = true
-                    break
-                } else {
-                    MXLog.warning("[NSE-RESILIENT] App Group sync attempt \(attempt) failed")
-                    usleep(10000) // 10ms delay
-                }
-            }
-            
-            if syncSuccess {
-                MXLog.info("[NSE-RESILIENT] VoIP event stored successfully")
-                return true
+    private func storeVoIPEventSafely(eventId: String, roomID: String, roomDisplayName: String, timestamp: Timestamp, liveKitCredentials: LiveKitCredentials) -> Bool {
+        guard let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") else {
+            MXLog.error("[NSE-RESILIENT] Failed to access App Group UserDefaults")
+            return false
+        }
+        
+        let voipEventData: [String: Any] = [
+            "event_id": eventId,
+            "room_id": roomID,
+            "sender_display_name": roomDisplayName.isEmpty ? "Unknown Caller" : roomDisplayName,
+            "is_video": true,
+            "event_type": "m.call.invite",
+            "timestamp": timestamp,
+            "processed_at": Date().timeIntervalSince1970,
+            "nse_version": "1.0", // For debugging
+            "processing_attempt": 1,
+            // Include LiveKit credentials
+            "livekit_access_token": liveKitCredentials.accessToken ?? "",
+            "livekit_server_url": liveKitCredentials.serverURL ?? "",
+            "livekit_room_url": liveKitCredentials.roomURL ?? ""
+        ]
+        
+        appGroupDefaults.set(voipEventData, forKey: "pending_voip_event")
+        
+        // Multiple synchronization attempts for reliability
+        var syncSuccess = false
+        for attempt in 1...3 {
+            if appGroupDefaults.synchronize() {
+                syncSuccess = true
+                break
             } else {
-                MXLog.error("[NSE-RESILIENT] All App Group sync attempts failed")
-                return false
+                MXLog.warning("[NSE-RESILIENT] App Group sync attempt \(attempt) failed")
+                usleep(10000) // 10ms delay
             }
-            
-        } catch {
-            MXLog.error("[NSE-RESILIENT] Exception storing VoIP event: \(error)")
+        }
+        
+        if syncSuccess {
+            MXLog.info("[NSE-RESILIENT] VoIP event stored successfully")
+            return true
+        } else {
+            MXLog.error("[NSE-RESILIENT] All App Group sync attempts failed")
             return false
         }
     }
@@ -369,8 +543,8 @@ class NotificationHandler {
     /// Send wakeup notification with error handling
     private func sendWakeupNotification(payload: [String: Any], roomDisplayName: String) async throws {
         let content = UNMutableNotificationContent()
-        content.title = "Incoming Call"
-        content.body = "Call from \(roomDisplayName.isEmpty ? "Unknown" : roomDisplayName)"
+        content.title = "Входящий вызов от \(roomDisplayName.isEmpty ? "Unknown" : roomDisplayName)"
+        content.body = "Коснитесь для ответа"
         content.categoryIdentifier = "VOIP_CALL"
         content.userInfo = payload
         
@@ -383,10 +557,9 @@ class NotificationHandler {
         content.sound = UNNotificationSound.defaultCritical
         
         // Schedule notification with unique identifier
-        let request = UNNotificationRequest(
-            identifier: "voip_wakeup_\(UUID().uuidString)",
-            content: content,
-            trigger: nil // Immediate delivery
+        let request = UNNotificationRequest(identifier: "voip_wakeup_\(UUID().uuidString)",
+                                            content: content,
+                                            trigger: nil // Immediate delivery
         )
         
         try await UNUserNotificationCenter.current().add(request)
@@ -397,69 +570,60 @@ class NotificationHandler {
     private func sendVoIPEventToMainApp(eventType: String, roomId: String, eventId: String) {
         MXLog.info("[NSE-RESILIENT] Sending VoIP event '\(eventType)' for room: \(roomId)")
         
-        do {
-            guard let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") else {
-                MXLog.error("[NSE-RESILIENT] Failed to access App Group for VoIP event")
-                return
-            }
-            
-            // Создаём надёжные данные события
-            let voipEventData: [String: Any] = [
-                "event_type": eventType.isEmpty ? "unknown" : eventType,
-                "event_id": eventId.isEmpty ? UUID().uuidString : eventId,
-                "room_id": roomId.isEmpty ? "unknown_room" : roomId,
-                "timestamp": Date().timeIntervalSince1970,
-                "source": "nse",
-                "nse_version": "1.0",
-                "retry_count": 0
-            ]
-            
-            // Попытка сохранения с повторными попытками
-            var saveSuccess = false
-            for attempt in 1...3 {
-                do {
-                    appGroupDefaults.set(voipEventData, forKey: "latest_voip_event")
-                    
-                    if appGroupDefaults.synchronize() {
-                        saveSuccess = true
-                        MXLog.info("[NSE-RESILIENT] VoIP event saved successfully on attempt \(attempt)")
-                        break
-                    } else {
-                        MXLog.warning("[NSE-RESILIENT] App Group sync failed on attempt \(attempt)")
-                    }
-                } catch {
-                    MXLog.error("[NSE-RESILIENT] Exception saving VoIP event on attempt \(attempt): \(error)")
-                }
-                
-                if attempt < 3 {
-                    usleep(20000) // 20ms delay between attempts
-                }
-            }
-            
-            if !saveSuccess {
-                MXLog.error("[NSE-RESILIENT] All attempts to save VoIP event failed")
-                return
-            }
-            
-            // Дополнительная отправка для macOS (если доступно)
-            #if os(macOS)
-            do {
-                let notificationName = Notification.Name("VoIPEventFromNSE")
-                DistributedNotificationCenter.default().postNotificationName(notificationName,
-                                                                             object: nil,
-                                                                             userInfo: voipEventData,
-                                                                             deliverImmediately: true)
-                MXLog.info("[NSE-RESILIENT] DistributedNotificationCenter message sent")
-            } catch {
-                MXLog.error("[NSE-RESILIENT] Failed to send DistributedNotificationCenter message: \(error)")
-            }
-            #endif
-            
-            MXLog.info("[NSE-RESILIENT] 📞 VoIP event '\(eventType)' successfully sent to main app for room: \(roomId)")
-            
-        } catch {
-            MXLog.error("[NSE-RESILIENT] Unexpected error sending VoIP event: \(error)")
+        guard let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") else {
+            MXLog.error("[NSE-RESILIENT] Failed to access App Group for VoIP event")
+            return
         }
+        
+        // Создаём надёжные данные события
+        let voipEventData: [String: Any] = [
+            "event_type": eventType.isEmpty ? "unknown" : eventType,
+            "event_id": eventId.isEmpty ? UUID().uuidString : eventId,
+            "room_id": roomId.isEmpty ? "unknown_room" : roomId,
+            "timestamp": Date().timeIntervalSince1970,
+            "source": "nse",
+            "nse_version": "1.0",
+            "retry_count": 0
+        ]
+        
+        // Попытка сохранения с повторными попытками
+        var saveSuccess = false
+        for attempt in 1...3 {
+            appGroupDefaults.set(voipEventData, forKey: "latest_voip_event")
+            
+            if appGroupDefaults.synchronize() {
+                saveSuccess = true
+                MXLog.info("[NSE-RESILIENT] VoIP event saved successfully on attempt \(attempt)")
+                break
+            } else {
+                MXLog.warning("[NSE-RESILIENT] App Group sync failed on attempt \(attempt)")
+            }
+            
+            if attempt < 3 {
+                usleep(20000) // 20ms delay between attempts
+            }
+        }
+        
+        if !saveSuccess {
+            MXLog.error("[NSE-RESILIENT] All attempts to save VoIP event failed")
+            return
+        }
+        
+        // Дополнительная отправка для macOS (если доступно)
+        #if os(macOS)
+        do {
+            let notificationName = Notification.Name("VoIPEventFromNSE")
+            DistributedNotificationCenter.default().postNotificationName(notificationName,
+                                                                         object: nil,
+                                                                         userInfo: voipEventData,
+                                                                         deliverImmediately: true)
+            MXLog.info("[NSE-RESILIENT] DistributedNotificationCenter message sent")
+        } catch {
+            MXLog.error("[NSE-RESILIENT] Failed to send DistributedNotificationCenter message: \(error)")
+        }
+        #endif
+        
+        MXLog.info("[NSE-RESILIENT] 📞 VoIP event '\(eventType)' successfully sent to main app for room: \(roomId)")
     }
     
     private enum NotificationProcessingResult {

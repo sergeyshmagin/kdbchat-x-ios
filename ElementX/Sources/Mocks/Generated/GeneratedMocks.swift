@@ -11922,6 +11922,41 @@ class NotificationManagerMock: NotificationManagerProtocol, @unchecked Sendable 
         }
         await removeDeliveredNotificationsForFullyReadRoomsClosure?(rooms)
     }
+    //MARK: - forceReRegisterPushers
+
+    var forceReRegisterPushersUnderlyingCallsCount = 0
+    var forceReRegisterPushersCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return forceReRegisterPushersUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = forceReRegisterPushersUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                forceReRegisterPushersUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    forceReRegisterPushersUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var forceReRegisterPushersCalled: Bool {
+        return forceReRegisterPushersCallsCount > 0
+    }
+    var forceReRegisterPushersClosure: (() async -> Void)?
+
+    func forceReRegisterPushers() async {
+        forceReRegisterPushersCallsCount += 1
+        await forceReRegisterPushersClosure?()
+    }
 }
 class NotificationSettingsProxyMock: NotificationSettingsProxyProtocol, @unchecked Sendable {
     var callbacks: PassthroughSubject<NotificationSettingsProxyCallback, Never> {

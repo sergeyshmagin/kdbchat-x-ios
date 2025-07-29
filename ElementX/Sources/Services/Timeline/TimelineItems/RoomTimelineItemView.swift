@@ -71,6 +71,8 @@ struct RoomTimelineItemView: View {
             CallInviteRoomTimelineView(timelineItem: item)
         case .callNotification(let item):
             CallNotificationRoomTimelineView(timelineItem: item)
+        case .liveKitCall(let item):
+            LiveKitCallRoomTimelineView(timelineItem: item)
         }
     }
 }

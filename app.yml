@@ -1,7 +1,7 @@
 settings:
   APP_DISPLAY_NAME: kdbchat
   PRODUCTION_APP_NAME: kdbchat
-  APP_GROUP_IDENTIFIER: group.io.kdbchat
+  APP_GROUP_IDENTIFIER: group.io.sergeyshmagin.kdbchat
   BASE_BUNDLE_IDENTIFIER: io.sergeyshmagin.kdbchat
   ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: "colors/accent-color"
-  DEVELOPMENT_TEAM: 7J4U792NQT
+  DEVELOPMENT_TEAM: DJ9S25B535

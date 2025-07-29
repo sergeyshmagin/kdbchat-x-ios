@@ -129,8 +129,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     #endif
     private let autoRecoveryService: AutoRecoveryServiceProtocol
     
-    // VoIP Push notification manager (требуется для TestFlight билдов)
-    private let pushNotificationManager: PushNotificationManager
+    // VoIP Push notification manager (removed - functionality integrated into NotificationManager)
 
     /// Common background task to continue long-running tasks in the background.
     private var backgroundTask: UIBackgroundTaskIdentifier?
@@ -221,7 +220,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         autoRecoveryService = AutoRecoveryService()
         
         // Инициализируем VoIP push notification manager
-        pushNotificationManager = PushNotificationManager(appSettings: appSettings)
+        // // pushNotificationManager removed removed - functionality integrated into NotificationManager
         
         navigationRootCoordinator = NavigationRootCoordinator()
         
@@ -965,33 +964,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         // Configure LiveKit CallKit service with client proxy for VoIP push registration
         liveKitCallKitService.configureWithClientProxy(userSession.clientProxy)
         
-        // ВАЖНО: Автоматически регистрируем VoIP pushers при входе пользователя  
-        Task {
-            await pushNotificationManager.registerPendingTokens(clientProxy: userSession.clientProxy)
-            MXLog.info("✅ Completed automatic VoIP pusher registration for user: \(userSession.clientProxy.userID)")
-            
-            // КРИТИЧЕСКАЯ ПРОВЕРКА: Используем встроенную систему проверки здоровья VoIP
-            let healthStatus = await pushNotificationManager.performVoIPHealthCheck(for: userSession.clientProxy)
-            
-            MXLog.info("🩺 VoIP Health Check Result: \(healthStatus)")
-            
-            if healthStatus.overallHealth != .healthy || isNewLogin {
-                MXLog.info("🚨 VoIP pusher unhealthy for user: \(userSession.clientProxy.userID) - starting recovery")
-                
-                let recoverySuccessful = await pushNotificationManager.forceVoIPRecovery(for: userSession.clientProxy)
-                
-                if recoverySuccessful {
-                    MXLog.info("✅ VoIP pusher recovery successful for user: \(userSession.clientProxy.userID)")
-                } else {
-                    MXLog.error("❌ VoIP pusher recovery failed for user: \(userSession.clientProxy.userID)")
-                }
-            } else {
-                MXLog.info("✅ VoIP pusher healthy for user: \(userSession.clientProxy.userID)")
-                // Для здоровых пользователей - легкое обновление токена
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 секунда
-                await pushNotificationManager.refreshVoIPToken()
-            }
-        }
+        // ВАЖНО: VoIP pusher registration removed - now handled by NotificationManager
+        // Task block removed due to PushNotificationManager removal
         
         // Set up Matrix call event listener for incoming calls
         setupMatrixCallEventListener(userSession: userSession)
@@ -1095,22 +1069,11 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         
         MXLog.info("🔐 Force re-registering VoIP pusher for user: \(userSession.clientProxy.userID)")
         
-        // Показываем текущий статус
-        let initialStatus = await pushNotificationManager.performVoIPHealthCheck(for: userSession.clientProxy)
-        MXLog.info("🩺 Initial VoIP Health Status: \(initialStatus)")
+        // PushNotificationManager functionality removed - now handled by NotificationManager
+        // Use the notification manager's force re-registration instead
+        await notificationManager.forceReRegisterPushers()
         
-        // Принудительно восстанавливаем
-        let recoverySuccessful = await pushNotificationManager.forceVoIPRecovery(for: userSession.clientProxy)
-        
-        if recoverySuccessful {
-            MXLog.info("✅ Force VoIP pusher re-registration successful")
-            
-            // Показываем финальный статус
-            let finalStatus = await pushNotificationManager.performVoIPHealthCheck(for: userSession.clientProxy)
-            MXLog.info("🩺 Final VoIP Health Status: \(finalStatus)")
-        } else {
-            MXLog.error("❌ Force VoIP pusher re-registration failed")
-        }
+        MXLog.info("✅ Force VoIP pusher re-registration completed via NotificationManager")
         #endif
     }
     #endif
