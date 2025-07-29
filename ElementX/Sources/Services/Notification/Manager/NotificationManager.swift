@@ -317,8 +317,8 @@ final class BadgeCountService: BadgeCountServiceProtocol {
             
             // Count unread messages, mentions, and notifications
             // Fix: Use unreadNotificationsCount only to avoid double counting
-            let roomUnreadCount = max(Int(summary.unreadNotificationsCount), 
-                                    Int(summary.unreadMessagesCount))
+            let roomUnreadCount = max(Int(summary.unreadNotificationsCount),
+                                      Int(summary.unreadMessagesCount))
             
             // Also count marked unread rooms (but not if already has unread)
             let markedUnreadCount = summary.isMarkedUnread && roomUnreadCount == 0 ? 1 : 0

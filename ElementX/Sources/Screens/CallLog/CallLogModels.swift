@@ -5,9 +5,9 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
+import Compound
 import Foundation
 import SwiftUI
-import Compound
 
 // MARK: - Call Log Entry
 
@@ -122,13 +122,13 @@ enum CallLogViewAction {
 // MARK: - View State
 
 struct CallLogViewState {
-    var searchQuery: String = ""
-    var isSearching: Bool = false
+    var searchQuery = ""
+    var isSearching = false
     var callHistory: [CallLogEntry] = []
     var contacts: [ContactWithCallHistory] = []
     var filteredContacts: [ContactWithCallHistory] = []
     var filteredCallHistory: [CallLogEntry] = []
-    var isLoading: Bool = false
+    var isLoading = false
     var error: String?
     
     var isEmpty: Bool {

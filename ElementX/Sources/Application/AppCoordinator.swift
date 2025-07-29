@@ -128,6 +128,9 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     private let elementCallService: ElementCallServiceProtocol
     #endif
     private let autoRecoveryService: AutoRecoveryServiceProtocol
+    
+    // VoIP Push notification manager (требуется для TestFlight билдов)
+    private let pushNotificationManager: PushNotificationManager
 
     /// Common background task to continue long-running tasks in the background.
     private var backgroundTask: UIBackgroundTaskIdentifier?
@@ -138,7 +141,11 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
             if let userSession {
                 configureElementCallService()
                 #if LIVEKIT_ENABLED
-                configureLiveKitService(userSession: userSession)
+                // Определяем является ли это новым входом, проверяя наличие сохраненных настроек пользователя
+                let isNewLogin = !UserDefaults.standard.bool(forKey: "user_session_configured_\(userSession.clientProxy.userID)")
+                UserDefaults.standard.set(true, forKey: "user_session_configured_\(userSession.clientProxy.userID)")
+                
+                configureLiveKitService(userSession: userSession, isNewLogin: isNewLogin)
                 #endif
                 configureNotificationManager()
                 observeUserSessionChanges()
@@ -212,6 +219,9 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         elementCallService = ElementCallService()
         #endif
         autoRecoveryService = AutoRecoveryService()
+        
+        // Инициализируем VoIP push notification manager
+        pushNotificationManager = PushNotificationManager(appSettings: appSettings)
         
         navigationRootCoordinator = NavigationRootCoordinator()
         
@@ -815,6 +825,15 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                     stateMachine.processEvent(.signOut(isSoft: false, disableAppLock: false))
                 case .clearCache:
                     stateMachine.processEvent(.clearCache)
+                case .refreshVoIPToken:
+                    Task { await self.refreshVoIPToken() }
+                case .clearAllVoIPTokens:
+                    Task { await self.clearAllVoIPTokens() }
+                case .showPusherInfo:
+                    // This is handled locally in DeveloperOptionsScreenCoordinator
+                    break
+                case .forceReregisterVoIPPusher:
+                    Task { await self.forceReregisterVoIPPusher() }
                 case .forceLogout:
                     stateMachine.processEvent(.signOut(isSoft: false, disableAppLock: true))
                 }
@@ -866,6 +885,10 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         unregisterForRemoteNotifications()
         
         Task {
+            // TODO: Unregister all pushers before logout when PushNotificationManager is added to project
+            // MXLog.info("🗑️ Unregistering all pushers before logout")
+            // await PushNotificationManager.shared.unregisterAllPushers()
+            
             // First log out from the server
             await userSession.clientProxy.logout()
             
@@ -933,14 +956,42 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     }
     
     #if LIVEKIT_ENABLED
-    private func configureLiveKitService(userSession: UserSessionProtocol) {
-        MXLog.info("Configuring LiveKit services with user session")
+    private func configureLiveKitService(userSession: UserSessionProtocol, isNewLogin: Bool = false) {
+        MXLog.info("Configuring LiveKit services with user session (isNewLogin: \(isNewLogin))")
         
         // Configure LiveKit auth service
         liveKitAuthService.configure(userSession: userSession)
         
         // Configure LiveKit CallKit service with client proxy for VoIP push registration
         liveKitCallKitService.configureWithClientProxy(userSession.clientProxy)
+        
+        // ВАЖНО: Автоматически регистрируем VoIP pushers при входе пользователя  
+        Task {
+            await pushNotificationManager.registerPendingTokens(clientProxy: userSession.clientProxy)
+            MXLog.info("✅ Completed automatic VoIP pusher registration for user: \(userSession.clientProxy.userID)")
+            
+            // КРИТИЧЕСКАЯ ПРОВЕРКА: Используем встроенную систему проверки здоровья VoIP
+            let healthStatus = await pushNotificationManager.performVoIPHealthCheck(for: userSession.clientProxy)
+            
+            MXLog.info("🩺 VoIP Health Check Result: \(healthStatus)")
+            
+            if healthStatus.overallHealth != .healthy || isNewLogin {
+                MXLog.info("🚨 VoIP pusher unhealthy for user: \(userSession.clientProxy.userID) - starting recovery")
+                
+                let recoverySuccessful = await pushNotificationManager.forceVoIPRecovery(for: userSession.clientProxy)
+                
+                if recoverySuccessful {
+                    MXLog.info("✅ VoIP pusher recovery successful for user: \(userSession.clientProxy.userID)")
+                } else {
+                    MXLog.error("❌ VoIP pusher recovery failed for user: \(userSession.clientProxy.userID)")
+                }
+            } else {
+                MXLog.info("✅ VoIP pusher healthy for user: \(userSession.clientProxy.userID)")
+                // Для здоровых пользователей - легкое обновление токена
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 секунда
+                await pushNotificationManager.refreshVoIPToken()
+            }
+        }
         
         // Set up Matrix call event listener for incoming calls
         setupMatrixCallEventListener(userSession: userSession)
@@ -1014,6 +1065,53 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                                                                      callId: callId,
                                                                      callerName: callerName)
         }
+    }
+    
+    /// Refresh VoIP push token for the LiveKit CallKit service
+    private func refreshVoIPToken() async {
+        #if LIVEKIT_ENABLED
+        MXLog.info("🔄 Refreshing VoIP push token from AppCoordinator")
+        // TODO: Re-enable when PushNotificationManager is added to project
+        await liveKitCallKitService.refreshVoIPToken()
+        #endif
+    }
+    
+    /// Clear all VoIP tokens and force complete refresh
+    private func clearAllVoIPTokens() async {
+        #if LIVEKIT_ENABLED
+        MXLog.info("🗑️ Clearing ALL VoIP tokens from AppCoordinator")
+        // TODO: Re-enable when PushNotificationManager is added to project
+        await liveKitCallKitService.clearAllVoIPTokens()
+        MXLog.info("✅ Forced complete VoIP token refresh")
+        #endif
+    }
+    
+    private func forceReregisterVoIPPusher() async {
+        #if LIVEKIT_ENABLED
+        guard let userSession else {
+            MXLog.error("No user session available for VoIP pusher re-registration")
+            return
+        }
+        
+        MXLog.info("🔐 Force re-registering VoIP pusher for user: \(userSession.clientProxy.userID)")
+        
+        // Показываем текущий статус
+        let initialStatus = await pushNotificationManager.performVoIPHealthCheck(for: userSession.clientProxy)
+        MXLog.info("🩺 Initial VoIP Health Status: \(initialStatus)")
+        
+        // Принудительно восстанавливаем
+        let recoverySuccessful = await pushNotificationManager.forceVoIPRecovery(for: userSession.clientProxy)
+        
+        if recoverySuccessful {
+            MXLog.info("✅ Force VoIP pusher re-registration successful")
+            
+            // Показываем финальный статус
+            let finalStatus = await pushNotificationManager.performVoIPHealthCheck(for: userSession.clientProxy)
+            MXLog.info("🩺 Final VoIP Health Status: \(finalStatus)")
+        } else {
+            MXLog.error("❌ Force VoIP pusher re-registration failed")
+        }
+        #endif
     }
     #endif
     

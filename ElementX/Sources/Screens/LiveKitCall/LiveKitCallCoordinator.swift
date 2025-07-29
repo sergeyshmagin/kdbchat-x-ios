@@ -16,6 +16,7 @@ struct LiveKitCallCoordinatorParameters {
     let roomId: String
     let authService: LiveKitAuthServiceProtocol
     let callType: CallType
+    let clientProxy: ClientProxyProtocol
 }
 
 enum LiveKitCallCoordinatorAction {
@@ -35,8 +36,8 @@ final class LiveKitCallCoordinator: CoordinatorProtocol {
         self.parameters = parameters
     }
     
-    convenience init(roomId: String, authService: LiveKitAuthServiceProtocol, callType: CallType = .video) {
-        self.init(parameters: LiveKitCallCoordinatorParameters(roomId: roomId, authService: authService, callType: callType))
+    convenience init(roomId: String, authService: LiveKitAuthServiceProtocol, clientProxy: ClientProxyProtocol, callType: CallType = .video) {
+        self.init(parameters: LiveKitCallCoordinatorParameters(roomId: roomId, authService: authService, callType: callType, clientProxy: clientProxy))
     }
     
     func start() {
@@ -60,11 +61,11 @@ final class LiveKitCallCoordinator: CoordinatorProtocol {
     
     func toPresentable() -> AnyView {
         let viewModel = LiveKitCallViewModel(roomId: parameters.roomId,
-                                             callService: LiveKitCallService(authService: parameters.authService, clientProxy: nil, callKitService: nil))
+                                             callService: LiveKitCallService(authService: parameters.authService, clientProxy: parameters.clientProxy, callKitService: nil))
         
         self.viewModel = viewModel
         
-        return AnyView(LiveKitCallScreen(roomId: parameters.roomId, authService: parameters.authService))
+        return AnyView(LiveKitCallScreen(roomId: parameters.roomId, authService: parameters.authService, clientProxy: parameters.clientProxy))
     }
 }
 #endif

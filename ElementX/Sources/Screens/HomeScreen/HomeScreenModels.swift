@@ -6,16 +6,16 @@
 //
 
 import Combine
-import Foundation
-import UIKit
-import SwiftUI
 import Compound
+import Foundation
+import SwiftUI
+import UIKit
 
 // MARK: - Call Type
 
 enum CallType: String, CaseIterable, Codable, Equatable {
-    case audio = "audio"
-    case video = "video"
+    case audio
+    case video
     
     var icon: KeyPath<CompoundIcons, Image> {
         switch self {
@@ -39,9 +39,9 @@ enum CallType: String, CaseIterable, Codable, Equatable {
 // MARK: - Call Direction
 
 enum CallDirection: String, CaseIterable, Codable {
-    case incoming = "incoming"
-    case outgoing = "outgoing"
-    case missed = "missed"
+    case incoming
+    case outgoing
+    case missed
     
     var displayName: String {
         switch self {
@@ -58,12 +58,12 @@ enum CallDirection: String, CaseIterable, Codable {
 // MARK: - Call Status
 
 enum CallStatus: String, CaseIterable, Codable {
-    case answered = "answered"
-    case declined = "declined"
-    case missed = "missed"
-    case cancelled = "cancelled"
-    case busy = "busy"
-    case failed = "failed"
+    case answered
+    case declined
+    case missed
+    case cancelled
+    case busy
+    case failed
     
     var displayName: String {
         switch self {
@@ -86,11 +86,11 @@ enum CallStatus: String, CaseIterable, Codable {
 // MARK: - Tab Navigation
 
 enum HomeScreenTab: String, CaseIterable, Identifiable {
-    case actual = "actual"
-    case calls = "calls"
-    case communities = "communities"
-    case chats = "chats"
-    case settings = "settings"
+    case actual
+    case calls
+    case communities
+    case chats
+    case settings
     
     var id: String {
         rawValue
@@ -223,7 +223,7 @@ struct HomeScreenViewState: BindableState {
     
     var reportRoomEnabled = false
     
-    var totalUnreadCount: Int = 0
+    var totalUnreadCount = 0
     
     var visibleRooms: [HomeScreenRoom] {
         if roomListMode == .skeletons {

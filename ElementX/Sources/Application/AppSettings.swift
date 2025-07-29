@@ -114,7 +114,7 @@ final class AppSettings {
                   mapTilerConfiguration: MapTilerConfiguration) {
         self.accountProviders = accountProviders
         self.allowOtherAccountProviders = allowOtherAccountProviders
-        self.pushGatewayBaseURL = pushGatewayBaseURL
+        // pushGatewayBaseURL is now computed from BuildConfiguration
         self.oidcRedirectURL = oidcRedirectURL
         self.websiteURL = websiteURL
         self.logoURL = logoURL
@@ -226,23 +226,59 @@ final class AppSettings {
     
     // MARK: - Notifications
     
+    /// App ID for regular (alert) push notifications
     var pusherAppID: String {
-        #if DEBUG
-        InfoPlistReader.main.baseBundleIdentifier + ".ios.dev"
+        #if IS_NSE
+        // In NSE context, use production app ID by default
+        return "io.sergeyshmagin.kdbchat.ios"
         #else
-        InfoPlistReader.main.baseBundleIdentifier + ".ios.prod"
+        return BuildConfiguration.shared.alertAppId
         #endif
     }
     
-    private(set) var pushGatewayBaseURL: URL = "https://sygnal.aibots.kz"
-    var pushGatewayNotifyEndpoint: URL { pushGatewayBaseURL.appending(path: "_matrix/push/v1/notify") }
+    /// App ID for production alert pushes (separate from debug)
+    var prodPushAppId: String {
+        "io.sergeyshmagin.kdbchat.ios"
+    }
+    
+    /// App ID for debug alert pushes
+    var debugPushAppId: String {
+        "io.sergeyshmagin.kdbchat.ios.debug"
+    }
+    
+    /// Push gateway base URL based on build configuration
+    var pushGatewayBaseURL: URL {
+        #if IS_NSE
+        // In NSE context, use production gateway by default
+        return URL(string: "https://sygnal.aibots.kz")!
+        #else
+        return BuildConfiguration.shared.pushGatewayURL
+        #endif
+    }
+    
+    var pushGatewayNotifyEndpoint: URL { 
+        pushGatewayBaseURL.appendingPathComponent("_matrix/push/v1/notify") 
+    }
     
     // MARK: - VoIP Push Configuration
     
-    /// App ID for VoIP push notifications
-    let voipAppId = "io.sergeyshmagin.kdbchat.voip"
+    /// App ID for VoIP push notifications (always production for VoIP)
+    var voipAppId: String {
+        #if IS_NSE
+        return "io.sergeyshmagin.kdbchat.voip"
+        #else
+        return BuildConfiguration.shared.voipAppId
+        #endif
+    }
+    
     /// VoIP push topic for APNs
-    let voipPushTopic = "io.sergeyshmagin.kdbchat.voip"
+    var voipPushTopic: String {
+        #if IS_NSE
+        return "io.sergeyshmagin.kdbchat.voip"
+        #else
+        return BuildConfiguration.shared.voipAppId
+        #endif
+    }
     
     @UserPreference(key: UserDefaultsKeys.enableNotifications, defaultValue: true, storageType: .userDefaults(store))
     var enableNotifications

@@ -5,8 +5,8 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import SwiftUI
 import Compound
+import SwiftUI
 
 struct CallLogView: View {
     @StateObject private var viewModel: CallLogViewModel
@@ -353,7 +353,7 @@ struct CallLogView: View {
                 }
             }
             
-            if viewModel.viewState.filteredContacts.isEmpty && viewModel.viewState.filteredCallHistory.isEmpty {
+            if viewModel.viewState.filteredContacts.isEmpty, viewModel.viewState.filteredCallHistory.isEmpty {
                 VStack(spacing: 16) {
                     Spacer()
                     CompoundIcon(\.search, size: .large, relativeTo: .title)
@@ -393,7 +393,7 @@ struct CallLogView: View {
     private func getInitials(from name: String?) -> String {
         guard let name = name, !name.isEmpty else { return "?" }
         let components = name.split(separator: " ")
-        let initials = components.prefix(2).compactMap { $0.first }.map { String($0) }
+        let initials = components.prefix(2).compactMap(\.first).map { String($0) }
         return initials.joined().uppercased()
     }
     
@@ -433,7 +433,7 @@ struct CallLogView: View {
 private extension CallLogEntry {
     var callCount: Int {
         // This would be calculated based on grouped calls in real implementation
-        return 1
+        1
     }
 }
 

@@ -32,6 +32,16 @@ class DeveloperOptionsScreenViewModel: DeveloperOptionsScreenViewModelType, Deve
             actionsSubject.send(.checkNotificationPermissions)
         case .requestNotificationPermissions:
             actionsSubject.send(.requestNotificationPermissions)
+        case .refreshVoIPToken:
+            actionsSubject.send(.refreshVoIPToken)
+        case .clearAllVoIPTokens:
+            actionsSubject.send(.clearAllVoIPTokens)
+        case .showPusherInfo:
+            actionsSubject.send(.showPusherInfo)
+        case .forceReregisterVoIPPusher:
+            actionsSubject.send(.forceReregisterVoIPPusher)
+        case .showComprehensivePushDiagnostics:
+            actionsSubject.send(.showComprehensivePushDiagnostics)
         }
     }
 }

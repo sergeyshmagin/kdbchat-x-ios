@@ -14,6 +14,7 @@ protocol LiveKitAuthServiceProtocol {
     func getAccessToken(roomId: String) async throws -> String
     func testConnection() async -> Bool
     func configure(userSession: UserSessionProtocol)
+    func getCallDetails(roomId: String, callId: String) async throws -> LiveKitCallDetails
 }
 
 // MARK: - Data Models
@@ -88,11 +89,9 @@ final class LiveKitAuthService: LiveKitAuthServiceProtocol {
         // Generate access token for the call
         let token = generateMockJWT(roomId: roomId, participantName: participantName)
         
-        let details = LiveKitCallDetails(
-            roomUrl: "wss://video.aibots.kz",
-            accessToken: token,
-            serverUrl: "wss://video.aibots.kz"
-        )
+        let details = LiveKitCallDetails(roomUrl: "wss://video.aibots.kz",
+                                         accessToken: token,
+                                         serverUrl: "wss://video.aibots.kz")
         
         MXLog.info("Generated LiveKit call details for call: \(callId)")
         return details
@@ -305,6 +304,20 @@ final class MockLiveKitAuthService: LiveKitAuthServiceProtocol {
     func testConnection() async -> Bool {
         MXLog.info("Mock auth service - connection test always returns true")
         return true
+    }
+    
+    func getCallDetails(roomId: String, callId: String) async throws -> LiveKitCallDetails {
+        MXLog.info("Mock LiveKit call details generated for room: \(roomId), call: \(callId)")
+        
+        let mockToken = """
+        eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJtb2NrLWlzc3VlciIsImV4cCI6\
+        OTk5OTk5OTk5OSwibmJmIjowLCJzdWIiOiJtb2NrLXVzZXIiLCJuYW1lIjoibW9jay11c2VyIi\
+        wicm9vbSI6IlxcKHJvb21JZCkiLCJjYW5fcHVibGlzaCI6dHJ1ZSwiY2FuX3N1YnNjcmliZSI6dHJ1ZX0
+        """
+        
+        return LiveKitCallDetails(roomUrl: "wss://mock-livekit.example.com",
+                                  accessToken: mockToken,
+                                  serverUrl: "wss://mock-livekit.example.com")
     }
 }
 #endif

@@ -258,7 +258,7 @@ struct CallLogView: View {
     
     init(userSession: UserSessionProtocol) {
         self.userSession = userSession
-        self._viewModel = StateObject(wrappedValue: CallLogViewModel(userSession: userSession))
+        _viewModel = StateObject(wrappedValue: CallLogViewModel(userSession: userSession))
     }
     
     var body: some View {
@@ -359,7 +359,6 @@ struct CallLogView: View {
             Text("Вся история звонков будет удалена. Это действие нельзя отменить.")
         }
     }
-    
     
     @ViewBuilder
     private func contactRow(_ contact: RealContact) -> some View {
@@ -536,7 +535,7 @@ struct CallLogView: View {
     
     private func getInitials(from name: String) -> String {
         let components = name.split(separator: " ")
-        let initials = components.prefix(2).compactMap { $0.first }.map { String($0) }
+        let initials = components.prefix(2).compactMap(\.first).map { String($0) }
         return initials.joined().uppercased()
     }
 }
@@ -708,7 +707,7 @@ struct ContactDetailsView: View {
     
     private func getInitials(from name: String) -> String {
         let components = name.split(separator: " ")
-        let initials = components.prefix(2).compactMap { $0.first }.map { String($0) }
+        let initials = components.prefix(2).compactMap(\.first).map { String($0) }
         return initials.joined().uppercased()
     }
 }
@@ -808,7 +807,7 @@ struct RealContact: Identifiable {
         } else if calendar.isDateInYesterday(lastCallTime) {
             return "Вчера"
         } else if calendar.dateInterval(of: .weekOfYear, for: lastCallTime)?.contains(Date()) == true {
-            formatter.dateFormat = "EEEE"  
+            formatter.dateFormat = "EEEE"
             return formatter.string(from: lastCallTime)
         } else {
             formatter.dateFormat = "dd.MM.yy"
@@ -918,6 +917,20 @@ class CallLogViewModel: ObservableObject {
             callKit.setLiveKitCallService(liveKit)
             // Configure CallKit integration for incoming calls
             liveKit.configureCallKitService(callKit)
+            
+            // Ensure Matrix call service is ready for VoIP events
+            Task { [weak self] in
+                guard let self = self else { return }
+                await Task.detached {
+                    // Give some time for user session to fully initialize
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    await MainActor.run {
+                        // Update client proxy to ensure it's current
+                        liveKit.updateClientProxy(self.userSession.clientProxy)
+                        liveKit.ensureMatrixCallServiceReady()
+                    }
+                }.value
+            }
         }
         
         MXLog.info("LiveKit and CallKit services initialized for CallLog")
@@ -946,22 +959,20 @@ class CallLogViewModel: ObservableObject {
         // Получаем список прямых сообщений из RoomSummaryProvider
         let roomSummaryProvider = userSession.clientProxy.roomSummaryProvider
         let roomSummaries = roomSummaryProvider.roomListPublisher.value
-        let directMessageRooms = roomSummaries.filter { $0.isDirect }
+        let directMessageRooms = roomSummaries.filter(\.isDirect)
         
         allContacts = directMessageRooms.compactMap { summary in
             // Для DM комнат берем первого героя как контакт
             guard let hero = summary.heroes.first else { return nil }
             
-            return RealContact(
-                id: summary.id,
-                userId: hero.userID,
-                displayName: hero.displayName ?? hero.userID,
-                avatarURL: hero.avatarURL,
-                roomId: summary.id,
-                lastCall: nil, // Будет заполнено из истории звонков
-                lastCallTime: nil,
-                isMissed: false
-            )
+            return RealContact(id: summary.id,
+                               userId: hero.userID,
+                               displayName: hero.displayName ?? hero.userID,
+                               avatarURL: hero.avatarURL,
+                               roomId: summary.id,
+                               lastCall: nil, // Будет заполнено из истории звонков
+                               lastCallTime: nil,
+                               isMissed: false)
         }
     }
     
@@ -978,12 +989,12 @@ class CallLogViewModel: ObservableObject {
         } else {
             filteredContacts = allContacts.filter { contact in
                 (contact.displayName?.localizedCaseInsensitiveContains(searchQuery) ?? false) ||
-                contact.userId.localizedCaseInsensitiveContains(searchQuery)
+                    contact.userId.localizedCaseInsensitiveContains(searchQuery)
             }
             
             recentCalls = allCalls.filter { call in
                 (call.displayName?.localizedCaseInsensitiveContains(searchQuery) ?? false) ||
-                call.userId.localizedCaseInsensitiveContains(searchQuery)
+                    call.userId.localizedCaseInsensitiveContains(searchQuery)
             }
         }
     }
@@ -1022,12 +1033,10 @@ class CallLogViewModel: ObservableObject {
             let isVideo = (callType == .video)
             
             // Start call through CallKit - this will show native iOS call UI
-            try await callKitService.startOutgoingCall(
-                roomId: roomId,
-                callId: callId,
-                participantName: displayName,
-                isVideo: isVideo
-            )
+            try await callKitService.startOutgoingCall(roomId: roomId,
+                                                       callId: callId,
+                                                       participantName: displayName,
+                                                       isVideo: isVideo)
             
             MXLog.info("CallKit outgoing call initiated successfully")
             

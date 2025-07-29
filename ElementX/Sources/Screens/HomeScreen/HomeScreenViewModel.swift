@@ -500,7 +500,7 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
     }
     
     private func calculateTotalUnreadCount(from summaries: [RoomSummary]) -> Int {
-        return summaries.reduce(0) { total, summary in
+        summaries.reduce(0) { total, summary in
             // Skip muted rooms
             guard !summary.isMuted else { return total }
             

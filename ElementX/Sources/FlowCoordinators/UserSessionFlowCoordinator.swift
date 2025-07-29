@@ -19,6 +19,10 @@ import LiveKit
 enum UserSessionFlowCoordinatorAction {
     case logout
     case clearCache
+    case refreshVoIPToken
+    case clearAllVoIPTokens
+    case showPusherInfo
+    case forceReregisterVoIPPusher
     /// Logout without a confirmation. The user forgot their PIN.
     case forceLogout
 }
@@ -489,6 +493,15 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 Task { await self.runLogoutFlow() }
             case .clearCache:
                 actionsSubject.send(.clearCache)
+            case .refreshVoIPToken:
+                actionsSubject.send(.refreshVoIPToken)
+            case .clearAllVoIPTokens:
+                actionsSubject.send(.clearAllVoIPTokens)
+            case .showPusherInfo:
+                // This is handled locally in DeveloperOptionsScreenCoordinator
+                break
+            case .forceReregisterVoIPPusher:
+                actionsSubject.send(.forceReregisterVoIPPusher)
             case .forceLogout:
                 actionsSubject.send(.forceLogout)
             }
@@ -934,7 +947,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         MXLog.info("Presenting LiveKit call screen for room: \(roomProxy.id) with call type: \(callType)")
         
         let authService = LiveKitAuthService(clientProxy: userSession.clientProxy)
-        let liveKitCallCoordinator = LiveKitCallCoordinator(roomId: roomProxy.id, authService: authService, callType: callType)
+        let liveKitCallCoordinator = LiveKitCallCoordinator(roomId: roomProxy.id, authService: authService, clientProxy: userSession.clientProxy, callType: callType)
         
         liveKitCallCoordinator.actionsPublisher
             .sink { [weak self] action in

@@ -11513,37 +11513,7 @@ open class OAuthAuthorizationDataSDKMock: MatrixRustSDK.OAuthAuthorizationData, 
         fatalError("init(unsafeFromRawPointer:) has not been implemented")
     }
 
-    fileprivate var pointer: UnsafeMutableRawPointer!
-
     //MARK: - loginUrl
-
-    var loginUrlUnderlyingCallsCount = 0
-    open var loginUrlCallsCount: Int {
-        get {
-            if Thread.isMainThread {
-                return loginUrlUnderlyingCallsCount
-            } else {
-                var returnValue: Int? = nil
-                DispatchQueue.main.sync {
-                    returnValue = loginUrlUnderlyingCallsCount
-                }
-
-                return returnValue!
-            }
-        }
-        set {
-            if Thread.isMainThread {
-                loginUrlUnderlyingCallsCount = newValue
-            } else {
-                DispatchQueue.main.sync {
-                    loginUrlUnderlyingCallsCount = newValue
-                }
-            }
-        }
-    }
-    open var loginUrlCalled: Bool {
-        return loginUrlCallsCount > 0
-    }
 
     var loginUrlUnderlyingReturnValue: String!
     open var loginUrlReturnValue: String! {
@@ -11572,7 +11542,6 @@ open class OAuthAuthorizationDataSDKMock: MatrixRustSDK.OAuthAuthorizationData, 
     open var loginUrlClosure: (() -> String)?
 
     open override func loginUrl() -> String {
-        loginUrlCallsCount += 1
         if let loginUrlClosure = loginUrlClosure {
             return loginUrlClosure()
         } else {
@@ -15419,7 +15388,7 @@ open class RoomSDKMock: MatrixRustSDK.Room, @unchecked Sendable {
     open var sendCallNotificationCallIdApplicationNotifyTypeMentionsReceivedInvocations: [(callId: String, application: RtcApplicationType, notifyType: NotifyType, mentions: Mentions)] = []
     open var sendCallNotificationCallIdApplicationNotifyTypeMentionsClosure: ((String, RtcApplicationType, NotifyType, Mentions) async throws -> Void)?
 
-    open override func sendCallNotification(callId: String, application: RtcApplicationType, notifyType: NotifyType, mentions: Mentions) async throws {
+    open func sendCallNotification(callId: String, application: RtcApplicationType, notifyType: NotifyType, mentions: Mentions) async throws {
         if let error = sendCallNotificationCallIdApplicationNotifyTypeMentionsThrowableError {
             throw error
         }

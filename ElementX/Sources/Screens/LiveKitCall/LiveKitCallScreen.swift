@@ -18,9 +18,9 @@ struct LiveKitCallScreen: View {
     @State private var callDuration: TimeInterval = 0
     @State private var showMoreOptions = false
     
-    init(roomId: String, authService: LiveKitAuthServiceProtocol) {
+    init(roomId: String, authService: LiveKitAuthServiceProtocol, clientProxy: ClientProxyProtocol) {
         _viewModel = StateObject(wrappedValue: LiveKitCallViewModel(roomId: roomId,
-                                                                    callService: LiveKitCallService(authService: authService, clientProxy: nil, callKitService: nil)))
+                                                                    callService: LiveKitCallService(authService: authService, clientProxy: clientProxy, callKitService: nil)))
     }
     
     var body: some View {
@@ -544,7 +544,6 @@ struct LiveKitCallScreen: View {
     private var callControlsView: some View {
         GeometryReader { geometry in
             let screenWidth = geometry.size.width
-            let screenHeight = geometry.size.height
             
             // Control panel should be medium size, ~13.5% of screen width per button
             let buttonSize = screenWidth * 0.135 // Increased by 50% from 0.09
@@ -904,6 +903,7 @@ struct CallActionButtonStyle: ButtonStyle {
 
 #Preview {
     LiveKitCallScreen(roomId: "test-room",
-                      authService: MockLiveKitAuthService())
+                      authService: MockLiveKitAuthService(),
+                      clientProxy: ClientProxyMock(.init()))
 }
 #endif

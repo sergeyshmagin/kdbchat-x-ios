@@ -22,7 +22,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.io.sergeyshmagin.kdbchat</string>
+		<string>group.io.kdbchat</string>
 	</array>
 	<key>com.apple.security.network.client</key>
 	<true/>

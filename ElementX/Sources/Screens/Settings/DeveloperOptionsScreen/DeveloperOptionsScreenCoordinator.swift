@@ -11,6 +11,11 @@ import UserNotifications
 
 enum DeveloperOptionsScreenCoordinatorAction {
     case clearCache
+    case refreshVoIPToken
+    case clearAllVoIPTokens
+    case showPusherInfo
+    case forceReregisterVoIPPusher
+    case showComprehensivePushDiagnostics
 }
 
 final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
@@ -38,6 +43,16 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
                     Task { await self.checkNotificationPermissions() }
                 case .requestNotificationPermissions:
                     Task { await self.requestNotificationPermissions() }
+                case .refreshVoIPToken:
+                    actionsSubject.send(.refreshVoIPToken)
+                case .clearAllVoIPTokens:
+                    actionsSubject.send(.clearAllVoIPTokens)
+                case .showPusherInfo:
+                    Task { await self.showPusherInfo() }
+                case .forceReregisterVoIPPusher:
+                    actionsSubject.send(.forceReregisterVoIPPusher)
+                case .showComprehensivePushDiagnostics:
+                    Task { await self.showComprehensivePushDiagnostics() }
                 }
             }
             .store(in: &cancellables)
@@ -79,6 +94,37 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
         }
         
         MXLog.info(message)
+    }
+    
+    private func showPusherInfo() async {
+        let message = """
+        📱 Pusher Configuration Info:
+        
+        🏷️ App IDs:
+        • VoIP App ID: \(ServiceLocator.shared.settings.voipAppId)
+        • Regular Pusher App ID: \(ServiceLocator.shared.settings.pusherAppID)
+        • Base Bundle ID: \(InfoPlistReader.main.baseBundleIdentifier)
+        
+        📡 Push Gateway: \(ServiceLocator.shared.settings.pushGatewayNotifyEndpoint.absoluteString)
+        """
+        
+        await MainActor.run {
+            print("📱 \(message)")
+        }
+        
+        MXLog.info(message)
+    }
+    
+    private func showComprehensivePushDiagnostics() async {
+        let pushManager = PushNotificationManager.shared
+        let report = await pushManager.generateComprehensiveDiagnosticsReport()
+        
+        await MainActor.run {
+            print("🩺 \(report)")
+        }
+        
+        MXLog.info("🩺 Comprehensive Push Diagnostics Report Generated")
+        MXLog.info(report)
     }
     
     private func requestNotificationPermissions() async {

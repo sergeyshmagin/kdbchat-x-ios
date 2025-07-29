@@ -5,8 +5,8 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import Foundation
 import Combine
+import Foundation
 import SwiftUI
 
 @MainActor
@@ -18,60 +18,54 @@ class CallLogViewModel: ObservableObject {
     
     // Mock data for development - in real app this would come from Matrix SDK
     private let mockCallHistory: [CallLogEntry] = [
-        CallLogEntry(
-            roomId: "!room1:example.com",
-            userId: "@bolat:example.com",
-            displayName: "Болат Нач Упр Закупки",
-            avatarUrl: "https://example.com/avatar1.jpg",
-            callType: .video,
-            direction: .outgoing,
-            status: .answered,
-            timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
-            duration: 125 // 2 minutes 5 seconds
+        CallLogEntry(roomId: "!room1:example.com",
+                     userId: "@bolat:example.com",
+                     displayName: "Болат Нач Упр Закупки",
+                     avatarUrl: "https://example.com/avatar1.jpg",
+                     callType: .video,
+                     direction: .outgoing,
+                     status: .answered,
+                     timestamp: Date().addingTimeInterval(-3600), // 1 hour ago
+                     duration: 125 // 2 minutes 5 seconds
         ),
-        CallLogEntry(
-            roomId: "!room2:example.com",
-            userId: "@bolat2:example.com",
-            displayName: "Болат",
-            avatarUrl: nil,
-            callType: .audio,
-            direction: .incoming,
-            status: .answered,
-            timestamp: Date().addingTimeInterval(-7200), // 2 hours ago
-            duration: 67 // 1 minute 7 seconds
+        CallLogEntry(roomId: "!room2:example.com",
+                     userId: "@bolat2:example.com",
+                     displayName: "Болат",
+                     avatarUrl: nil,
+                     callType: .audio,
+                     direction: .incoming,
+                     status: .answered,
+                     timestamp: Date().addingTimeInterval(-7200), // 2 hours ago
+                     duration: 67 // 1 minute 7 seconds
         ),
-        CallLogEntry(
-            roomId: "!room3:example.com",
-            userId: "@rayimbek:example.com",
-            displayName: "Райимбек Болатбекулы",
-            avatarUrl: nil,
-            callType: .audio,
-            direction: .incoming,
-            status: .missed,
-            timestamp: Date().addingTimeInterval(-86400), // Yesterday
-            duration: nil
+        CallLogEntry(roomId: "!room3:example.com",
+                     userId: "@rayimbek:example.com",
+                     displayName: "Райимбек Болатбекулы",
+                     avatarUrl: nil,
+                     callType: .audio,
+                     direction: .incoming,
+                     status: .missed,
+                     timestamp: Date().addingTimeInterval(-86400), // Yesterday
+                     duration: nil),
+        CallLogEntry(roomId: "!room4:example.com",
+                     userId: "@bolat3:example.com",
+                     displayName: "Болат Бедахметович Жамишев",
+                     avatarUrl: nil,
+                     callType: .video,
+                     direction: .incoming,
+                     status: .answered,
+                     timestamp: Date().addingTimeInterval(-172_800), // 2 days ago
+                     duration: 98 // 1 minute 38 seconds
         ),
-        CallLogEntry(
-            roomId: "!room4:example.com",
-            userId: "@bolat3:example.com",
-            displayName: "Болат Бедахметович Жамишев",
-            avatarUrl: nil,
-            callType: .video,
-            direction: .incoming,
-            status: .answered,
-            timestamp: Date().addingTimeInterval(-172800), // 2 days ago
-            duration: 98 // 1 minute 38 seconds
-        ),
-        CallLogEntry(
-            roomId: "!room5:example.com",
-            userId: "@aset:example.com",
-            displayName: "Асет Болатович Шарипов",
-            avatarUrl: nil,
-            callType: .audio,
-            direction: .outgoing,
-            status: .answered,
-            timestamp: Date().addingTimeInterval(-259200), // 3 days ago
-            duration: 234 // 3 minutes 54 seconds
+        CallLogEntry(roomId: "!room5:example.com",
+                     userId: "@aset:example.com",
+                     displayName: "Асет Болатович Шарипов",
+                     avatarUrl: nil,
+                     callType: .audio,
+                     direction: .outgoing,
+                     status: .answered,
+                     timestamp: Date().addingTimeInterval(-259_200), // 3 days ago
+                     duration: 234 // 3 minutes 54 seconds
         )
     ]
     
@@ -111,20 +105,18 @@ class CallLogViewModel: ObservableObject {
     private func generateContactsFromCallHistory() -> [ContactWithCallHistory] {
         let groupedCalls = Dictionary(grouping: mockCallHistory) { $0.userId }
         
-        return groupedCalls.compactMap { (userId, calls) in
+        return groupedCalls.compactMap { userId, calls in
             guard let firstCall = calls.first else { return nil }
             
             let sortedCalls = calls.sorted { $0.timestamp > $1.timestamp }
             let recentCalls = Array(sortedCalls.prefix(3)) // Last 3 calls
             
-            return ContactWithCallHistory(
-                id: userId,
-                userId: userId,
-                displayName: firstCall.displayName,
-                avatarUrl: firstCall.avatarUrl,
-                lastSeen: getLastSeenStatus(for: userId),
-                recentCalls: recentCalls
-            )
+            return ContactWithCallHistory(id: userId,
+                                          userId: userId,
+                                          displayName: firstCall.displayName,
+                                          avatarUrl: firstCall.avatarUrl,
+                                          lastSeen: getLastSeenStatus(for: userId),
+                                          recentCalls: recentCalls)
         }.sorted { contact1, contact2 in
             // Sort by most recent call
             let timestamp1 = contact1.mostRecentCall?.timestamp ?? Date.distantPast
@@ -193,16 +185,15 @@ class CallLogViewModel: ObservableObject {
         // and add an entry to the call history
         
         // Add a new entry to call history to simulate outgoing call
-        let newEntry = CallLogEntry(
-            roomId: roomId,
-            userId: extractUserIdFromRoomId(roomId),
-            displayName: getDisplayNameForRoomId(roomId),
-            avatarUrl: nil,
-            callType: callType,
-            direction: .outgoing,
-            status: .answered, // Simulate successful call
-            timestamp: Date(),
-            duration: 45 // Simulate 45 second call
+        let newEntry = CallLogEntry(roomId: roomId,
+                                    userId: extractUserIdFromRoomId(roomId),
+                                    displayName: getDisplayNameForRoomId(roomId),
+                                    avatarUrl: nil,
+                                    callType: callType,
+                                    direction: .outgoing,
+                                    status: .answered, // Simulate successful call
+                                    timestamp: Date(),
+                                    duration: 45 // Simulate 45 second call
         )
         
         // Update call history
@@ -213,7 +204,7 @@ class CallLogViewModel: ObservableObject {
     
     private func extractUserIdFromRoomId(_ roomId: String) -> String {
         // Mock implementation - in real app this would be proper room to user mapping
-        return roomId.replacingOccurrences(of: "!room", with: "@user")
+        roomId.replacingOccurrences(of: "!room", with: "@user")
             .replacingOccurrences(of: ":example.com", with: "@example.com")
     }
     

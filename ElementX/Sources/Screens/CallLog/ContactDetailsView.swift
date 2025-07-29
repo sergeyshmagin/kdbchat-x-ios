@@ -5,8 +5,8 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import SwiftUI
 import Compound
+import SwiftUI
 
 struct ContactDetailsView: View {
     let contact: ContactWithCallHistory
@@ -252,7 +252,7 @@ struct ContactDetailsView: View {
     private func getInitials(from name: String?) -> String {
         guard let name = name, !name.isEmpty else { return "?" }
         let components = name.split(separator: " ")
-        let initials = components.prefix(2).compactMap { $0.first }.map { String($0) }
+        let initials = components.prefix(2).compactMap(\.first).map { String($0) }
         return initials.joined().uppercased()
     }
     
@@ -296,40 +296,32 @@ struct ContactDetailsView: View {
 
 struct ContactDetailsView_Previews: PreviewProvider {
     static var previews: some View {
-        ContactDetailsView(
-            contact: ContactWithCallHistory(
-                id: "@bolat:example.com",
-                userId: "@bolat:example.com",
-                displayName: "Болат Нач Упр Закупки",
-                avatarUrl: nil,
-                lastSeen: "Онлайн",
-                recentCalls: [
-                    CallLogEntry(
-                        roomId: "!room1:example.com",
-                        userId: "@bolat:example.com",
-                        displayName: "Болат Нач Упр Закупки",
-                        avatarUrl: nil,
-                        callType: .video,
-                        direction: .outgoing,
-                        status: .answered,
-                        timestamp: Date().addingTimeInterval(-3600),
-                        duration: 125
-                    ),
-                    CallLogEntry(
-                        roomId: "!room1:example.com",
-                        userId: "@bolat:example.com",
-                        displayName: "Болат Нач Упр Закупки",
-                        avatarUrl: nil,
-                        callType: .audio,
-                        direction: .incoming,
-                        status: .answered,
-                        timestamp: Date().addingTimeInterval(-7200),
-                        duration: 67
-                    )
-                ]
-            ),
-            onCallAction: { _ in },
-            onDismiss: { }
-        )
+        ContactDetailsView(contact: ContactWithCallHistory(id: "@bolat:example.com",
+                                                           userId: "@bolat:example.com",
+                                                           displayName: "Болат Нач Упр Закупки",
+                                                           avatarUrl: nil,
+                                                           lastSeen: "Онлайн",
+                                                           recentCalls: [
+                                                               CallLogEntry(roomId: "!room1:example.com",
+                                                                            userId: "@bolat:example.com",
+                                                                            displayName: "Болат Нач Упр Закупки",
+                                                                            avatarUrl: nil,
+                                                                            callType: .video,
+                                                                            direction: .outgoing,
+                                                                            status: .answered,
+                                                                            timestamp: Date().addingTimeInterval(-3600),
+                                                                            duration: 125),
+                                                               CallLogEntry(roomId: "!room1:example.com",
+                                                                            userId: "@bolat:example.com",
+                                                                            displayName: "Болат Нач Упр Закупки",
+                                                                            avatarUrl: nil,
+                                                                            callType: .audio,
+                                                                            direction: .incoming,
+                                                                            status: .answered,
+                                                                            timestamp: Date().addingTimeInterval(-7200),
+                                                                            duration: 67)
+                                                           ]),
+                           onCallAction: { _ in },
+                           onDismiss: { })
     }
 }

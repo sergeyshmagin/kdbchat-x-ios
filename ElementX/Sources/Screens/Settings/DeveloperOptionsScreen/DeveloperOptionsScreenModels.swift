@@ -11,6 +11,11 @@ enum DeveloperOptionsScreenViewModelAction {
     case clearCache
     case checkNotificationPermissions
     case requestNotificationPermissions
+    case refreshVoIPToken
+    case clearAllVoIPTokens
+    case showPusherInfo
+    case forceReregisterVoIPPusher
+    case showComprehensivePushDiagnostics
 }
 
 struct DeveloperOptionsScreenViewState: BindableState {
@@ -37,6 +42,11 @@ enum DeveloperOptionsScreenViewAction {
     case clearCache
     case checkNotificationPermissions
     case requestNotificationPermissions
+    case refreshVoIPToken
+    case clearAllVoIPTokens
+    case showPusherInfo
+    case forceReregisterVoIPPusher
+    case showComprehensivePushDiagnostics
 }
 
 protocol DeveloperOptionsProtocol: AnyObject {

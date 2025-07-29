@@ -60,6 +60,29 @@ struct DeveloperOptionsScreen: View {
                 Button("Request Notification Permissions") {
                     context.send(viewAction: .requestNotificationPermissions)
                 }
+                
+                Button("🔄 Refresh VoIP Token") {
+                    context.send(viewAction: .refreshVoIPToken)
+                }
+                
+                Button("🗑️ Clear All VoIP Tokens") {
+                    context.send(viewAction: .clearAllVoIPTokens)
+                }
+                .foregroundColor(.red)
+                
+                Button("🔐 Force Re-register VoIP Pusher") {
+                    context.send(viewAction: .forceReregisterVoIPPusher)
+                }
+                .foregroundColor(.orange)
+                
+                Button("📱 Show Pusher Info") {
+                    context.send(viewAction: .showPusherInfo)
+                }
+                
+                Button("🩺 Comprehensive Push Diagnostics") {
+                    context.send(viewAction: .showComprehensivePushDiagnostics)
+                }
+                .foregroundColor(.blue)
             }
             
             Section("Join rules") {
