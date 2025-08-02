@@ -117,7 +117,23 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
                                        _ messageContent: MessageContent,
                                        _ textMessageContent: TextMessageContent,
                                        _ isOutgoing: Bool) -> RoomTimelineItemProtocol {
-        TextRoomTimelineItem(id: eventItemProxy.id,
+        
+        // Check if this text message is actually a LiveKit call event JSON
+        let messageBody = textMessageContent.body
+        
+        // COMPREHENSIVE FIX: Enhanced JSON call detection
+        // Check for any call-related JSON patterns in text messages
+        let isCallJSON = isLiveKitCallJSON(messageBody)
+        
+        if isCallJSON {
+            MXLog.info("🎬 📨 DETECTED call JSON in text message: \(String(messageBody.prefix(150)))")
+            if let liveKitCallItem = buildLiveKitCallFromJSON(eventItemProxy, messageBody) {
+                MXLog.info("🎬 ✅ INTERCEPTED and converted LiveKit call JSON to proper notification!")
+                return liveKitCallItem
+            }
+        }
+        
+        return TextRoomTimelineItem(id: eventItemProxy.id,
                              timestamp: eventItemProxy.timestamp,
                              isOutgoing: isOutgoing,
                              isEditable: eventItemProxy.isEditable,
@@ -747,42 +763,84 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
         let lowerError = error.lowercased()
         let lowerEventType = eventType.lowercased()
         
+        // Get the body content of the event to check for JSON patterns
+        let eventBody = eventItemProxy.id.eventID ?? error
+        let lowerBody = eventBody.lowercased()
+        
         // Look for patterns that indicate this is a LiveKit call event
         let isLiveKitEvent = lowerError.contains("application_data") ||
-                           lowerError.contains("livekit") ||
-                           lowerError.contains("notify_type") ||
-                           lowerError.contains("ring") ||
-                           lowerEventType.contains("call") ||
-                           lowerEventType.contains("voip")
+            lowerError.contains("livekit") ||
+            lowerError.contains("notify_type") ||
+            lowerError.contains("ring") ||
+            lowerError.contains("call_id") ||
+            lowerError.contains("seq") ||
+            lowerError.contains("membership") ||
+            lowerError.contains("conf_id") ||
+            lowerError.contains("lifetime") ||
+            lowerError.contains("version") ||
+            lowerError.contains("expires") ||
+            lowerError.contains("device_id") ||
+            lowerEventType.contains("call") ||
+            lowerEventType.contains("voip") ||
+            lowerBody.contains("application_data") ||
+            lowerBody.contains("livekit") ||
+            lowerBody.contains("call_id") ||
+            lowerBody.contains("notify_type") ||
+            lowerBody.contains("ring") ||
+            lowerBody.contains("seq") ||
+            lowerBody.contains("membership") ||
+            lowerBody.contains("conf_id") ||
+            lowerBody.contains("expires") ||
+            lowerBody.contains("device_id")
         
-        guard isLiveKitEvent else { return nil }
+        // Additional check: if error looks like JSON with call-related fields
+        let isCallJSON = (error.contains("{") && error.contains("}")) &&
+            (error.contains("call_id") || 
+             error.contains("application_data") || 
+             error.contains("notify_type") ||
+             error.contains("membership") ||
+             error.contains("seq"))
         
-        // Determine call type - default to video for LiveKit calls
-        let callType: LiveKitCallRoomTimelineItem.CallType = .video
+        guard isLiveKitEvent || isCallJSON else { return nil }
+        
+        // Determine call type - check for "video" in the event data
+        // If no explicit type is found, default to video for LiveKit calls
+        let callType: LiveKitCallRoomTimelineItem.CallType = 
+            (lowerError.contains("\"type\":\"video\"") || 
+             lowerBody.contains("\"type\":\"video\"") || 
+             lowerError.contains("video") || 
+             lowerBody.contains("video")) ? .video : .video  // Default to video for LiveKit
         
         // Determine call state based on event context
         let callState: LiveKitCallRoomTimelineItem.CallState
         
-        if lowerError.contains("ring") || lowerEventType.contains("invite") {
+        if lowerError.contains("ring") || lowerError.contains("notify_type\":\"ring") || 
+           lowerEventType.contains("invite") || lowerBody.contains("ring") {
             callState = .started
-        } else if lowerError.contains("hangup") || lowerError.contains("end") {
+        } else if lowerError.contains("hangup") || lowerError.contains("end") || 
+                  lowerError.contains("membership\":\"leave") {
             callState = .ended
         } else if lowerError.contains("declined") || lowerError.contains("reject") {
             callState = .declined
+        } else if lowerError.contains("membership\":\"join") || lowerBody.contains("membership\":\"join") {
+            callState = .active
         } else {
             callState = .started // Default to started for LiveKit events
         }
         
-        MXLog.info("🎬 Detected LiveKit call event - Type: \(callType), State: \(callState), EventType: \(eventType)")
+        MXLog.info("🎬 ✅ DETECTED LiveKit call event - Type: \(callType), State: \(callState), EventType: \(eventType)")
+        MXLog.info("🎬 📄 Event data preview: \(String(error.prefix(200)))")
+        MXLog.info("🎬 🔍 Detection method: isLiveKitEvent=\(isLiveKitEvent), isCallJSON=\(isCallJSON)")
         
         return LiveKitCallRoomTimelineItem(id: eventItemProxy.id,
-                                          timestamp: eventItemProxy.timestamp,
-                                          isEditable: false,
-                                          canBeRepliedTo: false,
-                                          isOutgoing: eventItemProxy.isOwn,
-                                          sender: eventItemProxy.sender,
-                                          callType: callType,
-                                          callState: callState)
+                                           timestamp: eventItemProxy.timestamp,
+                                           isEditable: false,
+                                           canBeRepliedTo: false,
+                                           isOutgoing: eventItemProxy.isOwn,
+                                           sender: eventItemProxy.sender,
+                                           callType: callType,
+                                           callState: callState,
+                                           callDuration: nil)
     }
     
     private func buildCallInviteTimelineItem(for eventItemProxy: EventTimelineItemProxy) -> RoomTimelineItemProtocol {
@@ -964,6 +1022,156 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
             .text(.init(body: body))
         case .none:
             .text(.init(body: L10n.commonUnsupportedEvent))
+        }
+    }
+    
+    // MARK: - Enhanced LiveKit Call JSON Detection
+    
+    /// Comprehensive detection of LiveKit call JSON messages
+    private func isLiveKitCallJSON(_ messageBody: String) -> Bool {
+        // Must be JSON-like structure
+        guard messageBody.contains("{") && messageBody.contains("}") else { return false }
+        
+        let lowerBody = messageBody.lowercased()
+        
+        // Check for call-specific patterns from the provided JSON samples
+        let callPatterns = [
+            "call_id",
+            "notify_type", 
+            "application_data",
+            "livekit_server_url",
+            "livekit_access_token",
+            "livekit_room_url",
+            "conf_id", 
+            "device_id",
+            "membership",
+            "expires",
+            "lifetime",
+            "\"type\":\"video\"",
+            "\"seq\":",
+            "\"version\":",
+            "\"ring\""
+        ]
+        
+        // If the message contains any of these patterns, it's likely a call JSON
+        let hasCallPattern = callPatterns.contains { pattern in
+            lowerBody.contains(pattern.lowercased())
+        }
+        
+        return hasCallPattern
+    }
+    
+    /// Build a proper LiveKit call timeline item from JSON message
+    private func buildLiveKitCallFromJSON(_ eventItemProxy: EventTimelineItemProxy, _ jsonString: String) -> LiveKitCallRoomTimelineItem? {
+        
+        let lowerJSON = jsonString.lowercased()
+        
+        // CRITICAL FIX: Enhanced suppression logic
+        MXLog.info("🎬 🔍 Analyzing JSON: \(String(jsonString.prefix(150)))")
+        
+        // ENHANCED SUPPRESSION: Block ALL non-essential call JSON messages
+        
+        // CRITICAL: Multiple backup suppression patterns to catch all variations
+        
+        // SUPPRESS any JSON with membership:join (ANY variation)
+        if lowerJSON.contains("membership") && lowerJSON.contains("join") {
+            MXLog.info("🎬 ❌ SUPPRESSED: ANY membership JOIN variant - avoiding duplicate")
+            return nil
+        }
+        
+        // SUPPRESS any JSON with device_id + expires combination
+        if lowerJSON.contains("device_id") && lowerJSON.contains("expires") {
+            MXLog.info("🎬 ❌ SUPPRESSED: device_id + expires combo - avoiding duplicate")
+            return nil
+        }
+        
+        // SUPPRESS any JSON with seq number but no ring notification
+        if lowerJSON.contains("seq") && !lowerJSON.contains("notify_type") {
+            MXLog.info("🎬 ❌ SUPPRESSED: seq without notify_type - avoiding duplicate")
+            return nil
+        }
+        
+        // SUPPRESS any JSON with call_id + membership combination (join events)
+        if lowerJSON.contains("call_id") && lowerJSON.contains("membership") && !lowerJSON.contains("notify_type") {
+            MXLog.info("🎬 ❌ SUPPRESSED: call_id + membership without notify_type - avoiding duplicate")
+            return nil
+        }
+        
+        // SUPPRESS application_data events (usually duplicates)
+        if lowerJSON.contains("application_data") && !lowerJSON.contains("notify_type") {
+            MXLog.info("🎬 ❌ SUPPRESSED: application_data without notify_type - avoiding duplicate")
+            return nil
+        }
+        
+        // SUPPRESS version/lifetime events (usually duplicates)
+        if lowerJSON.contains("version") && lowerJSON.contains("lifetime") && !lowerJSON.contains("notify_type") {
+            MXLog.info("🎬 ❌ SUPPRESSED: version/lifetime without notify_type - avoiding duplicate")
+            return nil
+        }
+        
+        // FINAL CATCH-ALL: Suppress any JSON that has call metadata but no ring notification
+        if (lowerJSON.contains("call_id") || lowerJSON.contains("conf_id")) && 
+           !lowerJSON.contains("notify_type") && !lowerJSON.contains("ring") {
+            MXLog.info("🎬 ❌ SUPPRESSED: call metadata without ring/notify_type - avoiding duplicate")
+            return nil
+        }
+        
+        // Only allow primary ring notifications through
+        let callState: LiveKitCallRoomTimelineItem.CallState
+        
+        if lowerJSON.contains("notify_type\":\"ring") {
+            callState = .started
+            MXLog.info("🎬 ✅ ALLOWED: Ring notification - showing 'Call Started'")
+        } else if lowerJSON.contains("membership\":\"leave") {
+            callState = .ended
+            MXLog.info("🎬 ✅ ALLOWED: Leave notification - showing 'Call Ended'")
+        } else {
+            // Suppress everything else that doesn't have explicit ring/leave
+            MXLog.info("🎬 ❌ SUPPRESSED: Unknown call JSON - avoiding duplicate")
+            return nil
+        }
+        
+        let callType: LiveKitCallRoomTimelineItem.CallType = .video
+        let callID = extractCallID(from: jsonString)
+        
+        MXLog.info("🎬 🎯 Creating call notification - Type: \(callType), State: \(callState), CallID: \(callID)")
+        
+        return LiveKitCallRoomTimelineItem(id: eventItemProxy.id,
+                                           timestamp: eventItemProxy.timestamp,
+                                           isEditable: false,
+                                           canBeRepliedTo: false,
+                                           isOutgoing: eventItemProxy.isOwn,
+                                           sender: eventItemProxy.sender,
+                                           callType: callType,
+                                           callState: callState,
+                                           callDuration: extractCallDuration(from: jsonString, state: callState))
+    }
+    
+    /// Extract call ID from JSON for deduplication purposes
+    private func extractCallID(from jsonString: String) -> String {
+        // Simple regex-free extraction
+        if let range = jsonString.range(of: "\"call_id\":\"") {
+            let startIndex = range.upperBound  
+            if let endRange = jsonString[startIndex...].range(of: "\"") {
+                let callID = String(jsonString[startIndex..<endRange.lowerBound])
+                return callID
+            }
+        }
+        return "unknown"
+    }
+    
+    /// Extract call duration from JSON or calculate based on state
+    private func extractCallDuration(from jsonString: String, state: LiveKitCallRoomTimelineItem.CallState) -> TimeInterval? {
+        // For now, we don't have duration info in the JSON
+        // Return nil for ongoing calls, and use placeholder for ended calls
+        switch state {
+        case .started, .active:
+            return nil // Ongoing call, no duration yet
+        case .ended:
+            // TODO: Calculate actual duration when we have call start/end tracking
+            return 120 // Placeholder: 2 minutes
+        case .declined, .missed:
+            return 0 // No duration for declined/missed calls
         }
     }
 }

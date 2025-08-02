@@ -20,7 +20,9 @@ final class BadgeCountService: BadgeCountServiceProtocol {
     }
     
     func updateBadgeCount(to count: Int) {
-        Task { @MainActor in
+        // ИСПРАВЛЕНИЕ: Убираем лишнее оборачивание в Task для предотвращения дублирования
+        // Метод уже будет вызываться из MainActor контекста
+        DispatchQueue.main.async {
             UNUserNotificationCenter.current().setBadgeCount(count)
             MXLog.info("[BadgeCountService] Updated badge count to: \(count)")
         }
@@ -44,10 +46,9 @@ final class BadgeCountService: BadgeCountServiceProtocol {
                 return total
             }
             
-            // Count unread messages, mentions, and notifications
-            let roomUnreadCount = Int(summary.unreadMessagesCount) +
-                Int(summary.unreadMentionsCount) +
-                Int(summary.unreadNotificationsCount)
+            // ИСПРАВЛЕНИЕ: Используем только unreadNotificationsCount - это основной счетчик
+            // unreadMessagesCount и unreadMentionsCount могут дублировать данные
+            let roomUnreadCount = Int(summary.unreadNotificationsCount)
             
             // Also count marked unread rooms
             let markedUnreadCount = summary.isMarkedUnread ? 1 : 0
@@ -55,7 +56,15 @@ final class BadgeCountService: BadgeCountServiceProtocol {
             return total + roomUnreadCount + markedUnreadCount
         }
         
-        updateBadgeCount(to: totalUnreadCount)
+        // ИСПРАВЛЕНИЕ: Простая логика - всегда обновляем badge если значение изменилось
+        let currentBadge = UIApplication.shared.applicationIconBadgeNumber
+        
+        if totalUnreadCount != currentBadge {
+            MXLog.info("[BadgeCountService] Updating badge: current=\(currentBadge), calculated=\(totalUnreadCount)")
+            updateBadgeCount(to: totalUnreadCount)
+        } else {
+            MXLog.debug("[BadgeCountService] Badge count already correct: \(currentBadge)")
+        }
     }
     
     private func setupAppStateObservation() {

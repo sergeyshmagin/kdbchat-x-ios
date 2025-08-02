@@ -11957,6 +11957,268 @@ class NotificationManagerMock: NotificationManagerProtocol, @unchecked Sendable 
         forceReRegisterPushersCallsCount += 1
         await forceReRegisterPushersClosure?()
     }
+    //MARK: - registerVoIPPusher
+
+    var registerVoIPPusherWithUnderlyingCallsCount = 0
+    var registerVoIPPusherWithCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return registerVoIPPusherWithUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = registerVoIPPusherWithUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                registerVoIPPusherWithUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    registerVoIPPusherWithUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var registerVoIPPusherWithCalled: Bool {
+        return registerVoIPPusherWithCallsCount > 0
+    }
+    var registerVoIPPusherWithReceivedTokenData: Data?
+    var registerVoIPPusherWithReceivedInvocations: [Data] = []
+
+    var registerVoIPPusherWithUnderlyingReturnValue: Bool!
+    var registerVoIPPusherWithReturnValue: Bool! {
+        get {
+            if Thread.isMainThread {
+                return registerVoIPPusherWithUnderlyingReturnValue
+            } else {
+                var returnValue: Bool? = nil
+                DispatchQueue.main.sync {
+                    returnValue = registerVoIPPusherWithUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                registerVoIPPusherWithUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    registerVoIPPusherWithUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var registerVoIPPusherWithClosure: ((Data) async -> Bool)?
+
+    func registerVoIPPusher(with tokenData: Data) async -> Bool {
+        registerVoIPPusherWithCallsCount += 1
+        registerVoIPPusherWithReceivedTokenData = tokenData
+        DispatchQueue.main.async {
+            self.registerVoIPPusherWithReceivedInvocations.append(tokenData)
+        }
+        if let registerVoIPPusherWithClosure = registerVoIPPusherWithClosure {
+            return await registerVoIPPusherWithClosure(tokenData)
+        } else {
+            return registerVoIPPusherWithReturnValue
+        }
+    }
+    //MARK: - hasVoIPToken
+
+    var hasVoIPTokenUnderlyingCallsCount = 0
+    var hasVoIPTokenCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return hasVoIPTokenUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = hasVoIPTokenUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                hasVoIPTokenUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    hasVoIPTokenUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var hasVoIPTokenCalled: Bool {
+        return hasVoIPTokenCallsCount > 0
+    }
+
+    var hasVoIPTokenUnderlyingReturnValue: Bool!
+    var hasVoIPTokenReturnValue: Bool! {
+        get {
+            if Thread.isMainThread {
+                return hasVoIPTokenUnderlyingReturnValue
+            } else {
+                var returnValue: Bool? = nil
+                DispatchQueue.main.sync {
+                    returnValue = hasVoIPTokenUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                hasVoIPTokenUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    hasVoIPTokenUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var hasVoIPTokenClosure: (() -> Bool)?
+
+    func hasVoIPToken() -> Bool {
+        hasVoIPTokenCallsCount += 1
+        if let hasVoIPTokenClosure = hasVoIPTokenClosure {
+            return hasVoIPTokenClosure()
+        } else {
+            return hasVoIPTokenReturnValue
+        }
+    }
+    //MARK: - getVoIPPusherDiagnostics
+
+    var getVoIPPusherDiagnosticsUnderlyingCallsCount = 0
+    var getVoIPPusherDiagnosticsCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return getVoIPPusherDiagnosticsUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = getVoIPPusherDiagnosticsUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                getVoIPPusherDiagnosticsUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    getVoIPPusherDiagnosticsUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var getVoIPPusherDiagnosticsCalled: Bool {
+        return getVoIPPusherDiagnosticsCallsCount > 0
+    }
+
+    var getVoIPPusherDiagnosticsUnderlyingReturnValue: VoIPPusherDiagnostics!
+    var getVoIPPusherDiagnosticsReturnValue: VoIPPusherDiagnostics! {
+        get {
+            if Thread.isMainThread {
+                return getVoIPPusherDiagnosticsUnderlyingReturnValue
+            } else {
+                var returnValue: VoIPPusherDiagnostics? = nil
+                DispatchQueue.main.sync {
+                    returnValue = getVoIPPusherDiagnosticsUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                getVoIPPusherDiagnosticsUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    getVoIPPusherDiagnosticsUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var getVoIPPusherDiagnosticsClosure: (() -> VoIPPusherDiagnostics)?
+
+    func getVoIPPusherDiagnostics() -> VoIPPusherDiagnostics {
+        getVoIPPusherDiagnosticsCallsCount += 1
+        if let getVoIPPusherDiagnosticsClosure = getVoIPPusherDiagnosticsClosure {
+            return getVoIPPusherDiagnosticsClosure()
+        } else {
+            return getVoIPPusherDiagnosticsReturnValue
+        }
+    }
+    //MARK: - testVoIPPusherRegistration
+
+    var testVoIPPusherRegistrationUnderlyingCallsCount = 0
+    var testVoIPPusherRegistrationCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return testVoIPPusherRegistrationUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = testVoIPPusherRegistrationUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                testVoIPPusherRegistrationUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    testVoIPPusherRegistrationUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var testVoIPPusherRegistrationCalled: Bool {
+        return testVoIPPusherRegistrationCallsCount > 0
+    }
+
+    var testVoIPPusherRegistrationUnderlyingReturnValue: VoIPPusherTestResult!
+    var testVoIPPusherRegistrationReturnValue: VoIPPusherTestResult! {
+        get {
+            if Thread.isMainThread {
+                return testVoIPPusherRegistrationUnderlyingReturnValue
+            } else {
+                var returnValue: VoIPPusherTestResult? = nil
+                DispatchQueue.main.sync {
+                    returnValue = testVoIPPusherRegistrationUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                testVoIPPusherRegistrationUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    testVoIPPusherRegistrationUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var testVoIPPusherRegistrationClosure: (() async -> VoIPPusherTestResult)?
+
+    func testVoIPPusherRegistration() async -> VoIPPusherTestResult {
+        testVoIPPusherRegistrationCallsCount += 1
+        if let testVoIPPusherRegistrationClosure = testVoIPPusherRegistrationClosure {
+            return await testVoIPPusherRegistrationClosure()
+        } else {
+            return testVoIPPusherRegistrationReturnValue
+        }
+    }
 }
 class NotificationSettingsProxyMock: NotificationSettingsProxyProtocol, @unchecked Sendable {
     var callbacks: PassthroughSubject<NotificationSettingsProxyCallback, Never> {

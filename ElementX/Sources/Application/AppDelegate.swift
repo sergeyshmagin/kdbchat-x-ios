@@ -11,6 +11,7 @@ import SwiftUI
 enum AppDelegateCallback {
     case registeredNotifications(deviceToken: Data)
     case failedToRegisteredNotifications(error: Error)
+    case registeredVoIPNotifications(tokenData: Data)
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -33,6 +34,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: APNS требует hex формат, не base64!
+        let tokenHex = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        let tokenBase64 = deviceToken.base64EncodedString() // для сравнения в логах
+        let bundleId = Bundle.main.bundleIdentifier ?? "Unknown"
+        
+        MXLog.info("[AppDelegate] 🎯 ===== DEVICE TOKEN RECEIVED =====")
+        MXLog.info("[AppDelegate] 📦 Bundle ID: \(bundleId)")
+        MXLog.info("[AppDelegate] 🔑 Device Token (HEX): \(tokenHex)")
+        MXLog.info("[AppDelegate] 🔑 Device Token (Base64): \(tokenBase64)")
+        MXLog.info("[AppDelegate] 🔑 Token Length (HEX): \(tokenHex.count) chars")
+        MXLog.info("[AppDelegate] 🔑 Token Length (Base64): \(tokenBase64.count) chars")
+        MXLog.info("[AppDelegate] 📱 Device: \(UIDevice.current.model) (\(UIDevice.current.systemName) \(UIDevice.current.systemVersion))")
+        MXLog.info("[AppDelegate] 🏗️ Build Config: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")")
+        MXLog.info("[AppDelegate] ==========================================")
+        
         callbacks.send(.registeredNotifications(deviceToken: deviceToken))
         
         // PushNotificationManager removed - push registration now handled by NotificationManager

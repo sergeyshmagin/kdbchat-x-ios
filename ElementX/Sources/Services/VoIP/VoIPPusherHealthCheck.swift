@@ -121,7 +121,7 @@ final class VoIPPusherHealthCheck {
         if let voipRegistration = UserDefaults.standard.string(forKey: "last_push_registration_voip") {
             let components = voipRegistration.components(separatedBy: "_")
             if components.count >= 3 {
-                pushers.append(LocalPusherInfo(appId: "io.sergeyshmagin.kdbchat.voip",
+                pushers.append(LocalPusherInfo(appId: BuildConfiguration.shared.voipAppId,
                                                pushkey: components[0],
                                                profileTag: components[2],
                                                kind: "voip",
@@ -159,7 +159,7 @@ final class VoIPPusherHealthCheck {
     private func validateAppConfiguration() -> Bool {
         let buildConfig = BuildConfiguration.shared
         return buildConfig.shouldRegisterVoIP &&
-            buildConfig.voipAppId == "io.sergeyshmagin.kdbchat.voip"
+            !buildConfig.voipAppId.isEmpty
     }
     
     private func determineOverallHealth(_ status: VoIPHealthStatus) -> VoIPHealthStatus.Health {

@@ -8,6 +8,7 @@
 import Combine
 import SwiftUI
 import UserNotifications
+import UniformTypeIdentifiers
 
 enum DeveloperOptionsScreenCoordinatorAction {
     case clearCache
@@ -15,7 +16,10 @@ enum DeveloperOptionsScreenCoordinatorAction {
     case clearAllVoIPTokens
     case showPusherInfo
     case forceReregisterVoIPPusher
+    case forceReregisterPushers
+    case showVoIPDiagnostics
     case showComprehensivePushDiagnostics
+    case exportLogs(URL)
 }
 
 final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
@@ -51,8 +55,14 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
                     Task { await self.showPusherInfo() }
                 case .forceReregisterVoIPPusher:
                     actionsSubject.send(.forceReregisterVoIPPusher)
+                case .forceReregisterPushers:
+                    actionsSubject.send(.forceReregisterPushers)
+                case .showVoIPDiagnostics:
+                    Task { await self.showVoIPDiagnostics() }
                 case .showComprehensivePushDiagnostics:
                     Task { await self.showComprehensivePushDiagnostics() }
+                case .exportLogs:
+                    Task { await self.exportLogs() }
                 }
             }
             .store(in: &cancellables)
@@ -152,6 +162,121 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
             
             await MainActor.run {
                 print("📱 Permission Request Failed: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func showVoIPDiagnostics() async {
+        // For now, show basic diagnostics since NotificationManager is not in ServiceLocator
+        let message = """
+        🩺 VoIP PUSHER DIAGNOSTICS:
+        
+        📱 Configuration:
+        • VoIP App ID: \(ServiceLocator.shared.settings.voipAppId)
+        • Regular App ID: \(ServiceLocator.shared.settings.pusherAppID)
+        • Push Gateway: \(ServiceLocator.shared.settings.pushGatewayNotifyEndpoint)
+        • CallKit Integration: Required (iOS 13+)
+        
+        📋 Diagnostic Actions:
+        1. Check Xcode console for VoIP registration logs
+        2. Look for "[NotificationManager] 📲 VoIP token received"
+        3. Verify "[NotificationManager] ✅ VoIP pusher registration completed"
+        4. Check for retry attempts if registration failed
+        
+        🔍 Common Issues:
+        • No token: Check provisioning profile and Apple Developer settings
+        • Registration fails: Check network and Matrix server access
+        • No incoming calls: Verify Sygnal configuration and CallKit integration
+        • App terminated: Ensure CallKit is properly configured for VoIP pushes
+        
+        💡 Use "Force Re-register VoIP Pusher" to retry registration
+        """
+        
+        await MainActor.run {
+            print("🩺 \(message)")
+        }
+        
+        MXLog.info("🩺 VoIP Diagnostics Generated")
+        MXLog.info(message)
+        
+        // Trigger an action to show diagnostics in the logs
+        actionsSubject.send(.showVoIPDiagnostics)
+    }
+    
+    // MARK: - Log Export
+    
+    private func exportLogs() async {
+        MXLog.info("📄 Starting log export...")
+        
+        do {
+            // Get all log files from the tracing system
+            let logFiles = Tracing.logFiles
+            
+            guard !logFiles.isEmpty else {
+                MXLog.warning("📄 No log files found to export")
+                await MainActor.run {
+                    print("📄 No log files found to export")
+                }
+                return
+            }
+            
+            // Create a temporary directory for the exported logs
+            let tempDir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("ElementX-Logs-\(Date().timeIntervalSince1970)")
+            
+            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            
+            // Copy all log files to the temporary directory
+            var copiedFiles: [URL] = []
+            for (index, logFile) in logFiles.enumerated() {
+                let destinationURL = tempDir.appendingPathComponent("log-\(index)-\(logFile.lastPathComponent)")
+                try FileManager.default.copyItem(at: logFile, to: destinationURL)
+                copiedFiles.append(destinationURL)
+            }
+            
+            // Create a combined log file for easier viewing
+            let combinedLogURL = tempDir.appendingPathComponent("combined-logs.txt")
+            var combinedContent = """
+            ElementX Log Export
+            Generated: \(Date())
+            Bundle ID: \(InfoPlistReader.main.bundleIdentifier)
+            App Version: \(InfoPlistReader.main.bundleShortVersionString) (\(InfoPlistReader.main.bundleVersion))
+            Log Level: \(ServiceLocator.shared.settings.logLevel.title)
+            
+            === COMBINED LOGS ===
+            
+            """
+            
+            for (index, logFile) in logFiles.enumerated() {
+                combinedContent += "\n=== LOG FILE \(index + 1): \(logFile.lastPathComponent) ===\n"
+                if let content = try? String(contentsOf: logFile) {
+                    combinedContent += content
+                } else {
+                    combinedContent += "[Failed to read log file]\n"
+                }
+                combinedContent += "\n=== END LOG FILE \(index + 1) ===\n\n"
+            }
+            
+            try combinedContent.write(to: combinedLogURL, atomically: true, encoding: .utf8)
+            copiedFiles.append(combinedLogURL)
+            
+            MXLog.info("📄 Successfully exported \(copiedFiles.count) log files to: \(tempDir.path)")
+            
+            await MainActor.run {
+                print("📄 Log export completed. Files saved to: \(tempDir.path)")
+                print("📄 Files exported:")
+                for file in copiedFiles {
+                    print("  - \(file.lastPathComponent)")
+                }
+            }
+            
+            // Send the combined log file URL for sharing
+            actionsSubject.send(.exportLogs(combinedLogURL))
+            
+        } catch {
+            MXLog.error("📄 Log export failed: \(error)")
+            await MainActor.run {
+                print("📄 Log export failed: \(error.localizedDescription)")
             }
         }
     }

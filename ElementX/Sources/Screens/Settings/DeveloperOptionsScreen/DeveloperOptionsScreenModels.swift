@@ -15,7 +15,10 @@ enum DeveloperOptionsScreenViewModelAction {
     case clearAllVoIPTokens
     case showPusherInfo
     case forceReregisterVoIPPusher
+    case forceReregisterPushers
+    case showVoIPDiagnostics
     case showComprehensivePushDiagnostics
+    case exportLogs
 }
 
 struct DeveloperOptionsScreenViewState: BindableState {
@@ -46,7 +49,10 @@ enum DeveloperOptionsScreenViewAction {
     case clearAllVoIPTokens
     case showPusherInfo
     case forceReregisterVoIPPusher
+    case forceReregisterPushers
+    case showVoIPDiagnostics
     case showComprehensivePushDiagnostics
+    case exportLogs
 }
 
 protocol DeveloperOptionsProtocol: AnyObject {

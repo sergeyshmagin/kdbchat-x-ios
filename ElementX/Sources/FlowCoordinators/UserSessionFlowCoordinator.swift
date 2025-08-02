@@ -23,6 +23,7 @@ enum UserSessionFlowCoordinatorAction {
     case clearAllVoIPTokens
     case showPusherInfo
     case forceReregisterVoIPPusher
+    case forceReregisterPushers
     /// Logout without a confirmation. The user forgot their PIN.
     case forceLogout
 }
@@ -502,6 +503,8 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 break
             case .forceReregisterVoIPPusher:
                 actionsSubject.send(.forceReregisterVoIPPusher)
+            case .forceReregisterPushers:
+                actionsSubject.send(.forceReregisterPushers)
             case .forceLogout:
                 actionsSubject.send(.forceLogout)
             }

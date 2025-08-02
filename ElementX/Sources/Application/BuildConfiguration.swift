@@ -13,26 +13,35 @@ struct BuildConfiguration {
     
     // MARK: - Push Gateway Configuration
     
-    /// Base URL for the push gateway
+    /// Base URL for the push gateway (without the notify path)
+    var pushGatewayBaseURL: URL {
+        URL(string: "https://push.aibots.kz")!
+    }
+    
+    /// Full URL for push gateway notifications
     var pushGatewayURL: URL {
-        URL(string: "https://sygnal.aibots.kz/_matrix/push/v1/notify")!
+        pushGatewayBaseURL.appendingPathComponent("_matrix/push/v1/notify")
     }
     
-    /// App ID for alert pushes
+    /// App ID for alert pushes (должен соответствовать Bundle ID)
     var alertAppId: String {
+        let appId: String
         #if DEBUG
-        return "io.sergeyshmagin.kdbchat.ios.debug"
+        appId = "io.sergeyshmagin.kdbchat.debug"
         #else
-        return "io.sergeyshmagin.kdbchat.ios"
+        appId = "io.sergeyshmagin.kdbchat"  // Соответствует Bundle ID с Automatic Signing
         #endif
+        
+        MXLog.info("[BuildConfiguration] 📱 Alert App ID configured as: \(appId)")
+        return appId
     }
     
-    /// App ID for VoIP pushes
+    /// App ID for VoIP pushes (отдельный App ID для VoIP если понадобится)
     var voipAppId: String {
         #if DEBUG
-        return "io.sergeyshmagin.kdbchat.ios.voip.debug"
+        return "io.sergeyshmagin.kdbchat.debug"  // Для debug используем обычный
         #else
-        return "io.sergeyshmagin.kdbchat.ios.voip"
+        return "io.sergeyshmagin.kdbchat"  // Пока используем обычный App ID
         #endif
     }
     

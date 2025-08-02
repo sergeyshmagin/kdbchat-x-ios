@@ -456,6 +456,33 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     func unregisterForRemoteNotifications() {
         UIApplication.shared.unregisterForRemoteNotifications()
     }
+    
+    func registerForVoIPNotifications() {
+        // VoIP registration is handled automatically by NotificationManager's PKPushRegistry
+        MXLog.info("[AppCoordinator] VoIP registration requested - handled by NotificationManager")
+    }
+    
+    func voIPTokenUpdated(_ tokenData: Data) {
+        MXLog.info("[AppCoordinator] 📲 VoIP token updated: \(tokenData.base64EncodedString().prefix(20))...")
+        // Token registration is handled automatically by NotificationManager
+    }
+    
+    func handleVoIPPushNotification(roomId: String, callId: String, callerName: String, hasVideo: Bool) async {
+        MXLog.info("[AppCoordinator] 📞 Handling VoIP push: Room=\(roomId), Caller=\(callerName)")
+        
+        #if LIVEKIT_ENABLED
+        // Report the call to CallKit immediately as required by Apple
+        await liveKitCallKitService.handleIncomingCallFromMatrix(
+            roomId: roomId,
+            callId: callId,
+            callerName: callerName,
+            hasVideo: hasVideo
+        )
+        MXLog.info("[AppCoordinator] ✅ VoIP call reported to LiveKit CallKit service")
+        #else
+        MXLog.warning("[AppCoordinator] ⚠️ VoIP push received but LIVEKIT not enabled")
+        #endif
+    }
         
     func shouldDisplayInAppNotification(content: UNNotificationContent) -> Bool {
         guard let roomID = content.roomID else {
@@ -833,6 +860,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                     break
                 case .forceReregisterVoIPPusher:
                     Task { await self.forceReregisterVoIPPusher() }
+                case .forceReregisterPushers:
+                    Task { await self.forceReregisterAllPushers() }
                 case .forceLogout:
                     stateMachine.processEvent(.signOut(isSoft: false, disableAppLock: true))
                 }
@@ -1076,6 +1105,33 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         MXLog.info("✅ Force VoIP pusher re-registration completed via NotificationManager")
         #endif
     }
+    
+    /// Force re-register all push notifications (regular + VoIP)
+    private func forceReregisterAllPushers() async {
+        guard let userSession else {
+            MXLog.error("No user session available for push re-registration")
+            return
+        }
+        
+        MXLog.info("🚀 Force re-registering ALL pushers for user: \(userSession.clientProxy.userID)")
+        
+        // Re-register for remote notifications to get fresh device token
+        DispatchQueue.main.async {
+            UIApplication.shared.unregisterForRemoteNotifications()
+            UIApplication.shared.registerForRemoteNotifications()
+        }
+        
+        // Force re-register pushers through NotificationManager
+        await notificationManager.forceReRegisterPushers()
+        
+        #if LIVEKIT_ENABLED
+        // Also force VoIP pusher re-registration for LiveKit
+        await liveKitCallKitService.refreshVoIPToken()
+        #endif
+        
+        MXLog.info("✅ Force ALL pushers re-registration completed")
+    }
+    
     #endif
     
     #if !LIVEKIT_ENABLED
@@ -1118,6 +1174,8 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                     Task { await self?.notificationManager.register(with: deviceToken) }
                 case .failedToRegisteredNotifications(let error):
                     self?.notificationManager.registrationFailed(with: error)
+                case .registeredVoIPNotifications(let tokenData):
+                    self?.voIPTokenUpdated(tokenData)
                 }
             }
     }

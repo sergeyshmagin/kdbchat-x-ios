@@ -19,6 +19,7 @@ struct LiveKitCallRoomTimelineItem: EventBasedTimelineItemProtocol, Equatable {
     // Call-specific properties
     let callType: CallType
     let callState: CallState
+    let callDuration: TimeInterval? // Duration in seconds, nil if ongoing/unknown
     
     var properties = RoomTimelineItemProperties()
     
@@ -26,6 +27,8 @@ struct LiveKitCallRoomTimelineItem: EventBasedTimelineItemProtocol, Equatable {
         switch callState {
         case .started:
             return callType == .video ? "Video call started" : "Voice call started"
+        case .active:
+            return callType == .video ? "Video call active" : "Voice call active"
         case .ended:
             return callType == .video ? "Video call ended" : "Voice call ended"
         case .declined:
@@ -42,6 +45,7 @@ struct LiveKitCallRoomTimelineItem: EventBasedTimelineItemProtocol, Equatable {
     
     enum CallState: Equatable {
         case started
+        case active
         case ended
         case declined
         case missed

@@ -40,8 +40,14 @@ class DeveloperOptionsScreenViewModel: DeveloperOptionsScreenViewModelType, Deve
             actionsSubject.send(.showPusherInfo)
         case .forceReregisterVoIPPusher:
             actionsSubject.send(.forceReregisterVoIPPusher)
+        case .forceReregisterPushers:
+            actionsSubject.send(.forceReregisterPushers)
+        case .showVoIPDiagnostics:
+            actionsSubject.send(.showVoIPDiagnostics)
         case .showComprehensivePushDiagnostics:
             actionsSubject.send(.showComprehensivePushDiagnostics)
+        case .exportLogs:
+            actionsSubject.send(.exportLogs)
         }
     }
 }

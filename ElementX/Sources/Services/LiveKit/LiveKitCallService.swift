@@ -8,6 +8,7 @@
 #if LIVEKIT_ENABLED
 import AudioToolbox
 import AVFoundation
+import CallKit
 import Combine
 import Foundation
 import LiveKit
@@ -256,6 +257,16 @@ final class LiveKitCallService: ObservableObject {
                 localParticipant = room.localParticipant
                 callState = .active
                 isCallAnswered = true
+            }
+            
+            // 🔥 CRITICAL FIX: Report outgoing call as connected to appear in system call log
+            if isOutgoingCall, let callId = currentCallId {
+                if let callUUID = LiveKitCallKitService.shared.findCallUUID(for: callId) {
+                    LiveKitCallKitService.shared.reportOutgoingCallConnected(callUUID: callUUID)
+                    MXLog.info("🔥 CRITICAL: Successfully reported outgoing call connected to CallKit for call log")
+                } else {
+                    MXLog.warning("⚠️ CRITICAL: Could not find CallKit UUID for call ID: \(callId)")
+                }
             }
             await updateMediaStates()
             
@@ -602,7 +613,7 @@ final class LiveKitCallService: ObservableObject {
         }
         
         // Validate server URL format
-        if !serverURL.hasPrefix("wss://") && !serverURL.hasPrefix("ws://") {
+        if !serverURL.hasPrefix("wss://"), !serverURL.hasPrefix("ws://") {
             MXLog.warning("⚠️ WARNING: Server URL should start with ws:// or wss://")
             MXLog.warning("⚠️ Server URL: \(serverURL)")
         }
@@ -669,7 +680,7 @@ final class LiveKitCallService: ObservableObject {
             // Connect to LiveKit server using provided credentials
             try await room.connect(url: serverURL, token: accessToken)
             
-            // Enable local audio (always enabled for calls)  
+            // Enable local audio (always enabled for calls)
             try await room.localParticipant.setMicrophone(enabled: true)
             
             // Enable video only if this is a video call
@@ -891,6 +902,16 @@ extension LiveKitCallService: RoomDelegate {
                 self.cancelCallTimeoutTimer()
                 self.callState = .active
                 self.isCallAnswered = true
+                
+                // 🔥 CRITICAL FIX: Report outgoing call as connected to appear in system call log
+                if self.isOutgoingCall, let callId = self.currentCallId {
+                    if let callUUID = LiveKitCallKitService.shared.findCallUUID(for: callId) {
+                        LiveKitCallKitService.shared.reportOutgoingCallConnected(callUUID: callUUID)
+                        MXLog.info("🔥 CRITICAL: Successfully reported outgoing call connected to CallKit for call log (participant joined)")
+                    } else {
+                        MXLog.warning("⚠️ CRITICAL: Could not find CallKit UUID for call ID: \(callId)")
+                    }
+                }
             }
         }
     }

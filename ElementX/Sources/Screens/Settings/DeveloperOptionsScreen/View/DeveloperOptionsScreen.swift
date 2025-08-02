@@ -30,6 +30,11 @@ struct DeveloperOptionsScreen: View {
                         }
                     }
                 }
+                
+                Button("📄 Export Logs") {
+                    context.send(viewAction: .exportLogs)
+                }
+                .foregroundColor(.blue)
             }
             
             Section("General") {
@@ -73,7 +78,16 @@ struct DeveloperOptionsScreen: View {
                 Button("🔐 Force Re-register VoIP Pusher") {
                     context.send(viewAction: .forceReregisterVoIPPusher)
                 }
+                
+                Button("🚀 Force Re-register All Pushers") {
+                    context.send(viewAction: .forceReregisterPushers)
+                }
                 .foregroundColor(.orange)
+                
+                Button("🩺 VoIP Pusher Diagnostics") {
+                    context.send(viewAction: .showVoIPDiagnostics)
+                }
+                .foregroundColor(.teal)
                 
                 Button("📱 Show Pusher Info") {
                     context.send(viewAction: .showPusherInfo)

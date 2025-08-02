@@ -7,6 +7,7 @@
 
 import Foundation
 import UserNotifications
+import PushKit
 
 protocol NotificationManagerDelegate: AnyObject {
     func shouldDisplayInAppNotification(content: UNNotificationContent) -> Bool
@@ -16,6 +17,9 @@ protocol NotificationManagerDelegate: AnyObject {
                            replyText: String) async
     func registerForRemoteNotifications()
     func unregisterForRemoteNotifications()
+    func registerForVoIPNotifications()
+    func voIPTokenUpdated(_ tokenData: Data)
+    func handleVoIPPushNotification(roomId: String, callId: String, callerName: String, hasVideo: Bool) async
 }
 
 // MARK: - NotificationManagerProtocol
@@ -37,4 +41,29 @@ protocol NotificationManagerProtocol: AnyObject {
     func removeDeliveredNotificationsForFullyReadRooms(_ rooms: [RoomSummary]) async
     
     func forceReRegisterPushers() async
+    
+    // VoIP Push Support
+    func registerVoIPPusher(with tokenData: Data) async -> Bool
+    func hasVoIPToken() -> Bool
+    func getVoIPPusherDiagnostics() -> VoIPPusherDiagnostics
+    func testVoIPPusherRegistration() async -> VoIPPusherTestResult
+}
+
+// MARK: - Diagnostic Types
+
+struct VoIPPusherDiagnostics {
+    let hasToken: Bool
+    let tokenPrefix: String?
+    let lastRegistrationAttempt: Date?
+    let registrationSuccess: Bool
+    let retryCount: Int
+    let userSessionAvailable: Bool
+}
+
+struct VoIPPusherTestResult {
+    let success: Bool
+    let message: String
+    let tokenReceived: Bool
+    let pusherRegistered: Bool
+    let errorDetails: String?
 }

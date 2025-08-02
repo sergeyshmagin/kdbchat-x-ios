@@ -1,0 +1,417 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project ElementX.xcodeproj -scheme ElementX -configuration Release build
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  swift-log: https://github.com/apple/swift-log.git @ 1.6.3
+  swift-custom-dump: https://github.com/pointfreeco/swift-custom-dump @ 1.3.3
+  Sentry: https://github.com/getsentry/sentry-cocoa @ 8.52.1
+  swift-algorithms: https://github.com/apple/swift-algorithms @ 1.2.1
+  YbridOpus: https://github.com/vector-im/opus-swift @ 0.8.4
+  Compound: https://github.com/element-hq/compound-ios @ a32db8b
+  swift-snapshot-testing: https://github.com/pointfreeco/swift-snapshot-testing @ 1.18.4
+  swiftui-introspect: https://github.com/siteline/SwiftUI-Introspect @ 1.3.0
+  KeychainAccess: https://github.com/kishikawakatsumi/KeychainAccess @ 4.2.2
+  SFSafeSymbols: https://github.com/SFSafeSymbols/SFSafeSymbols @ 6.2.0
+  CompoundDesignTokens: https://github.com/element-hq/compound-design-tokens @ 5.0.1
+  SwiftProtobuf: https://github.com/apple/swift-protobuf.git @ 1.30.0
+  GZIP: https://github.com/nicklockwood/GZIP @ 1.3.2
+  MapLibre GL Native: https://github.com/maplibre/maplibre-gl-native-distribution @ 5.13.0
+  SwiftState: https://github.com/ReactKit/SwiftState @ 6.0.1
+  DTCoreText: https://github.com/Cocoanetics/DTCoreText @ 1.6.26
+  SwiftOGG: https://github.com/element-hq/swift-ogg @ 0.0.3
+  YbridOgg: https://github.com/vector-im/ogg-swift.git @ 0.8.3
+  xctest-dynamic-overlay: https://github.com/pointfreeco/xctest-dynamic-overlay @ 1.5.2
+  LiveKit: https://github.com/livekit/client-sdk-ios @ 2.0.19
+  LRUCache: https://github.com/nicklockwood/LRUCache @ 1.0.7
+  AnalyticsEvents: https://github.com/matrix-org/matrix-analytics-events @ 0.29.2
+  DSWaveformImage: https://github.com/dmrschmidt/DSWaveformImage @ 14.1.1
+  PostHog: https://github.com/PostHog/posthog-ios @ 3.27.0
+  swift-numerics: https://github.com/apple/swift-numerics.git @ 1.0.3
+  WysiwygComposer: https://github.com/element-hq/matrix-rich-text-editor-swift @ 2.37.12
+  KZFileWatchers: https://github.com/krzysztofzablocki/KZFileWatchers @ 1.2.0
+  Emojibase: https://github.com/matrix-org/emojibase-bindings @ 1.4.2
+  DeviceKit: https://github.com/devicekit/DeviceKit @ 5.6.0
+  DTFoundation: https://github.com/Cocoanetics/DTFoundation.git @ 1.7.19
+  LiveKitWebRTC: https://github.com/livekit/webrtc-xcframework.git @ 125.6422.11
+  swift-collections: https://github.com/apple/swift-collections @ 1.2.0
+  EmbeddedElementCall: https://github.com/element-hq/element-call-swift @ 0.13.1
+  MatrixRustSDK: https://github.com/element-hq/matrix-rust-components-swift @ 25.7.4
+  LoremSwiftum: https://github.com/lukaskubanek/LoremSwiftum @ 2.2.3
+  Kingfisher: https://github.com/onevcat/Kingfisher @ 8.3.3
+  Version: https://github.com/mxcl/Version @ 2.2.0
+  swift-syntax: https://github.com/swiftlang/swift-syntax @ 601.0.1
+  swift-async-algorithms: https://github.com/apple/swift-async-algorithms @ 1.0.4
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:00008112-000270961EFB401E, name:My Mac }
+{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
+{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }
+{ platform:iOS Simulator, arch:arm64, id:E6615935-6CCE-4F86-8895-B144961AC3F0, OS:18.5, name:iPad (A16) }
+{ platform:iOS Simulator, arch:x86_64, id:E6615935-6CCE-4F86-8895-B144961AC3F0, OS:18.5, name:iPad (A16) }
+{ platform:iOS Simulator, arch:arm64, id:EDA16981-B735-40D6-BE46-61F62AABC889, OS:18.5, name:iPad Air 11-inch (M3) }
+{ platform:iOS Simulator, arch:x86_64, id:EDA16981-B735-40D6-BE46-61F62AABC889, OS:18.5, name:iPad Air 11-inch (M3) }
+{ platform:iOS Simulator, arch:arm64, id:1E8693A8-BA60-4C36-94A0-7C699CE32936, OS:18.5, name:iPad Air 13-inch (M3) }
+{ platform:iOS Simulator, arch:x86_64, id:1E8693A8-BA60-4C36-94A0-7C699CE32936, OS:18.5, name:iPad Air 13-inch (M3) }
+{ platform:iOS Simulator, arch:arm64, id:4ED1142D-6403-4D99-9B69-7DFC7851838D, OS:18.5, name:iPad Pro 11-inch (M4) }
+{ platform:iOS Simulator, arch:x86_64, id:4ED1142D-6403-4D99-9B69-7DFC7851838D, OS:18.5, name:iPad Pro 11-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:10DE5E66-2606-4501-81B6-FCD95EF14613, OS:18.5, name:iPad Pro 13-inch (M4) }
+{ platform:iOS Simulator, arch:x86_64, id:10DE5E66-2606-4501-81B6-FCD95EF14613, OS:18.5, name:iPad Pro 13-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:87260E82-DB94-4EA4-BD34-2C7992803184, OS:18.5, name:iPad mini (A17 Pro) }
+{ platform:iOS Simulator, arch:x86_64, id:87260E82-DB94-4EA4-BD34-2C7992803184, OS:18.5, name:iPad mini (A17 Pro) }
+{ platform:iOS Simulator, arch:arm64, id:A80794BC-6E65-43C4-ABD9-DFBEA889774A, OS:18.5, name:iPhone 16 }
+{ platform:iOS Simulator, arch:x86_64, id:A80794BC-6E65-43C4-ABD9-DFBEA889774A, OS:18.5, name:iPhone 16 }
+{ platform:iOS Simulator, arch:arm64, id:D8A94D2E-5CA8-4DC0-8009-4405805AAD09, OS:18.5, name:iPhone 16 Plus }
+{ platform:iOS Simulator, arch:x86_64, id:D8A94D2E-5CA8-4DC0-8009-4405805AAD09, OS:18.5, name:iPhone 16 Plus }
+{ platform:iOS Simulator, arch:arm64, id:708404CE-7195-4A7C-9A9D-DE8D82D5C78A, OS:18.5, name:iPhone 16 Pro }
+{ platform:iOS Simulator, arch:x86_64, id:708404CE-7195-4A7C-9A9D-DE8D82D5C78A, OS:18.5, name:iPhone 16 Pro }
+{ platform:iOS Simulator, arch:arm64, id:F0084A84-2CB7-4C36-906A-29516615D958, OS:18.5, name:iPhone 16 Pro Max }
+{ platform:iOS Simulator, arch:x86_64, id:F0084A84-2CB7-4C36-906A-29516615D958, OS:18.5, name:iPhone 16 Pro Max }
+{ platform:iOS Simulator, arch:arm64, id:604CE95D-17E9-4592-8FBB-3D3AAC0BE688, OS:18.5, name:iPhone 16e }
+{ platform:iOS Simulator, arch:x86_64, id:604CE95D-17E9-4592-8FBB-3D3AAC0BE688, OS:18.5, name:iPhone 16e }
+{ platform:iOS, arch:arm64, id:00008110-000824110EE9801E, name:iPhone Sergey }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (92 targets)
+    Target 'ElementX' in project 'ElementX'
+        ➜ Explicit dependency on target 'NSE' in project 'ElementX'
+        ➜ Explicit dependency on target 'ShareExtension' in project 'ElementX'
+        ➜ Explicit dependency on target 'MatrixRustSDK' in project 'MatrixRustSDK'
+        ➜ Explicit dependency on target 'Compound' in project 'Compound'
+        ➜ Explicit dependency on target 'Algorithms' in project 'swift-algorithms'
+        ➜ Explicit dependency on target 'AnalyticsEvents' in project 'AnalyticsEvents'
+        ➜ Explicit dependency on target 'Collections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DeviceKit' in project 'DeviceKit'
+        ➜ Explicit dependency on target 'DTCoreText' in project 'DTCoreText'
+        ➜ Explicit dependency on target 'EmbeddedElementCall' in project 'EmbeddedElementCall'
+        ➜ Explicit dependency on target 'KeychainAccess' in project 'KeychainAccess'
+        ➜ Explicit dependency on target 'Kingfisher' in project 'Kingfisher'
+        ➜ Explicit dependency on target 'KZFileWatchers' in project 'KZFileWatchers'
+        ➜ Explicit dependency on target 'LiveKit' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LoremSwiftum' in project 'LoremSwiftum'
+        ➜ Explicit dependency on target 'LRUCache' in project 'LRUCache'
+        ➜ Explicit dependency on target 'Mapbox' in project 'MapLibre GL Native'
+        ➜ Explicit dependency on target 'PostHog' in project 'PostHog'
+        ➜ Explicit dependency on target 'SwiftState' in project 'SwiftState'
+        ➜ Explicit dependency on target 'GZIP' in project 'GZIP'
+        ➜ Explicit dependency on target 'Sentry' in project 'Sentry'
+        ➜ Explicit dependency on target 'SentrySwiftUI' in project 'Sentry'
+        ➜ Explicit dependency on target 'Version' in project 'Version'
+        ➜ Explicit dependency on target 'Emojibase' in project 'Emojibase'
+        ➜ Explicit dependency on target 'WysiwygComposer' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'SwiftOGG' in project 'SwiftOGG'
+        ➜ Explicit dependency on target 'DSWaveformImageViews' in project 'DSWaveformImage'
+    Target 'DSWaveformImageViews' in project 'DSWaveformImage'
+        ➜ Explicit dependency on target 'DSWaveformImageViews' in project 'DSWaveformImage'
+        ➜ Explicit dependency on target 'DSWaveformImage' in project 'DSWaveformImage'
+    Target 'DSWaveformImageViews' in project 'DSWaveformImage'
+        ➜ Explicit dependency on target 'DSWaveformImage' in project 'DSWaveformImage'
+    Target 'DSWaveformImage' in project 'DSWaveformImage' (no dependencies)
+    Target 'SwiftOGG' in project 'SwiftOGG'
+        ➜ Explicit dependency on target 'SwiftOGG' in project 'SwiftOGG'
+        ➜ Explicit dependency on target 'Copustools' in project 'SwiftOGG'
+        ➜ Explicit dependency on target 'YbridOpus' in project 'YbridOpus'
+        ➜ Explicit dependency on target 'YbridOgg' in project 'YbridOgg'
+    Target 'SwiftOGG' in project 'SwiftOGG'
+        ➜ Explicit dependency on target 'Copustools' in project 'SwiftOGG'
+        ➜ Explicit dependency on target 'YbridOpus' in project 'YbridOpus'
+        ➜ Explicit dependency on target 'YbridOgg' in project 'YbridOgg'
+    Target 'YbridOgg' in project 'YbridOgg' (no dependencies)
+    Target 'YbridOpus' in project 'YbridOpus' (no dependencies)
+    Target 'Copustools' in project 'SwiftOGG' (no dependencies)
+    Target 'WysiwygComposer' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'WysiwygComposer' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'DTCoreTextExtended' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'HTMLParser' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'DTCoreText' in project 'DTCoreText'
+    Target 'WysiwygComposer' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'DTCoreTextExtended' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'HTMLParser' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'DTCoreText' in project 'DTCoreText'
+    Target 'HTMLParser' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'DTCoreTextExtended' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'DTCoreText' in project 'DTCoreText'
+    Target 'DTCoreTextExtended' in project 'WysiwygComposer'
+        ➜ Explicit dependency on target 'DTCoreText' in project 'DTCoreText'
+    Target 'Emojibase' in project 'Emojibase'
+        ➜ Explicit dependency on target 'Emojibase' in project 'Emojibase'
+        ➜ Explicit dependency on target 'Emojibase_Emojibase' in project 'Emojibase'
+    Target 'Emojibase' in project 'Emojibase'
+        ➜ Explicit dependency on target 'Emojibase_Emojibase' in project 'Emojibase'
+    Target 'Emojibase_Emojibase' in project 'Emojibase' (no dependencies)
+    Target 'SentrySwiftUI' in project 'Sentry'
+        ➜ Explicit dependency on target 'SentrySwiftUI' in project 'Sentry'
+        ➜ Explicit dependency on target 'SentryInternal' in project 'Sentry'
+    Target 'SentrySwiftUI' in project 'Sentry'
+        ➜ Explicit dependency on target 'SentryInternal' in project 'Sentry'
+    Target 'SentryInternal' in project 'Sentry' (no dependencies)
+    Target 'Sentry' in project 'Sentry' (no dependencies)
+    Target 'GZIP' in project 'GZIP'
+        ➜ Explicit dependency on target 'GZIP' in project 'GZIP'
+    Target 'GZIP' in project 'GZIP' (no dependencies)
+    Target 'SwiftState' in project 'SwiftState'
+        ➜ Explicit dependency on target 'SwiftState' in project 'SwiftState'
+    Target 'SwiftState' in project 'SwiftState' (no dependencies)
+    Target 'PostHog' in project 'PostHog'
+        ➜ Explicit dependency on target 'PostHog' in project 'PostHog'
+        ➜ Explicit dependency on target 'PostHog_PostHog' in project 'PostHog'
+        ➜ Explicit dependency on target 'phlibwebp' in project 'PostHog'
+    Target 'PostHog' in project 'PostHog'
+        ➜ Explicit dependency on target 'PostHog_PostHog' in project 'PostHog'
+        ➜ Explicit dependency on target 'phlibwebp' in project 'PostHog'
+    Target 'phlibwebp' in project 'PostHog' (no dependencies)
+    Target 'PostHog_PostHog' in project 'PostHog' (no dependencies)
+    Target 'Mapbox' in project 'MapLibre GL Native' (no dependencies)
+    Target 'LoremSwiftum' in project 'LoremSwiftum'
+        ➜ Explicit dependency on target 'LoremSwiftum' in project 'LoremSwiftum'
+    Target 'LoremSwiftum' in project 'LoremSwiftum' (no dependencies)
+    Target 'LiveKit' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LiveKit' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LiveKit_LiveKit' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LKObjCHelpers' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LiveKitWebRTC' in project 'LiveKitWebRTC'
+        ➜ Explicit dependency on target 'SwiftProtobuf' in project 'SwiftProtobuf'
+        ➜ Explicit dependency on target 'Logging' in project 'swift-log'
+    Target 'LiveKit' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LiveKit_LiveKit' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LKObjCHelpers' in project 'LiveKit'
+        ➜ Explicit dependency on target 'LiveKitWebRTC' in project 'LiveKitWebRTC'
+        ➜ Explicit dependency on target 'SwiftProtobuf' in project 'SwiftProtobuf'
+        ➜ Explicit dependency on target 'Logging' in project 'swift-log'
+    Target 'Logging' in project 'swift-log'
+        ➜ Explicit dependency on target 'Logging' in project 'swift-log'
+    Target 'Logging' in project 'swift-log' (no dependencies)
+    Target 'SwiftProtobuf' in project 'SwiftProtobuf'
+        ➜ Explicit dependency on target 'SwiftProtobuf' in project 'SwiftProtobuf'
+        ➜ Explicit dependency on target 'SwiftProtobuf_SwiftProtobuf' in project 'SwiftProtobuf'
+    Target 'SwiftProtobuf' in project 'SwiftProtobuf'
+        ➜ Explicit dependency on target 'SwiftProtobuf_SwiftProtobuf' in project 'SwiftProtobuf'
+    Target 'SwiftProtobuf_SwiftProtobuf' in project 'SwiftProtobuf' (no dependencies)
+    Target 'LiveKitWebRTC' in project 'LiveKitWebRTC' (no dependencies)
+    Target 'LKObjCHelpers' in project 'LiveKit' (no dependencies)
+    Target 'LiveKit_LiveKit' in project 'LiveKit' (no dependencies)
+    Target 'KZFileWatchers' in project 'KZFileWatchers'
+        ➜ Explicit dependency on target 'KZFileWatchers' in project 'KZFileWatchers'
+    Target 'KZFileWatchers' in project 'KZFileWatchers' (no dependencies)
+    Target 'EmbeddedElementCall' in project 'EmbeddedElementCall'
+        ➜ Explicit dependency on target 'EmbeddedElementCall' in project 'EmbeddedElementCall'
+        ➜ Explicit dependency on target 'EmbeddedElementCall_EmbeddedElementCall' in project 'EmbeddedElementCall'
+    Target 'EmbeddedElementCall' in project 'EmbeddedElementCall'
+        ➜ Explicit dependency on target 'EmbeddedElementCall_EmbeddedElementCall' in project 'EmbeddedElementCall'
+    Target 'EmbeddedElementCall_EmbeddedElementCall' in project 'EmbeddedElementCall' (no dependencies)
+    Target 'AnalyticsEvents' in project 'AnalyticsEvents'
+        ➜ Explicit dependency on target 'AnalyticsEvents' in project 'AnalyticsEvents'
+    Target 'AnalyticsEvents' in project 'AnalyticsEvents' (no dependencies)
+    Target 'Algorithms' in project 'swift-algorithms'
+        ➜ Explicit dependency on target 'Algorithms' in project 'swift-algorithms'
+        ➜ Explicit dependency on target 'RealModule' in project 'swift-numerics'
+    Target 'Algorithms' in project 'swift-algorithms'
+        ➜ Explicit dependency on target 'RealModule' in project 'swift-numerics'
+    Target 'RealModule' in project 'swift-numerics'
+        ➜ Explicit dependency on target 'RealModule' in project 'swift-numerics'
+        ➜ Explicit dependency on target '_NumericsShims' in project 'swift-numerics'
+    Target 'RealModule' in project 'swift-numerics'
+        ➜ Explicit dependency on target '_NumericsShims' in project 'swift-numerics'
+    Target '_NumericsShims' in project 'swift-numerics' (no dependencies)
+    Target 'ShareExtension' in project 'ElementX'
+        ➜ Explicit dependency on target 'MatrixRustSDK' in project 'MatrixRustSDK'
+        ➜ Explicit dependency on target 'Collections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'Compound' in project 'Compound'
+    Target 'NSE' in project 'ElementX'
+        ➜ Explicit dependency on target 'MatrixRustSDK' in project 'MatrixRustSDK'
+        ➜ Explicit dependency on target 'KeychainAccess' in project 'KeychainAccess'
+        ➜ Explicit dependency on target 'Kingfisher' in project 'Kingfisher'
+        ➜ Explicit dependency on target 'Collections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'Compound' in project 'Compound'
+        ➜ Explicit dependency on target 'DeviceKit' in project 'DeviceKit'
+        ➜ Explicit dependency on target 'DTCoreText' in project 'DTCoreText'
+        ➜ Explicit dependency on target 'LRUCache' in project 'LRUCache'
+        ➜ Explicit dependency on target 'Version' in project 'Version'
+    Target 'Version' in project 'Version'
+        ➜ Explicit dependency on target 'Version' in project 'Version'
+    Target 'Version' in project 'Version' (no dependencies)
+    Target 'LRUCache' in project 'LRUCache'
+        ➜ Explicit dependency on target 'LRUCache' in project 'LRUCache'
+    Target 'LRUCache' in project 'LRUCache' (no dependencies)
+    Target 'DTCoreText' in project 'DTCoreText'
+        ➜ Explicit dependency on target 'DTCoreText' in project 'DTCoreText'
+        ➜ Explicit dependency on target 'DTCoreText_DTCoreText' in project 'DTCoreText'
+        ➜ Explicit dependency on target 'DTFoundation' in project 'DTFoundation'
+    Target 'DTCoreText' in project 'DTCoreText'
+        ➜ Explicit dependency on target 'DTCoreText_DTCoreText' in project 'DTCoreText'
+        ➜ Explicit dependency on target 'DTFoundation' in project 'DTFoundation'
+    Target 'DTFoundation' in project 'DTFoundation'
+        ➜ Explicit dependency on target 'DTFoundation' in project 'DTFoundation'
+    Target 'DTFoundation' in project 'DTFoundation' (no dependencies)
+    Target 'DTCoreText_DTCoreText' in project 'DTCoreText' (no dependencies)
+    Target 'DeviceKit' in project 'DeviceKit'
+        ➜ Explicit dependency on target 'DeviceKit' in project 'DeviceKit'
+        ➜ Explicit dependency on target 'DeviceKit_DeviceKit' in project 'DeviceKit'
+    Target 'DeviceKit' in project 'DeviceKit'
+        ➜ Explicit dependency on target 'DeviceKit_DeviceKit' in project 'DeviceKit'
+    Target 'DeviceKit_DeviceKit' in project 'DeviceKit' (no dependencies)
+    Target 'Compound' in project 'Compound'
+        ➜ Explicit dependency on target 'Compound' in project 'Compound'
+        ➜ Explicit dependency on target 'CompoundDesignTokens' in project 'CompoundDesignTokens'
+        ➜ Explicit dependency on target 'SwiftUIIntrospect' in project 'swiftui-introspect'
+        ➜ Explicit dependency on target 'SFSafeSymbols' in project 'SFSafeSymbols'
+    Target 'Compound' in project 'Compound'
+        ➜ Explicit dependency on target 'CompoundDesignTokens' in project 'CompoundDesignTokens'
+        ➜ Explicit dependency on target 'SwiftUIIntrospect' in project 'swiftui-introspect'
+        ➜ Explicit dependency on target 'SFSafeSymbols' in project 'SFSafeSymbols'
+    Target 'SFSafeSymbols' in project 'SFSafeSymbols'
+        ➜ Explicit dependency on target 'SFSafeSymbols' in project 'SFSafeSymbols'
+    Target 'SFSafeSymbols' in project 'SFSafeSymbols' (no dependencies)
+    Target 'SwiftUIIntrospect' in project 'swiftui-introspect'
+        ➜ Explicit dependency on target 'SwiftUIIntrospect' in project 'swiftui-introspect'
+    Target 'SwiftUIIntrospect' in project 'swiftui-introspect' (no dependencies)
+    Target 'CompoundDesignTokens' in project 'CompoundDesignTokens'
+        ➜ Explicit dependency on target 'CompoundDesignTokens' in project 'CompoundDesignTokens'
+        ➜ Explicit dependency on target 'CompoundDesignTokens_CompoundDesignTokens' in project 'CompoundDesignTokens'
+    Target 'CompoundDesignTokens' in project 'CompoundDesignTokens'
+        ➜ Explicit dependency on target 'CompoundDesignTokens_CompoundDesignTokens' in project 'CompoundDesignTokens'
+    Target 'CompoundDesignTokens_CompoundDesignTokens' in project 'CompoundDesignTokens' (no dependencies)
+    Target 'Collections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'Collections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+        ➜ Explicit dependency on target 'BitCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'HashTreeCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'HeapModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target '_RopeModule' in project 'swift-collections'
+    Target 'Collections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+        ➜ Explicit dependency on target 'BitCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'HashTreeCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'HeapModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target '_RopeModule' in project 'swift-collections'
+    Target '_RopeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'OrderedCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'HeapModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'HashTreeCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'DequeModule' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'BitCollections' in project 'swift-collections'
+        ➜ Explicit dependency on target 'InternalCollectionsUtilities' in project 'swift-collections'
+    Target 'InternalCollectionsUtilities' in project 'swift-collections' (no dependencies)
+    Target 'Kingfisher' in project 'Kingfisher'
+        ➜ Explicit dependency on target 'Kingfisher' in project 'Kingfisher'
+        ➜ Explicit dependency on target 'Kingfisher_Kingfisher' in project 'Kingfisher'
+    Target 'Kingfisher' in project 'Kingfisher'
+        ➜ Explicit dependency on target 'Kingfisher_Kingfisher' in project 'Kingfisher'
+    Target 'Kingfisher_Kingfisher' in project 'Kingfisher' (no dependencies)
+    Target 'KeychainAccess' in project 'KeychainAccess'
+        ➜ Explicit dependency on target 'KeychainAccess' in project 'KeychainAccess'
+    Target 'KeychainAccess' in project 'KeychainAccess' (no dependencies)
+    Target 'MatrixRustSDK' in project 'MatrixRustSDK'
+        ➜ Explicit dependency on target 'MatrixRustSDK' in project 'MatrixRustSDK'
+    Target 'MatrixRustSDK' in project 'MatrixRustSDK' (no dependencies)
+
+GatherProvisioningInputs
+2025-07-31 15:55:45.887 xcodebuild[77041:14496451]  DVTDeveloperAccountManager: Failed to load credentials for 90E0DF4F-0F3C-4ADA-8C53-406C2721278B: Error Domain=DVTSecErrorDomain Code=-25307 "A default keychain could not be found." UserInfo={NSLocalizedDescription=A default keychain could not be found.}
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk -x objective-c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/sergeysh/Dev/KDB_MESSENDGER_IOS/ElementX/Resources/Assets.xcassets
+
+ReadFileContents /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/share/docc/features.json
+
+Build description signature: f1a932d2e9038ff7470de9ec0a1e8b0e
+Build description path: /Users/sergeysh/Library/Developer/Xcode/DerivedData/ElementX-cjkoeaomllihpjduamyblxlckyeh/Build/Intermediates.noindex/XCBuildData/f1a932d2e9038ff7470de9ec0a1e8b0e.xcbuilddata
+/Users/sergeysh/Dev/KDB_MESSENDGER_IOS/ElementX.xcodeproj: error: No signing certificate "iOS Development" found: No "iOS Development" signing certificate matching team ID "DJ9S25B535" with a private key was found. (in target 'ElementX' from project 'ElementX')
+/Users/sergeysh/Dev/KDB_MESSENDGER_IOS/ElementX.xcodeproj: error: Provisioning profile "iOS Team Provisioning Profile: io.sergeyshmagin.kdbchat" doesn't include the currently selected device "MacBook Pro — Aru" (identifier 00008112-000270961EFB401E). (in target 'ElementX' from project 'ElementX')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in target 'ElementX' from project 'ElementX')
+note: Run script build phase '🛠 SwiftGen' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'ElementX' from project 'ElementX')
+note: Run script build phase '🧙 Sourcery - Generate preview tests' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'ElementX' from project 'ElementX')
+note: Run script build phase '⚠️ SwiftLint' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'ElementX' from project 'ElementX')
+note: Run script build phase '🧹 SwiftFormat' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'ElementX' from project 'ElementX')
+note: Run script build phase '🧙 Sourcery - Generate mocks' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'ElementX' from project 'ElementX')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'HashTreeCollections' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target '_RopeModule' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Version' from project 'Version')
+/Users/sergeysh/Dev/KDB_MESSENDGER_IOS/ElementX.xcodeproj: error: No signing certificate "iOS Development" found: No "iOS Development" signing certificate matching team ID "DJ9S25B535" with a private key was found. (in target 'ShareExtension' from project 'ElementX')
+/Users/sergeysh/Dev/KDB_MESSENDGER_IOS/ElementX.xcodeproj: error: Provisioning profile "iOS Team Provisioning Profile: io.sergeyshmagin.kdbchat.shareextension" doesn't include the currently selected device "MacBook Pro — Aru" (identifier 00008112-000270961EFB401E). (in target 'ShareExtension' from project 'ElementX')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in target 'ShareExtension' from project 'ElementX')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Algorithms' from project 'swift-algorithms')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'SentrySwiftUI' from project 'Sentry')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'SwiftOGG' from project 'SwiftOGG')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'LoremSwiftum' from project 'LoremSwiftum')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'InternalCollectionsUtilities' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'LKObjCHelpers' from project 'LiveKit')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'AnalyticsEvents' from project 'AnalyticsEvents')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'HeapModule' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'DTCoreText' from project 'DTCoreText')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target '_NumericsShims' from project 'swift-numerics')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'SentryInternal' from project 'Sentry')
+/Users/sergeysh/Dev/KDB_MESSENDGER_IOS/ElementX.xcodeproj: error: No signing certificate "iOS Development" found: No "iOS Development" signing certificate matching team ID "DJ9S25B535" with a private key was found. (in target 'NSE' from project 'ElementX')
+/Users/sergeysh/Dev/KDB_MESSENDGER_IOS/ElementX.xcodeproj: error: Provisioning profile "iOS Team Provisioning Profile: io.sergeyshmagin.kdbchat.nse" doesn't include the currently selected device "MacBook Pro — Aru" (identifier 00008112-000270961EFB401E). (in target 'NSE' from project 'ElementX')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in target 'NSE' from project 'ElementX')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Kingfisher' from project 'Kingfisher')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'PostHog' from project 'PostHog')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'DSWaveformImageViews' from project 'DSWaveformImage')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'CompoundDesignTokens' from project 'CompoundDesignTokens')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'GZIP' from project 'GZIP')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'SwiftState' from project 'SwiftState')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'DTCoreTextExtended' from project 'WysiwygComposer')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'LRUCache' from project 'LRUCache')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'MatrixRustSDK' from project 'MatrixRustSDK')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'phlibwebp' from project 'PostHog')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Collections' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'DeviceKit' from project 'DeviceKit')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'EmbeddedElementCall' from project 'EmbeddedElementCall')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Copustools' from project 'SwiftOGG')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Logging' from project 'swift-log')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'RealModule' from project 'swift-numerics')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'KZFileWatchers' from project 'KZFileWatchers')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'DequeModule' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Compound' from project 'Compound')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'HTMLParser' from project 'WysiwygComposer')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'SwiftUIIntrospect' from project 'swiftui-introspect')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'SwiftProtobuf' from project 'SwiftProtobuf')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'Emojibase' from project 'Emojibase')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'SFSafeSymbols' from project 'SFSafeSymbols')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'DSWaveformImage' from project 'DSWaveformImage')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'BitCollections' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'OrderedCollections' from project 'swift-collections')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'WysiwygComposer' from project 'WysiwygComposer')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'DTFoundation' from project 'DTFoundation')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'KeychainAccess' from project 'KeychainAccess')
+note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-Owholemodule, expected -Onone (in target 'LiveKit' from project 'LiveKit')
+** BUILD FAILED **
+
+
+The following build commands failed:
+	Building project ElementX with scheme ElementX and configuration Release
+(1 failure)
+Found unhandled resource at /Users/sergeysh/Library/Developer/Xcode/DerivedData/ElementX-cjkoeaomllihpjduamyblxlckyeh/SourcePackages/checkouts/element-call-swift/Sources/dist

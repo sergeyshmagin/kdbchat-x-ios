@@ -11,7 +11,6 @@ import MatrixRustSDK
 /// CRITICAL FIX: Matrix Call Event Processor for LiveKit Integration
 /// Handles Matrix m.call.invite events and extracts application_data for LiveKit auto-connect
 final class MatrixCallEventProcessor: ObservableObject {
-    
     private let clientProxy: ClientProxyProtocol
     
     init(clientProxy: ClientProxyProtocol) {
@@ -65,11 +64,9 @@ final class MatrixCallEventProcessor: ObservableObject {
             let roomURL = storedPushData["livekit_room_url"] as? String
             
             if let token = accessToken, let server = serverURL, !token.isEmpty, !server.isEmpty {
-                return LiveKitCredentials(
-                    accessToken: token,
-                    serverURL: server,
-                    roomURL: roomURL
-                )
+                return LiveKitCredentials(accessToken: token,
+                                          serverURL: server,
+                                          roomURL: roomURL)
             }
         }
         
@@ -116,42 +113,40 @@ final class MatrixCallEventProcessor: ObservableObject {
         
         // Method 1: Direct keys
         accessToken = payload["livekit_access_token"] as? String ??
-                     payload["lk_token"] as? String
+            payload["lk_token"] as? String
         
         serverURL = payload["livekit_server_url"] as? String ??
-                   payload["lk_url"] as? String ??
-                   "wss://video.aibots.kz"
+            payload["lk_url"] as? String ??
+            "wss://video.aibots.kz"
         
         roomURL = payload["livekit_room_url"] as? String ??
-                 payload["lk_room"] as? String
+            payload["lk_room"] as? String
         
         // Method 2: application_data object
         if let applicationData = payload["application_data"] as? [String: Any] {
             accessToken = accessToken ?? applicationData["livekit_access_token"] as? String ??
-                         applicationData["lk_token"] as? String
+                applicationData["lk_token"] as? String
             
             serverURL = serverURL ?? applicationData["livekit_server_url"] as? String ??
-                       applicationData["lk_url"] as? String
+                applicationData["lk_url"] as? String
             
             roomURL = roomURL ?? applicationData["livekit_room_url"] as? String ??
-                     applicationData["lk_room"] as? String
+                applicationData["lk_room"] as? String
         }
         
         // Method 3: Nested in content
         if let content = payload["content"] as? [String: Any],
            let applicationData = content["application_data"] as? [String: Any] {
             accessToken = accessToken ?? applicationData["livekit_access_token"] as? String
-            serverURL = serverURL ?? applicationData["livekit_server_url"] as? String  
+            serverURL = serverURL ?? applicationData["livekit_server_url"] as? String
             roomURL = roomURL ?? applicationData["livekit_room_url"] as? String
         }
         
         MXLog.info("[MATRIX-CALL-PROCESSOR] Extracted - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL ?? "[MISSING]")")
         
-        return LiveKitCredentials(
-            accessToken: accessToken,
-            serverURL: serverURL,
-            roomURL: roomURL
-        )
+        return LiveKitCredentials(accessToken: accessToken,
+                                  serverURL: serverURL,
+                                  roomURL: roomURL)
     }
 }
 

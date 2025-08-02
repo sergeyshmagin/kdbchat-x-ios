@@ -43,8 +43,13 @@ class NotificationHandler {
         MXLog.info("\(tag) Processing event: \(eventID) in room: \(roomID)")
         MXLog.info("\(tag) Notification userInfo: \(notificationContent.userInfo)")
         
-        // Copy over the unread information to the notification badge
-        notificationContent.badge = notificationContent.unreadCount as NSNumber?
+        // ИСПРАВЛЕНИЕ ДУБЛИРОВАНИЯ BADGE: Не переопределяем badge из push service
+        // Push service уже установил правильный badge count
+        MXLog.info("[NotificationHandler] Original badge from push: \(notificationContent.badge?.intValue ?? -1)")
+        MXLog.info("[NotificationHandler] UnreadCount from notification: \(notificationContent.unreadCount)")
+        
+        // Позволяем push service управлять badge count вместо NSE
+        // notificationContent.badge остается как установлен в push payload
         
         guard let notificationItemProxy = await userSession.notificationItemProxy(roomID: roomID, eventID: eventID) else {
             MXLog.error("\(tag) Failed retrieving notification item")
@@ -52,10 +57,18 @@ class NotificationHandler {
             return
         }
         
-        switch await preprocessNotification(notificationItemProxy) {
-        case .processedShouldDiscard, .unsupportedShouldDiscard:
+        let processingResult = await preprocessNotification(notificationItemProxy)
+        MXLog.info("\(tag) 📊 PROCESSING RESULT: \(processingResult)")
+        
+        switch processingResult {
+        case .processedShouldDiscard:
+            MXLog.info("\(tag) 🚫 DISCARDING notification: processedShouldDiscard")
+            discardNotification()
+        case .unsupportedShouldDiscard:
+            MXLog.info("\(tag) 🚫 DISCARDING notification: unsupportedShouldDiscard")
             discardNotification()
         case .shouldDisplay:
+            MXLog.info("\(tag) ✅ DISPLAYING notification")
             await notificationContentBuilder.process(notificationContent: &notificationContent,
                                                      notificationItem: notificationItemProxy,
                                                      mediaProvider: userSession.mediaProvider)
@@ -74,25 +87,40 @@ class NotificationHandler {
     // MARK: - Private
     
     private func deliverNotification() {
-        MXLog.info("\(tag) Delivering notification")
+        MXLog.info("\(tag) 📤 DELIVERING notification:")
+        MXLog.info("\(tag) - Title: '\(notificationContent.title)'")
+        MXLog.info("\(tag) - Body: '\(notificationContent.body)'")
+        MXLog.info("\(tag) - Badge: \(notificationContent.badge ?? 0)")
+        MXLog.info("\(tag) - Sound: \(String(describing: notificationContent.sound))")
+        MXLog.info("\(tag) - User Info: \(notificationContent.userInfo)")
         contentHandler(notificationContent)
     }
 
     private func discardNotification() {
-        MXLog.info("\(tag) Discarding notification")
+        MXLog.info("\(tag) 🗑️ DISCARDING notification (but preserving badge)")
         
         let content = UNMutableNotificationContent()
-        content.badge = notificationContent.unreadCount as NSNumber?
+        // ИСПРАВЛЕНИЕ: При отмене уведомления не изменяем badge
+        // content.badge = notificationContent.badge // Сохраняем оригинальный badge
+        MXLog.info("\(tag) - Original badge preserved: \(notificationContent.badge ?? 0)")
         
         contentHandler(content)
     }
     
     private func preprocessNotification(_ itemProxy: NotificationItemProxyProtocol) async -> NotificationProcessingResult {
+        MXLog.info("\(tag) 🔍 PREPROCESSING NOTIFICATION:")
+        MXLog.info("\(tag) - hideQuietNotificationAlerts: \(settings.hideQuietNotificationAlerts)")
+        MXLog.info("\(tag) - itemProxy.isNoisy: \(itemProxy.isNoisy)")
+        MXLog.info("\(tag) - Room ID: \(itemProxy.roomID)")
+        MXLog.info("\(tag) - Event type: \(String(describing: itemProxy.event))")
+        
         if settings.hideQuietNotificationAlerts, !itemProxy.isNoisy {
+            MXLog.info("\(tag) ❌ DISCARDING: Hide quiet alerts is ON and notification is not noisy")
             return .processedShouldDiscard
         }
         
         guard case let .timeline(event) = itemProxy.event else {
+            MXLog.info("\(tag) ✅ Non-timeline event, should display")
             return .shouldDisplay
         }
         
@@ -104,10 +132,13 @@ class NotificationHandler {
                  .sticker:
                 return .shouldDisplay
             case .roomMessage(let messageType, _):
+                MXLog.info("\(tag) 💬 Room message type: \(messageType)")
                 switch messageType {
                 case .emote, .image, .audio, .video, .file, .notice, .text, .location, .gallery:
+                    MXLog.info("\(tag) ✅ Supported message type, should display")
                     return .shouldDisplay
                 case .other:
+                    MXLog.info("\(tag) ❌ Unsupported message type, discarding")
                     return .unsupportedShouldDiscard
                 }
             case .roomRedaction(let redactedEventID, _):
@@ -301,7 +332,7 @@ class NotificationHandler {
             return .shouldDisplay // Fallback to regular notification
         }
         
-        // Extract LiveKit credentials from Matrix event 
+        // Extract LiveKit credentials from Matrix event
         let liveKitCredentials = await extractLiveKitCredentialsFromMatrixEvent(notificationItemProxy)
         
         let payload = [
@@ -381,7 +412,6 @@ class NotificationHandler {
         
         return credentialsFromPush
     }
-    
     
     /// Extract LiveKit credentials from notification userInfo (enhanced version)
     private func extractLiveKitCredentialsFromNotificationUserInfo() -> LiveKitCredentials {
@@ -487,11 +517,9 @@ class NotificationHandler {
         
         MXLog.info("[NSE-PUSH-EXTRACT] Final extraction result - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL ?? "[MISSING]"), Room: \(roomURL ?? "[MISSING]")")
         
-        return LiveKitCredentials(
-            accessToken: accessToken,
-            serverURL: serverURL,
-            roomURL: roomURL
-        )
+        return LiveKitCredentials(accessToken: accessToken,
+                                  serverURL: serverURL,
+                                  roomURL: roomURL)
     }
     
     /// Safely store VoIP event data with error handling

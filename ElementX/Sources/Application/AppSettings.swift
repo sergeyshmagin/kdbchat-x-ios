@@ -228,56 +228,48 @@ final class AppSettings {
     
     /// App ID for regular (alert) push notifications
     var pusherAppID: String {
-        #if IS_NSE
-        // In NSE context, use production app ID by default
-        return "io.sergeyshmagin.kdbchat.ios"
-        #else
         return BuildConfiguration.shared.alertAppId
-        #endif
     }
     
     /// App ID for production alert pushes (separate from debug)
     var prodPushAppId: String {
-        "io.sergeyshmagin.kdbchat.ios"
+        BuildConfiguration.shared.alertAppId  // Используем переменную вместо хардкода
     }
     
     /// App ID for debug alert pushes
     var debugPushAppId: String {
-        "io.sergeyshmagin.kdbchat.ios.debug"
+        BuildConfiguration.shared.alertAppId  // Используем переменную вместо хардкода
     }
     
     /// Push gateway base URL based on build configuration
     var pushGatewayBaseURL: URL {
         #if IS_NSE
         // In NSE context, use production gateway by default
-        return URL(string: "https://sygnal.aibots.kz")!
+        return URL(string: "https://push.aibots.kz")!
         #else
-        return BuildConfiguration.shared.pushGatewayURL
+        return BuildConfiguration.shared.pushGatewayBaseURL
         #endif
     }
     
     var pushGatewayNotifyEndpoint: URL {
-        pushGatewayBaseURL.appendingPathComponent("_matrix/push/v1/notify")
+        #if IS_NSE
+        // In NSE context, build the full URL
+        return pushGatewayBaseURL.appendingPathComponent("_matrix/push/v1/notify")
+        #else
+        return BuildConfiguration.shared.pushGatewayURL
+        #endif
     }
     
     // MARK: - VoIP Push Configuration
     
     /// App ID for VoIP push notifications (always production for VoIP)
     var voipAppId: String {
-        #if IS_NSE
-        return "io.sergeyshmagin.kdbchat.voip"
-        #else
         return BuildConfiguration.shared.voipAppId
-        #endif
     }
     
     /// VoIP push topic for APNs
     var voipPushTopic: String {
-        #if IS_NSE
-        return "io.sergeyshmagin.kdbchat.voip"
-        #else
         return BuildConfiguration.shared.voipAppId
-        #endif
     }
     
     @UserPreference(key: UserDefaultsKeys.enableNotifications, defaultValue: true, storageType: .userDefaults(store))

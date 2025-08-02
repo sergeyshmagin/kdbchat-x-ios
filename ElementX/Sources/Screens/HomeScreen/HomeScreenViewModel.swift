@@ -504,12 +504,14 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
             // Skip muted rooms
             guard !summary.isMuted else { return total }
             
-            // Count unread messages, mentions, and notifications
-            let roomUnreadCount = Int(summary.unreadMessagesCount) +
-                Int(summary.unreadMentionsCount) +
-                Int(summary.unreadNotificationsCount)
+            // ИСПРАВЛЕНИЕ: Используем только unreadNotificationsCount - это основной счетчик
+            // unreadMessagesCount и unreadMentionsCount могут дублировать данные
+            let roomUnreadCount = Int(summary.unreadNotificationsCount)
             
-            return total + roomUnreadCount
+            // Also count marked unread rooms
+            let markedUnreadCount = summary.isMarkedUnread ? 1 : 0
+            
+            return total + roomUnreadCount + markedUnreadCount
         }
     }
 }

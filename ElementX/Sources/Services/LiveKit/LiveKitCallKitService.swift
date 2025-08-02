@@ -212,7 +212,7 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
     
     /// Report an incoming call with LiveKit credentials from VoIP push payload
     func reportIncomingCallWithCredentials(roomId: String, callId: String, callerName: String, hasVideo: Bool = true,
-                                          liveKitAccessToken: String?, liveKitServerURL: String?, liveKitRoomURL: String?) async throws {
+                                           liveKitAccessToken: String?, liveKitServerURL: String?, liveKitRoomURL: String?) async throws {
         let callUUID = UUID()
         
         MXLog.info("📞 Reporting incoming call with LiveKit credentials: \(callId) from \(callerName)")
@@ -256,6 +256,22 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
     /// Update call with new information
     func updateCall(callUUID: UUID, update: CXCallUpdate) {
         provider.reportCall(with: callUUID, updated: update)
+    }
+    
+    /// Report outgoing call as connected - CRITICAL for call log
+    func reportOutgoingCallConnected(callUUID: UUID, connectedAt: Date = Date()) {
+        MXLog.info("🔥 CRITICAL: Reporting outgoing call connected: \(callUUID) at \(connectedAt)")
+        provider.reportOutgoingCall(with: callUUID, connectedAt: connectedAt)
+    }
+    
+    /// Find CallKit UUID by call ID - CRITICAL for call log integration
+    func findCallUUID(for callId: String) -> UUID? {
+        for (uuid, call) in activeCalls {
+            if call.id == callId {
+                return uuid
+            }
+        }
+        return nil
     }
     
     /// Report call ended
@@ -390,13 +406,11 @@ extension LiveKitCallKitService: CXProviderDelegate {
                     
                     do {
                         // Use credentials directly to connect to LiveKit room
-                        try await liveKitCallService?.answerCallWithCredentials(
-                            roomId: call.roomId,
-                            callId: call.id,
-                            accessToken: accessToken,
-                            serverURL: serverURL,
-                            roomURL: finalRoomURL
-                        )
+                        try await liveKitCallService?.answerCallWithCredentials(roomId: call.roomId,
+                                                                                callId: call.id,
+                                                                                accessToken: accessToken,
+                                                                                serverURL: serverURL,
+                                                                                roomURL: finalRoomURL)
                         MXLog.info("✅ Auto-connect with credentials successful")
                     } catch {
                         MXLog.error("❌ Auto-connect with credentials failed: \(error)")
@@ -585,12 +599,12 @@ extension LiveKitCallKitService {
             // Extract LiveKit credentials from CallKit payload
             let liveKitCredentials = extractLiveKitCredentialsFromCallKitPayload(payload.dictionaryPayload)
             
-            processIncomingCallWithCredentials(roomId: roomID, 
-                                             callId: callId, 
-                                             callerName: roomDisplayName, 
-                                             hasVideo: true,
-                                             liveKitCredentials: liveKitCredentials,
-                                             completion: completion)
+            processIncomingCallWithCredentials(roomId: roomID,
+                                               callId: callId,
+                                               callerName: roomDisplayName,
+                                               hasVideo: true,
+                                               liveKitCredentials: liveKitCredentials,
+                                               completion: completion)
             return
         }
         
@@ -615,12 +629,12 @@ extension LiveKitCallKitService {
         // Extract LiveKit credentials from payload
         let liveKitCredentials = extractLiveKitCredentialsFromPayload(payload)
         
-        processIncomingCallWithCredentials(roomId: roomId, 
-                                          callId: eventId, 
-                                          callerName: callerInfo.displayName, 
-                                          hasVideo: isVideoCall,
-                                          liveKitCredentials: liveKitCredentials,
-                                          completion: completion)
+        processIncomingCallWithCredentials(roomId: roomId,
+                                           callId: eventId,
+                                           callerName: callerInfo.displayName,
+                                           hasVideo: isVideoCall,
+                                           liveKitCredentials: liveKitCredentials,
+                                           completion: completion)
     }
     
     /// Структура для информации о звонящем
@@ -695,46 +709,40 @@ extension LiveKitCallKitService {
         
         MXLog.info("[CALLKIT-CREDENTIALS] Found credentials - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL)")
         
-        return LiveKitCredentials(
-            accessToken: accessToken,
-            serverURL: serverURL,
-            roomURL: roomURL
-        )
+        return LiveKitCredentials(accessToken: accessToken,
+                                  serverURL: serverURL,
+                                  roomURL: roomURL)
     }
     
     /// Extract LiveKit credentials from VoIP push payload
     private func extractLiveKitCredentialsFromPayload(_ payload: [AnyHashable: Any]) -> LiveKitCredentials {
         // Try to extract LiveKit credentials from various payload locations
         let accessToken = payload["livekit_access_token"] as? String ??
-                         (payload["application_data"] as? [String: Any])?["livekit_access_token"] as? String ??
-                         extractFromApplicationDataString(payload, key: "livekit_access_token")
+            (payload["application_data"] as? [String: Any])?["livekit_access_token"] as? String ??
+            extractFromApplicationDataString(payload, key: "livekit_access_token")
         
         let serverURL = payload["livekit_server_url"] as? String ??
-                       (payload["application_data"] as? [String: Any])?["livekit_server_url"] as? String ??
-                       extractFromApplicationDataString(payload, key: "livekit_server_url") ??
-                       "wss://video.aibots.kz" // Default server URL
+            (payload["application_data"] as? [String: Any])?["livekit_server_url"] as? String ??
+            extractFromApplicationDataString(payload, key: "livekit_server_url") ??
+            "wss://video.aibots.kz" // Default server URL
         
         let roomURL = payload["livekit_room_url"] as? String ??
-                     (payload["application_data"] as? [String: Any])?["livekit_room_url"] as? String ??
-                     extractFromApplicationDataString(payload, key: "livekit_room_url")
+            (payload["application_data"] as? [String: Any])?["livekit_room_url"] as? String ??
+            extractFromApplicationDataString(payload, key: "livekit_room_url")
         
         MXLog.info("[VOIP-LIVEKIT] Extracted credentials - Token: \(accessToken != nil ? "[PRESENT]" : "[MISSING]"), Server: \(serverURL ?? "[MISSING]"), Room: \(roomURL ?? "[MISSING]")")
         
         // Also check App Group for stored credentials from NSE
         if accessToken == nil {
             let appGroupCredentials = extractCredentialsFromAppGroup()
-            return LiveKitCredentials(
-                accessToken: appGroupCredentials.accessToken,
-                serverURL: serverURL ?? appGroupCredentials.serverURL,
-                roomURL: roomURL ?? appGroupCredentials.roomURL
-            )
+            return LiveKitCredentials(accessToken: appGroupCredentials.accessToken,
+                                      serverURL: serverURL ?? appGroupCredentials.serverURL,
+                                      roomURL: roomURL ?? appGroupCredentials.roomURL)
         }
         
-        return LiveKitCredentials(
-            accessToken: accessToken,
-            serverURL: serverURL,
-            roomURL: roomURL
-        )
+        return LiveKitCredentials(accessToken: accessToken,
+                                  serverURL: serverURL,
+                                  roomURL: roomURL)
     }
     
     /// Extract credentials from App Group storage (from NSE) - Enhanced version
@@ -782,11 +790,9 @@ extension LiveKitCallKitService {
         appGroupDefaults.removeObject(forKey: "pending_voip_event")
         appGroupDefaults.synchronize()
         
-        return LiveKitCredentials(
-            accessToken: accessToken?.isEmpty == false ? accessToken : nil,
-            serverURL: serverURL?.isEmpty == false ? serverURL : nil,
-            roomURL: roomURL?.isEmpty == false ? roomURL : nil
-        )
+        return LiveKitCredentials(accessToken: accessToken?.isEmpty == false ? accessToken : nil,
+                                  serverURL: serverURL?.isEmpty == false ? serverURL : nil,
+                                  roomURL: roomURL?.isEmpty == false ? roomURL : nil)
     }
     
     /// Extract value from application_data JSON string
@@ -809,15 +815,13 @@ extension LiveKitCallKitService {
                    !accessToken.isEmpty,
                    !serverURL.isEmpty {
                     MXLog.info("🎬 Using LiveKit credentials for auto-connect call")
-                    try await reportIncomingCallWithCredentials(
-                        roomId: roomId, 
-                        callId: callId, 
-                        callerName: callerName, 
-                        hasVideo: hasVideo,
-                        liveKitAccessToken: accessToken,
-                        liveKitServerURL: serverURL,
-                        liveKitRoomURL: liveKitCredentials.roomURL
-                    )
+                    try await reportIncomingCallWithCredentials(roomId: roomId,
+                                                                callId: callId,
+                                                                callerName: callerName,
+                                                                hasVideo: hasVideo,
+                                                                liveKitAccessToken: accessToken,
+                                                                liveKitServerURL: serverURL,
+                                                                liveKitRoomURL: liveKitCredentials.roomURL)
                 } else {
                     MXLog.info("🔄 No LiveKit credentials available, using standard flow")
                     try await reportIncomingCall(roomId: roomId, callId: callId, callerName: callerName, hasVideo: hasVideo)
@@ -923,7 +927,7 @@ extension LiveKitCallKitService {
     /// Get current VoIP diagnostics information
     func getVoIPDiagnostics() -> String {
         // PushNotificationManager.shared.getDiagnosticsInfo() // Removed - now handled by NotificationManager
-        return "VoIP diagnostics not available - PushNotificationManager has been removed"
+        "VoIP diagnostics not available - PushNotificationManager has been removed"
     }
     
     /// Test method for simulating Matrix events with LiveKit credentials

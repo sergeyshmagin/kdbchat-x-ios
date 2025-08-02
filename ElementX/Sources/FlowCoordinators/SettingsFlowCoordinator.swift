@@ -7,6 +7,7 @@
 
 import Combine
 import SwiftUI
+import UIKit
 
 enum SettingsFlowCoordinatorAction {
     case presentedSettings
@@ -17,6 +18,7 @@ enum SettingsFlowCoordinatorAction {
     case clearAllVoIPTokens
     case showPusherInfo
     case forceReregisterVoIPPusher
+    case forceReregisterPushers
     /// Logout without a confirmation. The user forgot their PIN.
     case forceLogout
 }
@@ -255,9 +257,16 @@ class SettingsFlowCoordinator: FlowCoordinatorProtocol {
                     break
                 case .forceReregisterVoIPPusher:
                     actionsSubject.send(.forceReregisterVoIPPusher)
+                case .forceReregisterPushers:
+                    actionsSubject.send(.forceReregisterPushers)
+                case .showVoIPDiagnostics:
+                    // This is handled locally in DeveloperOptionsScreenCoordinator
+                    break
                 case .showComprehensivePushDiagnostics:
                     // This is handled locally in DeveloperOptionsScreenCoordinator
                     break
+                case .exportLogs(let fileURL):
+                    self.presentDocumentPicker(for: fileURL)
                 }
             }
             .store(in: &cancellables)
@@ -282,6 +291,46 @@ class SettingsFlowCoordinator: FlowCoordinatorProtocol {
             .store(in: &cancellables)
         
         navigationStackCoordinator.push(coordinator)
+    }
+
+    // MARK: - Log Export
+    
+    private func presentDocumentPicker(for fileURL: URL) {
+        guard let mainWindow = parameters.windowManager.mainWindow,
+              let rootViewController = mainWindow.rootViewController else {
+            MXLog.error("📄 Failed to present document picker: no root view controller")
+            return
+        }
+        
+        // Find the top-most view controller
+        var topViewController = rootViewController
+        while let presentedVC = topViewController.presentedViewController {
+            topViewController = presentedVC
+        }
+        
+        // Create and present activity view controller for sharing
+        let activityViewController = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+        
+        // Configure for iPad
+        if let popoverController = activityViewController.popoverPresentationController {
+            popoverController.sourceView = topViewController.view
+            popoverController.sourceRect = CGRect(x: topViewController.view.bounds.midX, 
+                                                  y: topViewController.view.bounds.midY, 
+                                                  width: 0, height: 0)
+            popoverController.permittedArrowDirections = []
+        }
+        
+        // Set completion handler to clean up temporary files
+        activityViewController.completionWithItemsHandler = { _, _, _, _ in
+            // Clean up temporary directory after sharing
+            Task {
+                try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            }
+        }
+        
+        topViewController.present(activityViewController, animated: true)
+        
+        MXLog.info("📄 Presented activity view controller for log export")
     }
 
     // MARK: OIDC Account Management
