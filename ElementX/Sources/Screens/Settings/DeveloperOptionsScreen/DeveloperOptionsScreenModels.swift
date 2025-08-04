@@ -19,6 +19,9 @@ enum DeveloperOptionsScreenViewModelAction {
     case showVoIPDiagnostics
     case showComprehensivePushDiagnostics
     case exportLogs
+    case clearLogs
+    case diagnoseRecoveryKeys
+    case clearRecoveryKeys
 }
 
 struct DeveloperOptionsScreenViewState: BindableState {
@@ -53,6 +56,9 @@ enum DeveloperOptionsScreenViewAction {
     case showVoIPDiagnostics
     case showComprehensivePushDiagnostics
     case exportLogs
+    case clearLogs
+    case diagnoseRecoveryKeys
+    case clearRecoveryKeys
 }
 
 protocol DeveloperOptionsProtocol: AnyObject {

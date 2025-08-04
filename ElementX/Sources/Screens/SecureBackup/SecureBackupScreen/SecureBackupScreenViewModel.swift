@@ -49,6 +49,8 @@ class SecureBackupScreenViewModel: SecureBackupScreenViewModelType, SecureBackup
         switch viewAction {
         case .recoveryKey:
             actionsSubject.send(.manageRecoveryKey)
+        case .viewRecoveryKey:
+            actionsSubject.send(.viewRecoveryKey)
         case .keyStorageToggled(let enable):
             let keyBackupState = secureBackupController.keyBackupState.value
             switch (keyBackupState, enable) {

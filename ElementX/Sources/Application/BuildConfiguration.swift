@@ -29,7 +29,7 @@ struct BuildConfiguration {
         #if DEBUG
         appId = "io.sergeyshmagin.kdbchat.debug"
         #else
-        appId = "io.sergeyshmagin.kdbchat"  // Соответствует Bundle ID с Automatic Signing
+        appId = "io.sergeyshmagin.kdbchat" // Соответствует Bundle ID с Automatic Signing
         #endif
         
         MXLog.info("[BuildConfiguration] 📱 Alert App ID configured as: \(appId)")
@@ -39,9 +39,9 @@ struct BuildConfiguration {
     /// App ID for VoIP pushes (отдельный App ID для VoIP если понадобится)
     var voipAppId: String {
         #if DEBUG
-        return "io.sergeyshmagin.kdbchat.debug"  // Для debug используем обычный
+        return "io.sergeyshmagin.kdbchat.debug" // Для debug используем обычный
         #else
-        return "io.sergeyshmagin.kdbchat"  // Пока используем обычный App ID
+        return "io.sergeyshmagin.kdbchat" // Пока используем обычный App ID
         #endif
     }
     

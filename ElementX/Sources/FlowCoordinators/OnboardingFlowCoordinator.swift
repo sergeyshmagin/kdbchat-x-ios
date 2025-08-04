@@ -311,7 +311,9 @@ class OnboardingFlowCoordinator: FlowCoordinatorProtocol {
     private func presentRecoveryKeyScreen() {
         let parameters = SecureBackupRecoveryKeyScreenCoordinatorParameters(secureBackupController: userSession.clientProxy.secureBackupController,
                                                                             userIndicatorController: ServiceLocator.shared.userIndicatorController,
-                                                                            isModallyPresented: false)
+                                                                            isModallyPresented: false,
+                                                                            clientProxy: userSession.clientProxy,
+                                                                            forceMode: nil)
         
         let coordinator = SecureBackupRecoveryKeyScreenCoordinator(parameters: parameters)
         

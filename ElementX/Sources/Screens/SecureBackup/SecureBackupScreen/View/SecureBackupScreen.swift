@@ -75,29 +75,44 @@ struct SecureBackupScreen: View {
     
     private var recoveryKeySection: some View {
         Section {
-            switch context.viewState.recoveryState {
-            case .enabled:
+            // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Определяем реальную работоспособность recovery
+            // Если backup работает, то recovery функционален, даже если SDK показывает incomplete
+            let isRecoveryActuallyWorking = (context.viewState.recoveryState == .enabled) || 
+                                          (context.viewState.recoveryState == .incomplete && context.viewState.keyBackupState == .enabled)
+            
+            if isRecoveryActuallyWorking {
+                // Recovery работает - показываем полные опции
                 ListRow(label: .default(title: L10n.screenChatBackupRecoveryActionChange,
                                         description: L10n.screenChatBackupRecoveryActionChangeDescription,
                                         icon: \.key,
                                         iconAlignment: .top),
                         kind: .navigationLink { context.send(viewAction: .recoveryKey) })
                     .accessibilityIdentifier(A11yIdentifiers.secureBackupScreen.recoveryKey)
-            case .disabled:
-                ListRow(label: .default(title: L10n.screenChatBackupRecoveryActionSetup,
-                                        description: L10n.screenChatBackupRecoveryActionChangeDescription,
+                
+                ListRow(label: .default(title: "Просмотр ключа восстановления",
+                                        description: "Посмотреть текущий ключ восстановления",
                                         icon: \.key,
                                         iconAlignment: .top),
-                        details: .icon(BadgeView(size: 10)),
-                        kind: .navigationLink { context.send(viewAction: .recoveryKey) })
-                    .accessibilityIdentifier(A11yIdentifiers.secureBackupScreen.recoveryKey)
-            case .incomplete:
-                ListRow(label: .plain(title: L10n.screenChatBackupRecoveryActionConfirm),
-                        details: .icon(BadgeView(size: 10)),
-                        kind: .navigationLink { context.send(viewAction: .recoveryKey) })
-                    .accessibilityIdentifier(A11yIdentifiers.secureBackupScreen.recoveryKey)
-            default:
-                ListRow(label: .plain(title: L10n.commonLoading), details: .isWaiting(true), kind: .label)
+                        kind: .navigationLink { context.send(viewAction: .viewRecoveryKey) })
+            } else {
+                // Recovery не работает - показываем соответствующие опции
+                switch context.viewState.recoveryState {
+                case .disabled:
+                    ListRow(label: .default(title: L10n.screenChatBackupRecoveryActionSetup,
+                                            description: L10n.screenChatBackupRecoveryActionChangeDescription,
+                                            icon: \.key,
+                                            iconAlignment: .top),
+                            details: .icon(BadgeView(size: 10)),
+                            kind: .navigationLink { context.send(viewAction: .recoveryKey) })
+                        .accessibilityIdentifier(A11yIdentifiers.secureBackupScreen.recoveryKey)
+                case .incomplete:
+                    ListRow(label: .plain(title: L10n.screenChatBackupRecoveryActionConfirm),
+                            details: .icon(BadgeView(size: 10)),
+                            kind: .navigationLink { context.send(viewAction: .recoveryKey) })
+                        .accessibilityIdentifier(A11yIdentifiers.secureBackupScreen.recoveryKey)
+                default:
+                    ListRow(label: .plain(title: L10n.commonLoading), details: .isWaiting(true), kind: .label)
+                }
             }
         } footer: {
             recoveryKeySectionFooter
@@ -107,10 +122,13 @@ struct SecureBackupScreen: View {
     
     @ViewBuilder
     private var recoveryKeySectionFooter: some View {
-        switch context.viewState.recoveryState {
-        case .incomplete:
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Показываем описание incomplete только если recovery действительно не работает
+        let isRecoveryActuallyWorking = (context.viewState.recoveryState == .enabled) || 
+                                      (context.viewState.recoveryState == .incomplete && context.viewState.keyBackupState == .enabled)
+        
+        if context.viewState.recoveryState == .incomplete && !isRecoveryActuallyWorking {
             Text(L10n.screenChatBackupRecoveryActionConfirmDescription)
-        default:
+        } else {
             EmptyView()
         }
     }

@@ -73,7 +73,9 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
                     }
                 case .incomplete:
                     state.requiresExtraAccountSetup = true
-                    state.securityBannerMode = .show(.recoveryOutOfSync)
+                    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Дать время автоматическому восстановлению завершиться
+                    // перед показом баннера восстановления
+                    handleIncompleteRecoveryState()
                 default:
                     state.securityBannerMode = .none
                     state.requiresExtraAccountSetup = false
@@ -512,6 +514,45 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
             let markedUnreadCount = summary.isMarkedUnread ? 1 : 0
             
             return total + roomUnreadCount + markedUnreadCount
+        }
+    }
+    
+    /// КРИТИЧЕСКИЙ МЕТОД: Обработка состояния incomplete с задержкой для автоматического восстановления
+    /// Это предотвращает показ баннера восстановления когда автоматическое восстановление может справиться
+    private func handleIncompleteRecoveryState() {
+        // Немедленно проверяем, можем ли мы избежать показа баннера
+        guard !state.securityBannerMode.isDismissed else {
+            return // Пользователь уже скрыл баннер
+        }
+        
+        MXLog.info("[HomeScreenViewModel] Recovery state is incomplete - checking if automatic recovery is in progress")
+        
+        // Даем время автоматическому восстановлению завершиться перед показом баннера
+        // Это предотвращает мигание баннера при успешном автоматическом восстановлении
+        Task { @MainActor in
+            // Ждем 3 секунды для автоматического восстановления
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            
+            // Проверяем актуальное состояние recovery и backup после задержки
+            let currentSecurityState = userSession.sessionSecurityStatePublisher.value
+            let keyBackupState = userSession.clientProxy.secureBackupController.keyBackupState.value
+            
+            MXLog.info("[HomeScreenViewModel] After waiting - Recovery: \(currentSecurityState.recoveryState), KeyBackup: \(keyBackupState)")
+            
+            // КРИТИЧЕСКАЯ ЛОГИКА: Если backup работает (enabled/enabling), то автоматическое восстановление сработало
+            // даже если recovery state все еще incomplete из-за бага SDK
+            let isBackupWorking = (keyBackupState == .enabled || keyBackupState == .enabling)
+            
+            if currentSecurityState.recoveryState == .incomplete && !isBackupWorking {
+                MXLog.info("[HomeScreenViewModel] Recovery incomplete and backup not working - showing recovery banner")
+                state.securityBannerMode = .show(.recoveryOutOfSync)
+            } else if isBackupWorking {
+                MXLog.info("[HomeScreenViewModel] ✅ Backup is working - hiding recovery banner (automatic recovery succeeded)")
+                // Backup работает = автоматическое восстановление успешно, баннер не нужен
+            } else {
+                MXLog.info("[HomeScreenViewModel] Recovery state resolved automatically to: \(currentSecurityState.recoveryState)")
+                // Состояние разрешилось автоматически
+            }
         }
     }
 }

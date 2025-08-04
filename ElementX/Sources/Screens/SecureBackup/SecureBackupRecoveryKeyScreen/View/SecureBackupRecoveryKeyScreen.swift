@@ -44,6 +44,9 @@ struct SecureBackupRecoveryKeyScreen: View {
             case .fixRecovery:
                 header
                 confirmRecoveryKeySection
+            case .viewRecovery:
+                header
+                viewRecoveryKeySection
             case .unknown:
                 header
             }
@@ -75,6 +78,8 @@ struct SecureBackupRecoveryKeyScreen: View {
             recoveryCreatedActionButtons
         case .fixRecovery:
             incompleteVerificationActionButtons
+        case .viewRecovery:
+            viewRecoveryActionButtons
         case .unknown:
             EmptyView()
         }
@@ -203,6 +208,60 @@ struct SecureBackupRecoveryKeyScreen: View {
                     .foregroundColor(.compound.textSecondary)
                     .font(.compound.bodySM)
             }
+        }
+    }
+    
+    private var viewRecoveryKeySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.commonRecoveryKey)
+                .foregroundColor(.compound.textPrimary)
+                .font(.compound.bodySMSemibold)
+                .padding(.leading, 16)
+            
+            ZStack {
+                RecoveryKeyView(recoveryKey: "", isInvisibleForLayout: true) { }
+                
+                if context.viewState.recoveryKey == nil {
+                    Button("Загрузить ключ") {
+                        context.send(viewAction: .loadExistingKey)
+                    }
+                    .font(.compound.bodyLGSemibold)
+                } else {
+                    RecoveryKeyView(recoveryKey: context.viewState.recoveryKey ?? "") {
+                        context.send(viewAction: .copyKey)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .background(Color.compound.bgSubtleSecondaryLevel0)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            
+            if let subtitle = context.viewState.recoveryKeySubtitle {
+                Text(subtitle)
+                    .foregroundColor(.compound.textSecondary)
+                    .font(.compound.bodySM)
+                    .padding(.leading, 16)
+            }
+        }
+    }
+    
+    private var viewRecoveryActionButtons: some View {
+        VStack(spacing: 16) {
+            if let recoveryKey = context.viewState.recoveryKey {
+                ShareLink(item: recoveryKey) {
+                    Label(L10n.screenRecoveryKeySaveAction, icon: \.download)
+                }
+                .buttonStyle(.compound(.secondary))
+            }
+            
+            Button {
+                context.send(viewAction: .done)
+            } label: {
+                Text(L10n.actionDone)
+            }
+            .buttonStyle(.compound(.primary))
         }
     }
 }

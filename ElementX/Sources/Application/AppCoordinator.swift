@@ -472,12 +472,10 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         
         #if LIVEKIT_ENABLED
         // Report the call to CallKit immediately as required by Apple
-        await liveKitCallKitService.handleIncomingCallFromMatrix(
-            roomId: roomId,
-            callId: callId,
-            callerName: callerName,
-            hasVideo: hasVideo
-        )
+        await liveKitCallKitService.handleIncomingCallFromMatrix(roomId: roomId,
+                                                                 callId: callId,
+                                                                 callerName: callerName,
+                                                                 hasVideo: hasVideo)
         MXLog.info("[AppCoordinator] ✅ VoIP call reported to LiveKit CallKit service")
         #else
         MXLog.warning("[AppCoordinator] ⚠️ VoIP push received but LIVEKIT not enabled")

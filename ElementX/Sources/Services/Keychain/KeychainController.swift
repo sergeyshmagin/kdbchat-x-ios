@@ -27,13 +27,19 @@ class KeychainController: KeychainControllerProtocol {
     private let restorationTokenKeychain: Keychain
     /// The keychain responsible for storing all other secrets in the app (keyed by `Key`s).
     private let mainKeychain: Keychain
+    /// The access group for keychain items
+    private let accessGroup: String
     
     private enum Key: String {
         case appLockPINCode
         case appLockBiometricState
+        case ssssRecoveryKey = "ssss_recovery_key"
+        case ssssRecoveryKeyCreationDate = "ssss_recovery_key_creation_date"
+        case ssssRecoveryKeyVersion = "ssss_recovery_key_version"
     }
 
     init(service: KeychainControllerService, accessGroup: String) {
+        self.accessGroup = accessGroup
         restorationTokenKeychain = Keychain(service: service.restorationTokenID, accessGroup: accessGroup)
         mainKeychain = Keychain(service: service.mainID, accessGroup: accessGroup)
     }
@@ -181,6 +187,104 @@ class KeychainController: KeychainControllerProtocol {
             try mainKeychain.remove(Key.appLockBiometricState.rawValue)
         } catch {
             MXLog.error("Failed removing the PIN code biometric state.")
+        }
+    }
+    
+    // MARK: - SSSS Recovery Key Management
+    
+    /// Создает безопасный keychain для SSSS ключей с настройками сохранения после переустановки
+    private func createSSSSKeychain() -> Keychain {
+        return Keychain(service: mainKeychain.service, accessGroup: accessGroup)
+            .accessibility(.whenUnlocked) // Доступно после разблокировки, остается после переустановки приложения
+            .synchronizable(false) // Никогда не синхронизировать через iCloud
+    }
+    
+    /// Сохраняет SSSS ключ восстановления в Keychain с максимальной защитой
+    func setSSSSRecoveryKey(_ key: String, forUserID userID: String) throws {
+        let keyIdentifier = "\(Key.ssssRecoveryKey.rawValue)_\(userID)"
+        let dateIdentifier = "\(Key.ssssRecoveryKeyCreationDate.rawValue)_\(userID)"
+        let versionIdentifier = "\(Key.ssssRecoveryKeyVersion.rawValue)_\(userID)"
+        
+        let secureKeychain = createSSSSKeychain()
+        
+        do {
+            // Сохраняем ключ
+            try secureKeychain.set(key, key: keyIdentifier)
+            
+            // Сохраняем метаданные
+            let currentTime = Date().timeIntervalSince1970
+            try secureKeychain.set(String(currentTime), key: dateIdentifier)
+            try secureKeychain.set("1.0", key: versionIdentifier)
+            
+            MXLog.info("SSSS recovery key stored securely for user: \(userID)")
+        } catch {
+            MXLog.error("Failed to store SSSS recovery key: \(error)")
+            throw error
+        }
+    }
+    
+    /// Получает SSSS ключ восстановления из Keychain
+    func ssssRecoveryKey(forUserID userID: String) -> String? {
+        let keyIdentifier = "\(Key.ssssRecoveryKey.rawValue)_\(userID)"
+        let secureKeychain = createSSSSKeychain()
+        
+        do {
+            let key = try secureKeychain.getString(keyIdentifier)
+            if key != nil {
+                MXLog.info("SSSS recovery key retrieved for user: \(userID)")
+            }
+            return key
+        } catch {
+            MXLog.error("Failed to retrieve SSSS recovery key: \(error)")
+            return nil
+        }
+    }
+    
+    /// Проверяет существование SSSS ключа
+    func hasSSSSRecoveryKey(forUserID userID: String) -> Bool {
+        let keyIdentifier = "\(Key.ssssRecoveryKey.rawValue)_\(userID)"
+        let secureKeychain = createSSSSKeychain()
+        
+        do {
+            return try secureKeychain.contains(keyIdentifier)
+        } catch {
+            MXLog.error("Failed to check SSSS key existence: \(error)")
+            return false
+        }
+    }
+    
+    /// Удаляет SSSS ключ и метаданные
+    func removeSSSSRecoveryKey(forUserID userID: String) {
+        let keyIdentifier = "\(Key.ssssRecoveryKey.rawValue)_\(userID)"
+        let dateIdentifier = "\(Key.ssssRecoveryKeyCreationDate.rawValue)_\(userID)"
+        let versionIdentifier = "\(Key.ssssRecoveryKeyVersion.rawValue)_\(userID)"
+        
+        let secureKeychain = createSSSSKeychain()
+        
+        do {
+            try secureKeychain.remove(keyIdentifier)
+            try secureKeychain.remove(dateIdentifier)
+            try secureKeychain.remove(versionIdentifier)
+            MXLog.info("SSSS recovery key removed for user: \(userID)")
+        } catch {
+            MXLog.error("Failed to remove SSSS recovery key: \(error)")
+        }
+    }
+    
+    /// Получает дату создания ключа
+    func ssssRecoveryKeyCreationDate(forUserID userID: String) -> Date? {
+        let dateIdentifier = "\(Key.ssssRecoveryKeyCreationDate.rawValue)_\(userID)"
+        let secureKeychain = createSSSSKeychain()
+        
+        do {
+            guard let timeString = try secureKeychain.getString(dateIdentifier),
+                  let timeInterval = Double(timeString) else {
+                return nil
+            }
+            return Date(timeIntervalSince1970: timeInterval)
+        } catch {
+            MXLog.error("Failed to retrieve key creation date: \(error)")
+            return nil
         }
     }
 }

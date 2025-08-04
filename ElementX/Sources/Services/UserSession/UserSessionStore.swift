@@ -156,7 +156,8 @@ class UserSessionStore: UserSessionStoreProtocol {
             return try await ClientProxy(client: client,
                                          needsSlidingSyncMigration: needsSlidingSyncMigration,
                                          networkMonitor: networkMonitor,
-                                         appSettings: appSettings)
+                                         appSettings: appSettings,
+                                         keychainController: keychainController)
         } catch {
             throw UserSessionStoreError.failedSettingUpClientProxy(error)
         }

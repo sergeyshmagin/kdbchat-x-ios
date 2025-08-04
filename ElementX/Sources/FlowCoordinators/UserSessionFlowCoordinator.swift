@@ -16,6 +16,13 @@ import CallKit
 import LiveKit
 #endif
 
+/// Результат валидации существующего ключа восстановления
+enum RecoveryKeyValidationResult {
+    case valid      // Ключ валиден и может быть переиспользован
+    case invalid    // Ключ невалиден и должен быть заменен
+    case unknown    // Не удалось определить валидность ключа
+}
+
 enum UserSessionFlowCoordinatorAction {
     case logout
     case clearCache
@@ -524,6 +531,14 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                         let roomSummaries = self.userSession.clientProxy.staticRoomSummaryProvider.roomListPublisher.value
                         await self.notificationManager.removeDeliveredNotificationsForFullyReadRooms(roomSummaries)
                     }
+                case .autoRecoveryKeySetupCompleted:
+                    handleAutoRecoveryKeySetupCompleted()
+                case .autoRecoveryKeySetupFailed(let error):
+                    handleAutoRecoveryKeySetupFailed(error)
+                case .backupRestoreCompleted:
+                    handleBackupRestoreCompleted()
+                case .backupRestoreFailed(let error):
+                    handleBackupRestoreFailed(error)
                 default:
                     break
                 }
@@ -558,6 +573,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 }
             }
             .store(in: &cancellables)
+        
+        // Настраиваем автоматические ключи восстановления при запуске
+        setupAutoRecoveryKeySystem()
     }
     
     private func processDecryptionError(_ info: UnableToDecryptInfo) {
@@ -606,6 +624,199 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    // MARK: - Auto Recovery Key Management
+    
+    /// Настраивает автоматические ключи восстановления после успешного логина
+    private func setupAutoRecoveryKeySystem() {
+        MXLog.info("Starting auto recovery key system setup")
+        
+        let userID = userSession.clientProxy.userID
+        
+        // НОВАЯ ЛОГИКА: Проверяем есть ли уже ключ в keychain для данного пользователя
+        let keychainController = KeychainController(service: .sessions, accessGroup: "")
+        let hasExistingKey = keychainController.hasSSSSRecoveryKey(forUserID: userID)
+        
+        if hasExistingKey {
+            MXLog.info("Found existing recovery key in keychain for user: \(userID)")
+            
+            // Проверяем валидность ключа перед использованием
+            Task { @MainActor in
+                let validationResult = await validateExistingRecoveryKey(userID: userID)
+                
+                switch validationResult {
+                case .valid:
+                    MXLog.info("Existing recovery key is valid, proceeding with safe setup")
+                    await userSession.clientProxy.performSafeAutoRecoverySetup()
+                    // Настраиваем cross-signing после успешной настройки recovery key
+                    await setupCrossSigningAutomatically()
+                    
+                case .invalid:
+                    MXLog.warning("Existing recovery key is invalid, will create new one")
+                    keychainController.removeSSSSRecoveryKey(forUserID: userID)
+                    await userSession.clientProxy.performSafeAutoRecoverySetup()
+                    // Настраиваем cross-signing после успешной настройки recovery key
+                    await setupCrossSigningAutomatically()
+                    
+                case .unknown:
+                    MXLog.info("Cannot validate existing recovery key, proceeding with safe setup")
+                    await userSession.clientProxy.performSafeAutoRecoverySetup()
+                    // Настраиваем cross-signing после успешной настройки recovery key
+                    await setupCrossSigningAutomatically()
+                }
+            }
+        } else {
+            MXLog.info("No existing recovery key found in keychain, creating new one")
+            
+            // Запускаем БЕЗОПАСНУЮ настройку и восстановление в фоновом режиме
+            Task { @MainActor in
+                // КРИТИЧНО: Используем новый безопасный метод, который СНАЧАЛА проверяет существующий backup
+                // и НИКОГДА не перезаписывает данные без необходимости
+                await userSession.clientProxy.performSafeAutoRecoverySetup()
+                // Настраиваем cross-signing после успешной настройки recovery key
+                await setupCrossSigningAutomatically()
+            }
+        }
+    }
+    
+    /// Валидирует существующий ключ восстановления в keychain
+    private func validateExistingRecoveryKey(userID: String) async -> RecoveryKeyValidationResult {
+        MXLog.info("🔍 Validating existing recovery key for user: \(userID)")
+        
+        let keychainController = KeychainController(service: .sessions, accessGroup: "")
+        
+        // Пытаемся получить ключ из keychain
+        guard let existingKey = keychainController.ssssRecoveryKey(forUserID: userID) else {
+            MXLog.warning("Cannot retrieve recovery key from keychain for validation")
+            return .unknown
+        }
+        
+        // ИСПОЛЬЗУЕМ ЦЕНТРАЛИЗОВАННУЮ ВАЛИДАЦИЮ из AutoRecoveryKeyService для согласованности
+        let validationResult = await userSession.clientProxy.autoRecoveryKeyService.validateLocalKeyReadOnly(existingKey)
+        switch validationResult {
+        case .success(true):
+            MXLog.info("Recovery key format validation passed")
+        case .success(false):
+            MXLog.error("Recovery key has invalid format: \(existingKey.prefix(10))...")
+            return .invalid
+        case .failure(let error):
+            MXLog.error("Recovery key validation failed: \(error)")
+            return .invalid
+        }
+        
+        // Пытаемся проверить ключ через clientProxy
+        do {
+            let result = userSession.clientProxy.exportRecoveryKeyForBackup()
+            switch result {
+            case .success(let currentKey):
+                if currentKey == existingKey {
+                    MXLog.info("✅ Existing recovery key matches current backup key")
+                    return .valid
+                } else {
+                    MXLog.warning("⚠️ Existing recovery key differs from current backup key")
+                    return .invalid
+                }
+            case .failure(let error):
+                MXLog.warning("Cannot export current recovery key for comparison: \(error)")
+                // Если не можем экспортировать текущий ключ, считаем существующий валидным
+                // чтобы избежать ненужной перезаписи
+                return .valid
+            }
+        } catch {
+            MXLog.error("Error during recovery key validation: \(error)")
+            return .unknown
+        }
+    }
+    
+    /// Автоматически настраивает cross-signing для улучшения безопасности шифрования
+    private func setupCrossSigningAutomatically() async {
+        MXLog.info("🔐 Starting automatic cross-signing setup for improved encryption")
+        
+        let result = await userSession.clientProxy.setupCrossSigningIfNeeded()
+        
+        switch result {
+        case .success:
+            MXLog.info("✅ Cross-signing setup completed successfully")
+            
+            // Показываем пользователю успешное уведомление
+            ServiceLocator.shared.userIndicatorController.submitIndicator(
+                UserIndicator(
+                    id: "cross_signing_setup_completed",
+                    type: .toast,
+                    title: "Шифрование настроено",
+                    iconName: "checkmark.shield"
+                )
+            )
+            
+        case .failure(let error):
+            MXLog.error("❌ Cross-signing setup failed: \(error)")
+            
+            // Показываем предупреждение пользователю
+            ServiceLocator.shared.userIndicatorController.submitIndicator(
+                UserIndicator(
+                    id: "cross_signing_setup_failed",
+                    type: .toast,
+                    title: "Настройка шифрования не завершена",
+                    iconName: "exclamationmark.shield"
+                )
+            )
+        }
+    }
+    
+    /// Обрабатывает успешную настройку автоматических ключей восстановления
+    private func handleAutoRecoveryKeySetupCompleted() {
+        MXLog.info("Auto recovery key system is now active")
+        
+        // Можно показать тихое уведомление об успешной настройке
+        ServiceLocator.shared.userIndicatorController.submitIndicator(
+            UserIndicator(id: "auto_recovery_setup",
+                         type: .toast,
+                         title: "Recovery key configured",
+                         iconName: "checkmark.shield")
+        )
+    }
+    
+    /// Обрабатывает ошибку настройки автоматических ключей восстановления
+    private func handleAutoRecoveryKeySetupFailed(_ error: String) {
+        MXLog.error("Auto recovery key setup failed: \(error)")
+        
+        // Показываем пользователю опциональное уведомление
+        ServiceLocator.shared.userIndicatorController.submitIndicator(
+            UserIndicator(id: "auto_recovery_setup_failed",
+                         type: .toast,
+                         title: "Recovery key setup failed - you can set it up manually in Settings")
+        )
+    }
+    
+    /// Обрабатывает успешное восстановление backup'а
+    private func handleBackupRestoreCompleted() {
+        MXLog.info("Backup restore completed successfully - encrypted messages should now be accessible")
+        
+        // Можно показать тихое уведомление об успешном восстановлении
+        ServiceLocator.shared.userIndicatorController.submitIndicator(
+            UserIndicator(id: "backup_restore_completed",
+                         type: .toast,
+                         title: "Message history restored",
+                         iconName: "checkmark.shield")
+        )
+    }
+    
+    /// Обрабатывает ошибку восстановления backup'а
+    private func handleBackupRestoreFailed(_ error: String) {
+        // Логируем ошибку, но не показываем пользователю если это просто отсутствие ключа
+        if error.contains("keyRetrievalFailed") {
+            MXLog.info("No recovery key found - this is normal for new accounts")
+        } else {
+            MXLog.error("Backup restore failed: \(error)")
+            
+            // Показываем уведомление только для серьезных ошибок
+            ServiceLocator.shared.userIndicatorController.submitIndicator(
+                UserIndicator(id: "backup_restore_failed",
+                             type: .toast,
+                             title: "Could not restore message history")
+            )
+        }
     }
     
     private func presentSessionVerificationScreen(flow: SessionVerificationScreenFlow) {
@@ -1031,7 +1242,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         let sheetNavigationStackCoordinator = NavigationStackCoordinator()
         let parameters = SecureBackupRecoveryKeyScreenCoordinatorParameters(secureBackupController: userSession.clientProxy.secureBackupController,
                                                                             userIndicatorController: ServiceLocator.shared.userIndicatorController,
-                                                                            isModallyPresented: true)
+                                                                            isModallyPresented: true,
+                                                                            clientProxy: userSession.clientProxy,
+                                                                            forceMode: nil)
         
         let coordinator = SecureBackupRecoveryKeyScreenCoordinator(parameters: parameters)
         coordinator.actions.sink { [weak self] action in

@@ -48,6 +48,12 @@ class DeveloperOptionsScreenViewModel: DeveloperOptionsScreenViewModelType, Deve
             actionsSubject.send(.showComprehensivePushDiagnostics)
         case .exportLogs:
             actionsSubject.send(.exportLogs)
+        case .clearLogs:
+            actionsSubject.send(.clearLogs)
+        case .diagnoseRecoveryKeys:
+            actionsSubject.send(.diagnoseRecoveryKeys)
+        case .clearRecoveryKeys:
+            actionsSubject.send(.clearRecoveryKeys)
         }
     }
 }

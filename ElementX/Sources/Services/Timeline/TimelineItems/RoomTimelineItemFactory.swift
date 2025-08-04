@@ -117,7 +117,6 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
                                        _ messageContent: MessageContent,
                                        _ textMessageContent: TextMessageContent,
                                        _ isOutgoing: Bool) -> RoomTimelineItemProtocol {
-        
         // Check if this text message is actually a LiveKit call event JSON
         let messageBody = textMessageContent.body
         
@@ -134,21 +133,21 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
         }
         
         return TextRoomTimelineItem(id: eventItemProxy.id,
-                             timestamp: eventItemProxy.timestamp,
-                             isOutgoing: isOutgoing,
-                             isEditable: eventItemProxy.isEditable,
-                             canBeRepliedTo: eventItemProxy.canBeRepliedTo,
-                             shouldBoost: eventItemProxy.shouldBoost,
-                             sender: eventItemProxy.sender,
-                             content: buildTextTimelineItemContent(textMessageContent),
-                             properties: .init(replyDetails: buildTimelineItemReplyDetails(messageLikeContent.inReplyTo),
-                                               isThreaded: messageLikeContent.threadRoot != nil,
-                                               threadSummary: buildTimelineItemThreadSummary(messageLikeContent.threadSummary),
-                                               isEdited: messageContent.isEdited,
-                                               reactions: buildAggregatedReactions(messageLikeContent.reactions),
-                                               deliveryStatus: eventItemProxy.deliveryStatus,
-                                               orderedReadReceipts: buildOrderedReadReceipts(eventItemProxy.readReceipts),
-                                               encryptionAuthenticity: buildEncryptionAuthenticity(eventItemProxy.shieldState)))
+                                    timestamp: eventItemProxy.timestamp,
+                                    isOutgoing: isOutgoing,
+                                    isEditable: eventItemProxy.isEditable,
+                                    canBeRepliedTo: eventItemProxy.canBeRepliedTo,
+                                    shouldBoost: eventItemProxy.shouldBoost,
+                                    sender: eventItemProxy.sender,
+                                    content: buildTextTimelineItemContent(textMessageContent),
+                                    properties: .init(replyDetails: buildTimelineItemReplyDetails(messageLikeContent.inReplyTo),
+                                                      isThreaded: messageLikeContent.threadRoot != nil,
+                                                      threadSummary: buildTimelineItemThreadSummary(messageLikeContent.threadSummary),
+                                                      isEdited: messageContent.isEdited,
+                                                      reactions: buildAggregatedReactions(messageLikeContent.reactions),
+                                                      deliveryStatus: eventItemProxy.deliveryStatus,
+                                                      orderedReadReceipts: buildOrderedReadReceipts(eventItemProxy.readReceipts),
+                                                      encryptionAuthenticity: buildEncryptionAuthenticity(eventItemProxy.shieldState)))
     }
     
     private func buildImageTimelineItem(for eventItemProxy: EventTimelineItemProxy,
@@ -795,30 +794,30 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
         
         // Additional check: if error looks like JSON with call-related fields
         let isCallJSON = (error.contains("{") && error.contains("}")) &&
-            (error.contains("call_id") || 
-             error.contains("application_data") || 
-             error.contains("notify_type") ||
-             error.contains("membership") ||
-             error.contains("seq"))
+            (error.contains("call_id") ||
+                error.contains("application_data") ||
+                error.contains("notify_type") ||
+                error.contains("membership") ||
+                error.contains("seq"))
         
         guard isLiveKitEvent || isCallJSON else { return nil }
         
         // Determine call type - check for "video" in the event data
         // If no explicit type is found, default to video for LiveKit calls
-        let callType: LiveKitCallRoomTimelineItem.CallType = 
-            (lowerError.contains("\"type\":\"video\"") || 
-             lowerBody.contains("\"type\":\"video\"") || 
-             lowerError.contains("video") || 
-             lowerBody.contains("video")) ? .video : .video  // Default to video for LiveKit
+        let callType: LiveKitCallRoomTimelineItem.CallType =
+            (lowerError.contains("\"type\":\"video\"") ||
+                lowerBody.contains("\"type\":\"video\"") ||
+                lowerError.contains("video") ||
+                lowerBody.contains("video")) ? .video : .video // Default to video for LiveKit
         
         // Determine call state based on event context
         let callState: LiveKitCallRoomTimelineItem.CallState
         
-        if lowerError.contains("ring") || lowerError.contains("notify_type\":\"ring") || 
-           lowerEventType.contains("invite") || lowerBody.contains("ring") {
+        if lowerError.contains("ring") || lowerError.contains("notify_type\":\"ring") ||
+            lowerEventType.contains("invite") || lowerBody.contains("ring") {
             callState = .started
-        } else if lowerError.contains("hangup") || lowerError.contains("end") || 
-                  lowerError.contains("membership\":\"leave") {
+        } else if lowerError.contains("hangup") || lowerError.contains("end") ||
+            lowerError.contains("membership\":\"leave") {
             callState = .ended
         } else if lowerError.contains("declined") || lowerError.contains("reject") {
             callState = .declined
@@ -1030,19 +1029,19 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     /// Comprehensive detection of LiveKit call JSON messages
     private func isLiveKitCallJSON(_ messageBody: String) -> Bool {
         // Must be JSON-like structure
-        guard messageBody.contains("{") && messageBody.contains("}") else { return false }
+        guard messageBody.contains("{"), messageBody.contains("}") else { return false }
         
         let lowerBody = messageBody.lowercased()
         
         // Check for call-specific patterns from the provided JSON samples
         let callPatterns = [
             "call_id",
-            "notify_type", 
+            "notify_type",
             "application_data",
             "livekit_server_url",
             "livekit_access_token",
             "livekit_room_url",
-            "conf_id", 
+            "conf_id",
             "device_id",
             "membership",
             "expires",
@@ -1063,7 +1062,6 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     
     /// Build a proper LiveKit call timeline item from JSON message
     private func buildLiveKitCallFromJSON(_ eventItemProxy: EventTimelineItemProxy, _ jsonString: String) -> LiveKitCallRoomTimelineItem? {
-        
         let lowerJSON = jsonString.lowercased()
         
         // CRITICAL FIX: Enhanced suppression logic
@@ -1074,44 +1072,44 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
         // CRITICAL: Multiple backup suppression patterns to catch all variations
         
         // SUPPRESS any JSON with membership:join (ANY variation)
-        if lowerJSON.contains("membership") && lowerJSON.contains("join") {
+        if lowerJSON.contains("membership"), lowerJSON.contains("join") {
             MXLog.info("🎬 ❌ SUPPRESSED: ANY membership JOIN variant - avoiding duplicate")
             return nil
         }
         
         // SUPPRESS any JSON with device_id + expires combination
-        if lowerJSON.contains("device_id") && lowerJSON.contains("expires") {
+        if lowerJSON.contains("device_id"), lowerJSON.contains("expires") {
             MXLog.info("🎬 ❌ SUPPRESSED: device_id + expires combo - avoiding duplicate")
             return nil
         }
         
         // SUPPRESS any JSON with seq number but no ring notification
-        if lowerJSON.contains("seq") && !lowerJSON.contains("notify_type") {
+        if lowerJSON.contains("seq"), !lowerJSON.contains("notify_type") {
             MXLog.info("🎬 ❌ SUPPRESSED: seq without notify_type - avoiding duplicate")
             return nil
         }
         
         // SUPPRESS any JSON with call_id + membership combination (join events)
-        if lowerJSON.contains("call_id") && lowerJSON.contains("membership") && !lowerJSON.contains("notify_type") {
+        if lowerJSON.contains("call_id"), lowerJSON.contains("membership"), !lowerJSON.contains("notify_type") {
             MXLog.info("🎬 ❌ SUPPRESSED: call_id + membership without notify_type - avoiding duplicate")
             return nil
         }
         
         // SUPPRESS application_data events (usually duplicates)
-        if lowerJSON.contains("application_data") && !lowerJSON.contains("notify_type") {
+        if lowerJSON.contains("application_data"), !lowerJSON.contains("notify_type") {
             MXLog.info("🎬 ❌ SUPPRESSED: application_data without notify_type - avoiding duplicate")
             return nil
         }
         
         // SUPPRESS version/lifetime events (usually duplicates)
-        if lowerJSON.contains("version") && lowerJSON.contains("lifetime") && !lowerJSON.contains("notify_type") {
+        if lowerJSON.contains("version"), lowerJSON.contains("lifetime"), !lowerJSON.contains("notify_type") {
             MXLog.info("🎬 ❌ SUPPRESSED: version/lifetime without notify_type - avoiding duplicate")
             return nil
         }
         
         // FINAL CATCH-ALL: Suppress any JSON that has call metadata but no ring notification
-        if (lowerJSON.contains("call_id") || lowerJSON.contains("conf_id")) && 
-           !lowerJSON.contains("notify_type") && !lowerJSON.contains("ring") {
+        if lowerJSON.contains("call_id") || lowerJSON.contains("conf_id"),
+           !lowerJSON.contains("notify_type"), !lowerJSON.contains("ring") {
             MXLog.info("🎬 ❌ SUPPRESSED: call metadata without ring/notify_type - avoiding duplicate")
             return nil
         }
@@ -1151,7 +1149,7 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     private func extractCallID(from jsonString: String) -> String {
         // Simple regex-free extraction
         if let range = jsonString.range(of: "\"call_id\":\"") {
-            let startIndex = range.upperBound  
+            let startIndex = range.upperBound
             if let endRange = jsonString[startIndex...].range(of: "\"") {
                 let callID = String(jsonString[startIndex..<endRange.lowerBound])
                 return callID

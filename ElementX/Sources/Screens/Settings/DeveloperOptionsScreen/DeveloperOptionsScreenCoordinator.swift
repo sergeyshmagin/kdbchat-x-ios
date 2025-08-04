@@ -7,8 +7,8 @@
 
 import Combine
 import SwiftUI
-import UserNotifications
 import UniformTypeIdentifiers
+import UserNotifications
 
 enum DeveloperOptionsScreenCoordinatorAction {
     case clearCache
@@ -20,6 +20,12 @@ enum DeveloperOptionsScreenCoordinatorAction {
     case showVoIPDiagnostics
     case showComprehensivePushDiagnostics
     case exportLogs(URL)
+    case clearLogs
+    case diagnoseRecoveryKeys
+    case clearRecoveryKeys
+    case diagnoseCrossSigning
+    case setupCrossSigning
+    case resetCrossSigning
 }
 
 final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
@@ -63,6 +69,12 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
                     Task { await self.showComprehensivePushDiagnostics() }
                 case .exportLogs:
                     Task { await self.exportLogs() }
+                case .clearLogs:
+                    Task { await self.clearAllLogs() }
+                case .diagnoseRecoveryKeys:
+                    actionsSubject.send(.diagnoseRecoveryKeys)
+                case .clearRecoveryKeys:
+                    actionsSubject.send(.clearRecoveryKeys)
                 }
             }
             .store(in: &cancellables)
@@ -244,7 +256,7 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
             Log Level: \(ServiceLocator.shared.settings.logLevel.title)
             
             === COMBINED LOGS ===
-            
+                
             """
             
             for (index, logFile) in logFiles.enumerated() {
@@ -273,10 +285,100 @@ final class DeveloperOptionsScreenCoordinator: CoordinatorProtocol {
             // Send the combined log file URL for sharing
             actionsSubject.send(.exportLogs(combinedLogURL))
             
+            // ВАЖНО: Очищаем оригинальные логи после успешного экспорта
+            // чтобы предотвратить накопление логов и экономить место
+            await clearOriginalLogFiles()
+            
         } catch {
             MXLog.error("📄 Log export failed: \(error)")
             await MainActor.run {
                 print("📄 Log export failed: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Немедленно очищает ВСЕ лог файлы (кнопка "Clear All Logs")
+    private func clearAllLogs() async {
+        MXLog.info("🧹 Starting manual cleanup of ALL log files...")
+        
+        let initialLogFiles = Tracing.logFiles
+        let initialCount = initialLogFiles.count
+        
+        await MainActor.run {
+            print("🧹 Clearing \(initialCount) log files...")
+        }
+        
+        // Показываем размер логов перед очисткой
+        var totalSize: Int64 = 0
+        for logFileURL in initialLogFiles {
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: logFileURL.path),
+               let fileSize = attributes[.size] as? Int64 {
+                totalSize += fileSize
+            }
+        }
+        
+        let sizeInMB = Double(totalSize) / (1024.0 * 1024.0)
+        MXLog.info("🧹 Total log size to clear: \(String(format: "%.1f", sizeInMB)) MB")
+        
+        await MainActor.run {
+            print("🧹 Clearing \(String(format: "%.1f", sizeInMB)) MB of log data...")
+        }
+        
+        // Очищаем логи
+        Tracing.deleteLogFiles()
+        
+        // Проверяем результат
+        let remainingLogFiles = Tracing.logFiles
+        let clearedCount = initialCount - remainingLogFiles.count
+        
+        if remainingLogFiles.isEmpty {
+            MXLog.info("✅ Successfully cleared ALL \(clearedCount) log files (\(String(format: "%.1f", sizeInMB)) MB freed)")
+            await MainActor.run {
+                print("✅ Successfully cleared ALL log files!")
+                print("📊 Freed: \(String(format: "%.1f", sizeInMB)) MB")
+                print("📈 Files cleared: \(clearedCount)")
+            }
+        } else {
+            MXLog.warning("⚠️ Partially cleared logs: \(clearedCount)/\(initialCount) files cleared, \(remainingLogFiles.count) remain")
+            await MainActor.run {
+                print("⚠️ Warning: Only \(clearedCount) of \(initialCount) log files were cleared")
+                print("❌ Remaining files:")
+                for file in remainingLogFiles {
+                    print("  - \(file.lastPathComponent)")
+                }
+            }
+        }
+        
+        // Отправляем action для обновления UI
+        actionsSubject.send(.clearLogs)
+    }
+    
+    /// Очищает оригинальные лог файлы после успешного экспорта
+    private func clearOriginalLogFiles() async {
+        MXLog.info("🧹 Starting cleanup of original log files after export...")
+        
+        await MainActor.run {
+            print("🧹 Clearing original log files to free up space...")
+        }
+        
+        // Используем системный метод очистки логов
+        Tracing.deleteLogFiles()
+        
+        // Проверяем результат
+        let remainingLogFiles = Tracing.logFiles
+        
+        if remainingLogFiles.isEmpty {
+            MXLog.info("🧹 Successfully cleared all original log files")
+            await MainActor.run {
+                print("✅ Original log files cleared successfully")
+            }
+        } else {
+            MXLog.warning("⚠️ Some log files remain after cleanup: \(remainingLogFiles.count) files")
+            await MainActor.run {
+                print("⚠️ Warning: \(remainingLogFiles.count) log files could not be cleared")
+                for file in remainingLogFiles {
+                    print("  - \(file.lastPathComponent)")
+                }
             }
         }
     }

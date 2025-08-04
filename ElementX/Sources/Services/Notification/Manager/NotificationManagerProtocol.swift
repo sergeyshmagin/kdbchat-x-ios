@@ -6,8 +6,8 @@
 //
 
 import Foundation
-import UserNotifications
 import PushKit
+import UserNotifications
 
 protocol NotificationManagerDelegate: AnyObject {
     func shouldDisplayInAppNotification(content: UNNotificationContent) -> Bool

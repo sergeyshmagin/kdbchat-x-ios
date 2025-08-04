@@ -55,7 +55,7 @@ struct LiveKitCallRoomTimelineView: View {
     
     private var callIcon: KeyPath<CompoundIcons, Image> {
         // Always use video call icon for LiveKit calls (as shown in screenshot)
-        return \.videoCallSolid
+        \.videoCallSolid
     }
     
     private func formatCallDuration(_ duration: TimeInterval) -> String {

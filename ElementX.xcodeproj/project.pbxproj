@@ -155,6 +155,24 @@
 		194585F6CD77242B36D4ADF1 /* Result.swift in Sources */ = {isa = PBXBuildFile; fileRef = DADECBBB672497BCD4822468 /* Result.swift */; };
 		1950A80CD198BED283DFC2CE /* ClientProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18F2958E6D247AE2516BEEE8 /* ClientProxy.swift */; };
 		197441F1EF23A5DABACCA79F /* StickerRoomTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5338450E6783A576B5C16DD /* StickerRoomTimelineView.swift */; };
+		19BE9B512E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B4F2E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift */; };
+		19BE9B522E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B4E2E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift */; };
+		19BE9B692E3E83DB00E0B5A0 /* MockImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B5E2E3E83DB00E0B5A0 /* MockImageCache.swift */; };
+		19BE9B6A2E3E83DB00E0B5A0 /* LayoutMocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B562E3E83DB00E0B5A0 /* LayoutMocks.swift */; };
+		19BE9B6B2E3E83DB00E0B5A0 /* AutoRecoveryKeyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B532E3E83DB00E0B5A0 /* AutoRecoveryKeyServiceTests.swift */; };
+		19BE9B6C2E3E83DB00E0B5A0 /* KeychainControllerSSSSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B542E3E83DB00E0B5A0 /* KeychainControllerSSSSTests.swift */; };
+		19BE9B6D2E3E83DB00E0B5A0 /* MediaLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B5C2E3E83DB00E0B5A0 /* MediaLoaderTests.swift */; };
+		19BE9B6E2E3E83DB00E0B5A0 /* UNNotification+Creator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B622E3E83DB00E0B5A0 /* UNNotification+Creator.swift */; };
+		19BE9B6F2E3E83DB00E0B5A0 /* LiveKitCallViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B5A2E3E83DB00E0B5A0 /* LiveKitCallViewModelTests.swift */; };
+		19BE9B702E3E83DB00E0B5A0 /* UserDiscoveryServiceTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B652E3E83DB00E0B5A0 /* UserDiscoveryServiceTest.swift */; };
+		19BE9B712E3E83DB00E0B5A0 /* UserSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B672E3E83DB00E0B5A0 /* UserSessionTests.swift */; };
+		19BE9B722E3E83DB00E0B5A0 /* NotificationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B612E3E83DB00E0B5A0 /* NotificationManagerTests.swift */; };
+		19BE9B732E3E83DB00E0B5A0 /* LiveKitAuthServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B582E3E83DB00E0B5A0 /* LiveKitAuthServiceTests.swift */; };
+		19BE9B742E3E83DB00E0B5A0 /* MediaProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B5D2E3E83DB00E0B5A0 /* MediaProviderTests.swift */; };
+		19BE9B752E3E83DB00E0B5A0 /* LiveKitCallServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B592E3E83DB00E0B5A0 /* LiveKitCallServiceTests.swift */; };
+		19BE9B762E3E83DB00E0B5A0 /* MockCoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B602E3E83DB00E0B5A0 /* MockCoder.swift */; };
+		19BE9B772E3E83DB00E0B5A0 /* CollapsibleFlowLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B552E3E83DB00E0B5A0 /* CollapsibleFlowLayoutTests.swift */; };
+		19BE9B782E3E83DB00E0B5A0 /* UNTextInputNotificationResponse+Creator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B632E3E83DB00E0B5A0 /* UNTextInputNotificationResponse+Creator.swift */; };
 		19DED23340D0855B59693ED2 /* VoiceMessageRecorderProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = D45C9EAA86423D7D3126DE4F /* VoiceMessageRecorderProtocol.swift */; };
 		19DF5600A7F547B22DD7872A /* CompletionSuggestionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A12D3D8138F1B71AFA7C858 /* CompletionSuggestionService.swift */; };
 		19FE025AE9BA2959B6589B0D /* RoomMemberDetailsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC575D1895FA62591451A93 /* RoomMemberDetailsScreen.swift */; };
@@ -1538,6 +1556,24 @@
 		18F2958E6D247AE2516BEEE8 /* ClientProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientProxy.swift; sourceTree = "<group>"; };
 		190EC7285D3CFEF0D3011BCF /* GeoURI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoURI.swift; sourceTree = "<group>"; };
 		196004E7695FBA292A7944AF /* ScreenTrackerViewModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTrackerViewModifier.swift; sourceTree = "<group>"; };
+		19BE9B4E2E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRecoveryKeyService.swift; sourceTree = "<group>"; };
+		19BE9B4F2E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRecoveryKeyServiceProtocol.swift; sourceTree = "<group>"; };
+		19BE9B532E3E83DB00E0B5A0 /* AutoRecoveryKeyServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRecoveryKeyServiceTests.swift; sourceTree = "<group>"; };
+		19BE9B542E3E83DB00E0B5A0 /* KeychainControllerSSSSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainControllerSSSSTests.swift; sourceTree = "<group>"; };
+		19BE9B552E3E83DB00E0B5A0 /* CollapsibleFlowLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollapsibleFlowLayoutTests.swift; sourceTree = "<group>"; };
+		19BE9B562E3E83DB00E0B5A0 /* LayoutMocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutMocks.swift; sourceTree = "<group>"; };
+		19BE9B582E3E83DB00E0B5A0 /* LiveKitAuthServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitAuthServiceTests.swift; sourceTree = "<group>"; };
+		19BE9B592E3E83DB00E0B5A0 /* LiveKitCallServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitCallServiceTests.swift; sourceTree = "<group>"; };
+		19BE9B5A2E3E83DB00E0B5A0 /* LiveKitCallViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitCallViewModelTests.swift; sourceTree = "<group>"; };
+		19BE9B5C2E3E83DB00E0B5A0 /* MediaLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLoaderTests.swift; sourceTree = "<group>"; };
+		19BE9B5D2E3E83DB00E0B5A0 /* MediaProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaProviderTests.swift; sourceTree = "<group>"; };
+		19BE9B5E2E3E83DB00E0B5A0 /* MockImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockImageCache.swift; sourceTree = "<group>"; };
+		19BE9B602E3E83DB00E0B5A0 /* MockCoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockCoder.swift; sourceTree = "<group>"; };
+		19BE9B612E3E83DB00E0B5A0 /* NotificationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManagerTests.swift; sourceTree = "<group>"; };
+		19BE9B622E3E83DB00E0B5A0 /* UNNotification+Creator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UNNotification+Creator.swift"; sourceTree = "<group>"; };
+		19BE9B632E3E83DB00E0B5A0 /* UNTextInputNotificationResponse+Creator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UNTextInputNotificationResponse+Creator.swift"; sourceTree = "<group>"; };
+		19BE9B652E3E83DB00E0B5A0 /* UserDiscoveryServiceTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDiscoveryServiceTest.swift; sourceTree = "<group>"; };
+		19BE9B672E3E83DB00E0B5A0 /* UserSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSessionTests.swift; sourceTree = "<group>"; };
 		19DD166C3625EE426203FA29 /* AppLockSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockSetupTests.swift; sourceTree = "<group>"; };
 		1A02406480C351B8C6E0682C /* MediaLoaderProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLoaderProtocol.swift; sourceTree = "<group>"; };
 		1A1265FAF2C0AF1C30605BE7 /* SessionVerificationRequestDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionVerificationRequestDetailsView.swift; sourceTree = "<group>"; };
@@ -2888,6 +2924,7 @@
 		0787F81684E503024BD0C051 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				19BE9B502E3E7F6C00E0B5A0 /* AutoRecoveryKey */,
 				4BF8D11D9ED15CFC373D0119 /* Analytics */,
 				7803E03F759061C948D66B7E /* AppLock */,
 				FCE7249621F507F34A8122FB /* Audio */,
@@ -3068,6 +3105,71 @@
 				A0D745ADE5568E50270F70EF /* SupportingFiles */,
 			);
 			path = PreviewTests;
+			sourceTree = "<group>";
+		};
+		19BE9B502E3E7F6C00E0B5A0 /* AutoRecoveryKey */ = {
+			isa = PBXGroup;
+			children = (
+				19BE9B4E2E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift */,
+				19BE9B4F2E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift */,
+			);
+			path = AutoRecoveryKey;
+			sourceTree = "<group>";
+		};
+		19BE9B572E3E83DB00E0B5A0 /* LayoutTests */ = {
+			isa = PBXGroup;
+			children = (
+				19BE9B552E3E83DB00E0B5A0 /* CollapsibleFlowLayoutTests.swift */,
+				19BE9B562E3E83DB00E0B5A0 /* LayoutMocks.swift */,
+			);
+			path = LayoutTests;
+			sourceTree = "<group>";
+		};
+		19BE9B5B2E3E83DB00E0B5A0 /* LiveKit */ = {
+			isa = PBXGroup;
+			children = (
+				19BE9B582E3E83DB00E0B5A0 /* LiveKitAuthServiceTests.swift */,
+				19BE9B592E3E83DB00E0B5A0 /* LiveKitCallServiceTests.swift */,
+				19BE9B5A2E3E83DB00E0B5A0 /* LiveKitCallViewModelTests.swift */,
+			);
+			path = LiveKit;
+			sourceTree = "<group>";
+		};
+		19BE9B5F2E3E83DB00E0B5A0 /* MediaProvider */ = {
+			isa = PBXGroup;
+			children = (
+				19BE9B5C2E3E83DB00E0B5A0 /* MediaLoaderTests.swift */,
+				19BE9B5D2E3E83DB00E0B5A0 /* MediaProviderTests.swift */,
+				19BE9B5E2E3E83DB00E0B5A0 /* MockImageCache.swift */,
+			);
+			path = MediaProvider;
+			sourceTree = "<group>";
+		};
+		19BE9B642E3E83DB00E0B5A0 /* NotificationManager */ = {
+			isa = PBXGroup;
+			children = (
+				19BE9B602E3E83DB00E0B5A0 /* MockCoder.swift */,
+				19BE9B612E3E83DB00E0B5A0 /* NotificationManagerTests.swift */,
+				19BE9B622E3E83DB00E0B5A0 /* UNNotification+Creator.swift */,
+				19BE9B632E3E83DB00E0B5A0 /* UNTextInputNotificationResponse+Creator.swift */,
+			);
+			path = NotificationManager;
+			sourceTree = "<group>";
+		};
+		19BE9B662E3E83DB00E0B5A0 /* UserDiscoveryService */ = {
+			isa = PBXGroup;
+			children = (
+				19BE9B652E3E83DB00E0B5A0 /* UserDiscoveryServiceTest.swift */,
+			);
+			path = UserDiscoveryService;
+			sourceTree = "<group>";
+		};
+		19BE9B682E3E83DB00E0B5A0 /* UserSession */ = {
+			isa = PBXGroup;
+			children = (
+				19BE9B672E3E83DB00E0B5A0 /* UserSessionTests.swift */,
+			);
+			path = UserSession;
 			sourceTree = "<group>";
 		};
 		1C62F5382CC9D9F7DCEC344A /* UserDiscoveryService */ = {
@@ -4390,6 +4492,14 @@
 		73CD9796729EB702B4DFA88C /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				19BE9B532E3E83DB00E0B5A0 /* AutoRecoveryKeyServiceTests.swift */,
+				19BE9B542E3E83DB00E0B5A0 /* KeychainControllerSSSSTests.swift */,
+				19BE9B572E3E83DB00E0B5A0 /* LayoutTests */,
+				19BE9B5B2E3E83DB00E0B5A0 /* LiveKit */,
+				19BE9B5F2E3E83DB00E0B5A0 /* MediaProvider */,
+				19BE9B642E3E83DB00E0B5A0 /* NotificationManager */,
+				19BE9B662E3E83DB00E0B5A0 /* UserDiscoveryService */,
+				19BE9B682E3E83DB00E0B5A0 /* UserSession */,
 				58C2527813FDAE23E72A9063 /* AnalyticsSettingsScreenViewModelTests.swift */,
 				C687844F60BFF532D49A994C /* AnalyticsTests.swift */,
 				E461B3C8BBBFCA400B268D14 /* AppRouteURLParserTests.swift */,
@@ -6955,6 +7065,22 @@
 				8ED8AF57A06F5EE9978ED23F /* AuthenticationStartScreenViewModelTests.swift in Sources */,
 				CEAEA57B7665C8E790599A78 /* BlockedUsersScreenViewModelTests.swift in Sources */,
 				1B2F9F368619FFF8C63C87CC /* BugReportScreenViewModelTests.swift in Sources */,
+				19BE9B692E3E83DB00E0B5A0 /* MockImageCache.swift in Sources */,
+				19BE9B6A2E3E83DB00E0B5A0 /* LayoutMocks.swift in Sources */,
+				19BE9B6B2E3E83DB00E0B5A0 /* AutoRecoveryKeyServiceTests.swift in Sources */,
+				19BE9B6C2E3E83DB00E0B5A0 /* KeychainControllerSSSSTests.swift in Sources */,
+				19BE9B6D2E3E83DB00E0B5A0 /* MediaLoaderTests.swift in Sources */,
+				19BE9B6E2E3E83DB00E0B5A0 /* UNNotification+Creator.swift in Sources */,
+				19BE9B6F2E3E83DB00E0B5A0 /* LiveKitCallViewModelTests.swift in Sources */,
+				19BE9B702E3E83DB00E0B5A0 /* UserDiscoveryServiceTest.swift in Sources */,
+				19BE9B712E3E83DB00E0B5A0 /* UserSessionTests.swift in Sources */,
+				19BE9B722E3E83DB00E0B5A0 /* NotificationManagerTests.swift in Sources */,
+				19BE9B732E3E83DB00E0B5A0 /* LiveKitAuthServiceTests.swift in Sources */,
+				19BE9B742E3E83DB00E0B5A0 /* MediaProviderTests.swift in Sources */,
+				19BE9B752E3E83DB00E0B5A0 /* LiveKitCallServiceTests.swift in Sources */,
+				19BE9B762E3E83DB00E0B5A0 /* MockCoder.swift in Sources */,
+				19BE9B772E3E83DB00E0B5A0 /* CollapsibleFlowLayoutTests.swift in Sources */,
+				19BE9B782E3E83DB00E0B5A0 /* UNTextInputNotificationResponse+Creator.swift in Sources */,
 				7F61F9ACD5EC9E845EF3EFBF /* BugReportServiceTests.swift in Sources */,
 				366D5BFE52CB79E804C7D095 /* CallScreenViewModelTests.swift in Sources */,
 				B5321A1F5B26A0F3EC54909E /* CollapsibleFlowLayoutTests.swift in Sources */,
@@ -7746,6 +7872,8 @@
 				BA4C9049BC96DED3A2F3B82E /* RoomNotificationSettingsScreenViewModelProtocol.swift in Sources */,
 				491D62ACD19E6F134B1766AF /* RoomNotificationSettingsUserDefinedScreen.swift in Sources */,
 				DBC8D1DBFE9F9CA7662BC8AA /* RoomPermissions.swift in Sources */,
+				19BE9B512E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift in Sources */,
+				19BE9B522E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift in Sources */,
 				7A02EB29F3B993AB20E0A198 /* RoomPollsHistoryScreen.swift in Sources */,
 				E58F1F3276E98A93F7D39219 /* RoomPollsHistoryScreenCoordinator.swift in Sources */,
 				51B3B19FA5F91B455C807BA7 /* RoomPollsHistoryScreenModels.swift in Sources */,

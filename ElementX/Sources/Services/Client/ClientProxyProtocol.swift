@@ -9,10 +9,35 @@ import Combine
 import Foundation
 import MatrixRustSDK
 
+/// Статус cross-signing и шифрования
+struct CrossSigningStatus {
+    let isEnabled: Bool
+    let hasBackup: Bool
+    let hasRecoveryKey: Bool
+    let lastDeviceCount: Int?
+    let needsSetup: Bool
+    
+    var description: String {
+        return """
+        Cross-Signing Status:
+        - Enabled: \(isEnabled ? "✅" : "❌")
+        - Has Backup: \(hasBackup ? "✅" : "❌")
+        - Has Recovery Key: \(hasRecoveryKey ? "✅" : "❌")
+        - Device Count: \(lastDeviceCount?.description ?? "Unknown")
+        - Needs Setup: \(needsSetup ? "⚠️ Yes" : "✅ No")
+        """
+    }
+}
+
+
 enum ClientProxyAction {
     case receivedSyncUpdate
     case receivedAuthError(isSoftLogout: Bool)
     case receivedDecryptionError(UnableToDecryptInfo)
+    case autoRecoveryKeySetupCompleted
+    case autoRecoveryKeySetupFailed(String)
+    case backupRestoreCompleted
+    case backupRestoreFailed(String)
     
     var isSyncUpdate: Bool {
         if case .receivedSyncUpdate = self {
@@ -133,6 +158,8 @@ protocol ClientProxyProtocol: AnyObject, MediaLoaderProtocol {
     
     var secureBackupController: SecureBackupControllerProtocol { get }
     
+    var autoRecoveryKeyService: AutoRecoveryKeyServiceProtocol { get }
+    
     var sessionVerificationController: SessionVerificationControllerProxyProtocol? { get }
     
     var isReportRoomSupported: Bool { get async }
@@ -241,4 +268,30 @@ protocol ClientProxyProtocol: AnyObject, MediaLoaderProtocol {
     
     func setTimelineMediaVisibility(_ value: TimelineMediaVisibility) async -> Result<Void, ClientProxyError>
     func setHideInviteAvatars(_ value: Bool) async -> Result<Void, ClientProxyError>
+    
+    // MARK: - Auto Recovery Key
+    
+    /// НОВЫЙ БЕЗОПАСНЫЙ МЕТОД: Выполняет полную диагностику и настройку автоматического восстановления
+    /// БЕЗОПАСНО: Сначала проверяет существующий backup на сервере, не перезаписывает данные
+    func performSafeAutoRecoverySetup() async
+    
+    /// DEPRECATED: Настраивает автоматические ключи восстановления при инициализации клиента
+    @available(*, deprecated, message: "Use performSafeAutoRecoverySetup instead")
+    func setupAutoRecoveryKeyIfNeeded() async
+    
+    /// DEPRECATED: Восстанавливает backup автоматически при входе в приложение
+    @available(*, deprecated, message: "Use performSafeAutoRecoverySetup instead")
+    func restoreBackupIfNeeded() async
+    
+    /// Экспортирует ключ восстановления для резервного копирования
+    func exportRecoveryKeyForBackup() -> Result<String, ClientProxyError>
+    
+    /// Автоматически настраивает cross-signing для улучшения шифрования
+    func setupCrossSigningIfNeeded() async -> Result<Void, ClientProxyError>
+    
+    /// Проверяет статус cross-signing и шифрования
+    func getCrossSigningStatus() async -> CrossSigningStatus
+    
+    /// Получает детальную диагностику encryption для разработчиков
+    func getDetailedEncryptionDiagnostics() async -> String
 }

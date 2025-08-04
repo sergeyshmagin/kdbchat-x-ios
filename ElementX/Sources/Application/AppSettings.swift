@@ -228,17 +228,17 @@ final class AppSettings {
     
     /// App ID for regular (alert) push notifications
     var pusherAppID: String {
-        return BuildConfiguration.shared.alertAppId
+        BuildConfiguration.shared.alertAppId
     }
     
     /// App ID for production alert pushes (separate from debug)
     var prodPushAppId: String {
-        BuildConfiguration.shared.alertAppId  // Используем переменную вместо хардкода
+        BuildConfiguration.shared.alertAppId // Используем переменную вместо хардкода
     }
     
     /// App ID for debug alert pushes
     var debugPushAppId: String {
-        BuildConfiguration.shared.alertAppId  // Используем переменную вместо хардкода
+        BuildConfiguration.shared.alertAppId // Используем переменную вместо хардкода
     }
     
     /// Push gateway base URL based on build configuration
@@ -264,12 +264,12 @@ final class AppSettings {
     
     /// App ID for VoIP push notifications (always production for VoIP)
     var voipAppId: String {
-        return BuildConfiguration.shared.voipAppId
+        BuildConfiguration.shared.voipAppId
     }
     
     /// VoIP push topic for APNs
     var voipPushTopic: String {
-        return BuildConfiguration.shared.voipAppId
+        BuildConfiguration.shared.voipAppId
     }
     
     @UserPreference(key: UserDefaultsKeys.enableNotifications, defaultValue: true, storageType: .userDefaults(store))

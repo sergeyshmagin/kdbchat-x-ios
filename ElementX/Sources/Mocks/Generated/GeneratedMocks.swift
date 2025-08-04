@@ -2353,6 +2353,11 @@ class ClientProxyMock: ClientProxyProtocol, @unchecked Sendable {
         set(value) { underlyingSecureBackupController = value }
     }
     var underlyingSecureBackupController: SecureBackupControllerProtocol!
+    var autoRecoveryKeyService: AutoRecoveryKeyServiceProtocol {
+        get { return underlyingAutoRecoveryKeyService }
+        set(value) { underlyingAutoRecoveryKeyService = value }
+    }
+    var underlyingAutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol!
     var sessionVerificationController: SessionVerificationControllerProxyProtocol?
     var isReportRoomSupportedCallsCount = 0
     var isReportRoomSupportedCalled: Bool {
@@ -5437,6 +5442,369 @@ class ClientProxyMock: ClientProxyProtocol, @unchecked Sendable {
             return await setHideInviteAvatarsClosure(value)
         } else {
             return setHideInviteAvatarsReturnValue
+        }
+    }
+    //MARK: - performSafeAutoRecoverySetup
+
+    var performSafeAutoRecoverySetupUnderlyingCallsCount = 0
+    var performSafeAutoRecoverySetupCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return performSafeAutoRecoverySetupUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = performSafeAutoRecoverySetupUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                performSafeAutoRecoverySetupUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    performSafeAutoRecoverySetupUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var performSafeAutoRecoverySetupCalled: Bool {
+        return performSafeAutoRecoverySetupCallsCount > 0
+    }
+    var performSafeAutoRecoverySetupClosure: (() async -> Void)?
+
+    func performSafeAutoRecoverySetup() async {
+        performSafeAutoRecoverySetupCallsCount += 1
+        await performSafeAutoRecoverySetupClosure?()
+    }
+    //MARK: - setupAutoRecoveryKeyIfNeeded
+
+    var setupAutoRecoveryKeyIfNeededUnderlyingCallsCount = 0
+    var setupAutoRecoveryKeyIfNeededCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return setupAutoRecoveryKeyIfNeededUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = setupAutoRecoveryKeyIfNeededUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                setupAutoRecoveryKeyIfNeededUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    setupAutoRecoveryKeyIfNeededUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var setupAutoRecoveryKeyIfNeededCalled: Bool {
+        return setupAutoRecoveryKeyIfNeededCallsCount > 0
+    }
+    var setupAutoRecoveryKeyIfNeededClosure: (() async -> Void)?
+
+    @available(*, deprecated, message: "Use performSafeAutoRecoverySetup instead")
+    func setupAutoRecoveryKeyIfNeeded() async {
+        setupAutoRecoveryKeyIfNeededCallsCount += 1
+        await setupAutoRecoveryKeyIfNeededClosure?()
+    }
+    //MARK: - restoreBackupIfNeeded
+
+    var restoreBackupIfNeededUnderlyingCallsCount = 0
+    var restoreBackupIfNeededCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return restoreBackupIfNeededUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = restoreBackupIfNeededUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                restoreBackupIfNeededUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    restoreBackupIfNeededUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var restoreBackupIfNeededCalled: Bool {
+        return restoreBackupIfNeededCallsCount > 0
+    }
+    var restoreBackupIfNeededClosure: (() async -> Void)?
+
+    @available(*, deprecated, message: "Use performSafeAutoRecoverySetup instead")
+    func restoreBackupIfNeeded() async {
+        restoreBackupIfNeededCallsCount += 1
+        await restoreBackupIfNeededClosure?()
+    }
+    //MARK: - exportRecoveryKeyForBackup
+
+    var exportRecoveryKeyForBackupUnderlyingCallsCount = 0
+    var exportRecoveryKeyForBackupCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return exportRecoveryKeyForBackupUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = exportRecoveryKeyForBackupUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                exportRecoveryKeyForBackupUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    exportRecoveryKeyForBackupUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var exportRecoveryKeyForBackupCalled: Bool {
+        return exportRecoveryKeyForBackupCallsCount > 0
+    }
+
+    var exportRecoveryKeyForBackupUnderlyingReturnValue: Result<String, ClientProxyError>!
+    var exportRecoveryKeyForBackupReturnValue: Result<String, ClientProxyError>! {
+        get {
+            if Thread.isMainThread {
+                return exportRecoveryKeyForBackupUnderlyingReturnValue
+            } else {
+                var returnValue: Result<String, ClientProxyError>? = nil
+                DispatchQueue.main.sync {
+                    returnValue = exportRecoveryKeyForBackupUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                exportRecoveryKeyForBackupUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    exportRecoveryKeyForBackupUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var exportRecoveryKeyForBackupClosure: (() -> Result<String, ClientProxyError>)?
+
+    func exportRecoveryKeyForBackup() -> Result<String, ClientProxyError> {
+        exportRecoveryKeyForBackupCallsCount += 1
+        if let exportRecoveryKeyForBackupClosure = exportRecoveryKeyForBackupClosure {
+            return exportRecoveryKeyForBackupClosure()
+        } else {
+            return exportRecoveryKeyForBackupReturnValue
+        }
+    }
+    //MARK: - setupCrossSigningIfNeeded
+
+    var setupCrossSigningIfNeededUnderlyingCallsCount = 0
+    var setupCrossSigningIfNeededCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return setupCrossSigningIfNeededUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = setupCrossSigningIfNeededUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                setupCrossSigningIfNeededUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    setupCrossSigningIfNeededUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var setupCrossSigningIfNeededCalled: Bool {
+        return setupCrossSigningIfNeededCallsCount > 0
+    }
+
+    var setupCrossSigningIfNeededUnderlyingReturnValue: Result<Void, ClientProxyError>!
+    var setupCrossSigningIfNeededReturnValue: Result<Void, ClientProxyError>! {
+        get {
+            if Thread.isMainThread {
+                return setupCrossSigningIfNeededUnderlyingReturnValue
+            } else {
+                var returnValue: Result<Void, ClientProxyError>? = nil
+                DispatchQueue.main.sync {
+                    returnValue = setupCrossSigningIfNeededUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                setupCrossSigningIfNeededUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    setupCrossSigningIfNeededUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var setupCrossSigningIfNeededClosure: (() async -> Result<Void, ClientProxyError>)?
+
+    func setupCrossSigningIfNeeded() async -> Result<Void, ClientProxyError> {
+        setupCrossSigningIfNeededCallsCount += 1
+        if let setupCrossSigningIfNeededClosure = setupCrossSigningIfNeededClosure {
+            return await setupCrossSigningIfNeededClosure()
+        } else {
+            return setupCrossSigningIfNeededReturnValue
+        }
+    }
+    //MARK: - getCrossSigningStatus
+
+    var getCrossSigningStatusUnderlyingCallsCount = 0
+    var getCrossSigningStatusCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return getCrossSigningStatusUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = getCrossSigningStatusUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                getCrossSigningStatusUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    getCrossSigningStatusUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var getCrossSigningStatusCalled: Bool {
+        return getCrossSigningStatusCallsCount > 0
+    }
+
+    var getCrossSigningStatusUnderlyingReturnValue: CrossSigningStatus!
+    var getCrossSigningStatusReturnValue: CrossSigningStatus! {
+        get {
+            if Thread.isMainThread {
+                return getCrossSigningStatusUnderlyingReturnValue
+            } else {
+                var returnValue: CrossSigningStatus? = nil
+                DispatchQueue.main.sync {
+                    returnValue = getCrossSigningStatusUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                getCrossSigningStatusUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    getCrossSigningStatusUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var getCrossSigningStatusClosure: (() async -> CrossSigningStatus)?
+
+    func getCrossSigningStatus() async -> CrossSigningStatus {
+        getCrossSigningStatusCallsCount += 1
+        if let getCrossSigningStatusClosure = getCrossSigningStatusClosure {
+            return await getCrossSigningStatusClosure()
+        } else {
+            return getCrossSigningStatusReturnValue
+        }
+    }
+    //MARK: - getDetailedEncryptionDiagnostics
+
+    var getDetailedEncryptionDiagnosticsUnderlyingCallsCount = 0
+    var getDetailedEncryptionDiagnosticsCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return getDetailedEncryptionDiagnosticsUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = getDetailedEncryptionDiagnosticsUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                getDetailedEncryptionDiagnosticsUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    getDetailedEncryptionDiagnosticsUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var getDetailedEncryptionDiagnosticsCalled: Bool {
+        return getDetailedEncryptionDiagnosticsCallsCount > 0
+    }
+
+    var getDetailedEncryptionDiagnosticsUnderlyingReturnValue: String!
+    var getDetailedEncryptionDiagnosticsReturnValue: String! {
+        get {
+            if Thread.isMainThread {
+                return getDetailedEncryptionDiagnosticsUnderlyingReturnValue
+            } else {
+                var returnValue: String? = nil
+                DispatchQueue.main.sync {
+                    returnValue = getDetailedEncryptionDiagnosticsUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                getDetailedEncryptionDiagnosticsUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    getDetailedEncryptionDiagnosticsUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var getDetailedEncryptionDiagnosticsClosure: (() async -> String)?
+
+    func getDetailedEncryptionDiagnostics() async -> String {
+        getDetailedEncryptionDiagnosticsCallsCount += 1
+        if let getDetailedEncryptionDiagnosticsClosure = getDetailedEncryptionDiagnosticsClosure {
+            return await getDetailedEncryptionDiagnosticsClosure()
+        } else {
+            return getDetailedEncryptionDiagnosticsReturnValue
         }
     }
     //MARK: - loadMediaContentForSource
@@ -10355,6 +10723,302 @@ class KeychainControllerMock: KeychainControllerProtocol, @unchecked Sendable {
     func removePINCodeBiometricState() {
         removePINCodeBiometricStateCallsCount += 1
         removePINCodeBiometricStateClosure?()
+    }
+    //MARK: - setSSSSRecoveryKey
+
+    var setSSSSRecoveryKeyForUserIDThrowableError: Error?
+    var setSSSSRecoveryKeyForUserIDUnderlyingCallsCount = 0
+    var setSSSSRecoveryKeyForUserIDCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return setSSSSRecoveryKeyForUserIDUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = setSSSSRecoveryKeyForUserIDUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                setSSSSRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    setSSSSRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var setSSSSRecoveryKeyForUserIDCalled: Bool {
+        return setSSSSRecoveryKeyForUserIDCallsCount > 0
+    }
+    var setSSSSRecoveryKeyForUserIDReceivedArguments: (key: String, userID: String)?
+    var setSSSSRecoveryKeyForUserIDReceivedInvocations: [(key: String, userID: String)] = []
+    var setSSSSRecoveryKeyForUserIDClosure: ((String, String) throws -> Void)?
+
+    func setSSSSRecoveryKey(_ key: String, forUserID userID: String) throws {
+        if let error = setSSSSRecoveryKeyForUserIDThrowableError {
+            throw error
+        }
+        setSSSSRecoveryKeyForUserIDCallsCount += 1
+        setSSSSRecoveryKeyForUserIDReceivedArguments = (key: key, userID: userID)
+        DispatchQueue.main.async {
+            self.setSSSSRecoveryKeyForUserIDReceivedInvocations.append((key: key, userID: userID))
+        }
+        try setSSSSRecoveryKeyForUserIDClosure?(key, userID)
+    }
+    //MARK: - ssssRecoveryKey
+
+    var ssssRecoveryKeyForUserIDUnderlyingCallsCount = 0
+    var ssssRecoveryKeyForUserIDCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return ssssRecoveryKeyForUserIDUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = ssssRecoveryKeyForUserIDUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                ssssRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    ssssRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var ssssRecoveryKeyForUserIDCalled: Bool {
+        return ssssRecoveryKeyForUserIDCallsCount > 0
+    }
+    var ssssRecoveryKeyForUserIDReceivedUserID: String?
+    var ssssRecoveryKeyForUserIDReceivedInvocations: [String] = []
+
+    var ssssRecoveryKeyForUserIDUnderlyingReturnValue: String?
+    var ssssRecoveryKeyForUserIDReturnValue: String? {
+        get {
+            if Thread.isMainThread {
+                return ssssRecoveryKeyForUserIDUnderlyingReturnValue
+            } else {
+                var returnValue: String?? = nil
+                DispatchQueue.main.sync {
+                    returnValue = ssssRecoveryKeyForUserIDUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                ssssRecoveryKeyForUserIDUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    ssssRecoveryKeyForUserIDUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var ssssRecoveryKeyForUserIDClosure: ((String) -> String?)?
+
+    func ssssRecoveryKey(forUserID userID: String) -> String? {
+        ssssRecoveryKeyForUserIDCallsCount += 1
+        ssssRecoveryKeyForUserIDReceivedUserID = userID
+        DispatchQueue.main.async {
+            self.ssssRecoveryKeyForUserIDReceivedInvocations.append(userID)
+        }
+        if let ssssRecoveryKeyForUserIDClosure = ssssRecoveryKeyForUserIDClosure {
+            return ssssRecoveryKeyForUserIDClosure(userID)
+        } else {
+            return ssssRecoveryKeyForUserIDReturnValue
+        }
+    }
+    //MARK: - hasSSSSRecoveryKey
+
+    var hasSSSSRecoveryKeyForUserIDUnderlyingCallsCount = 0
+    var hasSSSSRecoveryKeyForUserIDCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return hasSSSSRecoveryKeyForUserIDUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = hasSSSSRecoveryKeyForUserIDUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                hasSSSSRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    hasSSSSRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var hasSSSSRecoveryKeyForUserIDCalled: Bool {
+        return hasSSSSRecoveryKeyForUserIDCallsCount > 0
+    }
+    var hasSSSSRecoveryKeyForUserIDReceivedUserID: String?
+    var hasSSSSRecoveryKeyForUserIDReceivedInvocations: [String] = []
+
+    var hasSSSSRecoveryKeyForUserIDUnderlyingReturnValue: Bool!
+    var hasSSSSRecoveryKeyForUserIDReturnValue: Bool! {
+        get {
+            if Thread.isMainThread {
+                return hasSSSSRecoveryKeyForUserIDUnderlyingReturnValue
+            } else {
+                var returnValue: Bool? = nil
+                DispatchQueue.main.sync {
+                    returnValue = hasSSSSRecoveryKeyForUserIDUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                hasSSSSRecoveryKeyForUserIDUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    hasSSSSRecoveryKeyForUserIDUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var hasSSSSRecoveryKeyForUserIDClosure: ((String) -> Bool)?
+
+    func hasSSSSRecoveryKey(forUserID userID: String) -> Bool {
+        hasSSSSRecoveryKeyForUserIDCallsCount += 1
+        hasSSSSRecoveryKeyForUserIDReceivedUserID = userID
+        DispatchQueue.main.async {
+            self.hasSSSSRecoveryKeyForUserIDReceivedInvocations.append(userID)
+        }
+        if let hasSSSSRecoveryKeyForUserIDClosure = hasSSSSRecoveryKeyForUserIDClosure {
+            return hasSSSSRecoveryKeyForUserIDClosure(userID)
+        } else {
+            return hasSSSSRecoveryKeyForUserIDReturnValue
+        }
+    }
+    //MARK: - removeSSSSRecoveryKey
+
+    var removeSSSSRecoveryKeyForUserIDUnderlyingCallsCount = 0
+    var removeSSSSRecoveryKeyForUserIDCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return removeSSSSRecoveryKeyForUserIDUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = removeSSSSRecoveryKeyForUserIDUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                removeSSSSRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    removeSSSSRecoveryKeyForUserIDUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var removeSSSSRecoveryKeyForUserIDCalled: Bool {
+        return removeSSSSRecoveryKeyForUserIDCallsCount > 0
+    }
+    var removeSSSSRecoveryKeyForUserIDReceivedUserID: String?
+    var removeSSSSRecoveryKeyForUserIDReceivedInvocations: [String] = []
+    var removeSSSSRecoveryKeyForUserIDClosure: ((String) -> Void)?
+
+    func removeSSSSRecoveryKey(forUserID userID: String) {
+        removeSSSSRecoveryKeyForUserIDCallsCount += 1
+        removeSSSSRecoveryKeyForUserIDReceivedUserID = userID
+        DispatchQueue.main.async {
+            self.removeSSSSRecoveryKeyForUserIDReceivedInvocations.append(userID)
+        }
+        removeSSSSRecoveryKeyForUserIDClosure?(userID)
+    }
+    //MARK: - ssssRecoveryKeyCreationDate
+
+    var ssssRecoveryKeyCreationDateForUserIDUnderlyingCallsCount = 0
+    var ssssRecoveryKeyCreationDateForUserIDCallsCount: Int {
+        get {
+            if Thread.isMainThread {
+                return ssssRecoveryKeyCreationDateForUserIDUnderlyingCallsCount
+            } else {
+                var returnValue: Int? = nil
+                DispatchQueue.main.sync {
+                    returnValue = ssssRecoveryKeyCreationDateForUserIDUnderlyingCallsCount
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                ssssRecoveryKeyCreationDateForUserIDUnderlyingCallsCount = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    ssssRecoveryKeyCreationDateForUserIDUnderlyingCallsCount = newValue
+                }
+            }
+        }
+    }
+    var ssssRecoveryKeyCreationDateForUserIDCalled: Bool {
+        return ssssRecoveryKeyCreationDateForUserIDCallsCount > 0
+    }
+    var ssssRecoveryKeyCreationDateForUserIDReceivedUserID: String?
+    var ssssRecoveryKeyCreationDateForUserIDReceivedInvocations: [String] = []
+
+    var ssssRecoveryKeyCreationDateForUserIDUnderlyingReturnValue: Date?
+    var ssssRecoveryKeyCreationDateForUserIDReturnValue: Date? {
+        get {
+            if Thread.isMainThread {
+                return ssssRecoveryKeyCreationDateForUserIDUnderlyingReturnValue
+            } else {
+                var returnValue: Date?? = nil
+                DispatchQueue.main.sync {
+                    returnValue = ssssRecoveryKeyCreationDateForUserIDUnderlyingReturnValue
+                }
+
+                return returnValue!
+            }
+        }
+        set {
+            if Thread.isMainThread {
+                ssssRecoveryKeyCreationDateForUserIDUnderlyingReturnValue = newValue
+            } else {
+                DispatchQueue.main.sync {
+                    ssssRecoveryKeyCreationDateForUserIDUnderlyingReturnValue = newValue
+                }
+            }
+        }
+    }
+    var ssssRecoveryKeyCreationDateForUserIDClosure: ((String) -> Date?)?
+
+    func ssssRecoveryKeyCreationDate(forUserID userID: String) -> Date? {
+        ssssRecoveryKeyCreationDateForUserIDCallsCount += 1
+        ssssRecoveryKeyCreationDateForUserIDReceivedUserID = userID
+        DispatchQueue.main.async {
+            self.ssssRecoveryKeyCreationDateForUserIDReceivedInvocations.append(userID)
+        }
+        if let ssssRecoveryKeyCreationDateForUserIDClosure = ssssRecoveryKeyCreationDateForUserIDClosure {
+            return ssssRecoveryKeyCreationDateForUserIDClosure(userID)
+        } else {
+            return ssssRecoveryKeyCreationDateForUserIDReturnValue
+        }
     }
 }
 class KnockRequestProxyMock: KnockRequestProxyProtocol, @unchecked Sendable {

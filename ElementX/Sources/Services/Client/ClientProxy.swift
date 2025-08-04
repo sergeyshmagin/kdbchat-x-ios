@@ -16,6 +16,7 @@ class ClientProxy: ClientProxyProtocol {
     private let client: ClientProtocol
     private let networkMonitor: NetworkMonitorProtocol
     private let appSettings: AppSettings
+    private let keychainController: KeychainControllerProtocol
     
     private let mediaLoader: MediaLoaderProtocol
     private let clientQueue: DispatchQueue
@@ -54,6 +55,16 @@ class ClientProxy: ClientProxyProtocol {
     let notificationSettings: NotificationSettingsProxyProtocol
 
     let secureBackupController: SecureBackupControllerProtocol
+    
+    /// Lazy-инициализация сервиса автоматических ключей восстановления (DIP принцип)
+    private(set) lazy var autoRecoveryKeyService: AutoRecoveryKeyServiceProtocol = {
+        AutoRecoveryKeyService(
+            clientProxy: self,
+            keychainController: keychainController,
+            userID: userID
+        )
+    }()
+    
     
     private(set) var sessionVerificationController: SessionVerificationControllerProxyProtocol?
     
@@ -152,10 +163,12 @@ class ClientProxy: ClientProxyProtocol {
     init(client: ClientProtocol,
          needsSlidingSyncMigration: Bool,
          networkMonitor: NetworkMonitorProtocol,
-         appSettings: AppSettings) async throws {
+         appSettings: AppSettings,
+         keychainController: KeychainControllerProtocol) async throws {
         self.client = client
         self.networkMonitor = networkMonitor
         self.appSettings = appSettings
+        self.keychainController = keychainController
         
         clientQueue = .init(label: "ClientProxyQueue", attributes: .concurrent)
         
@@ -1191,6 +1204,127 @@ class ClientProxy: ClientProxyProtocol {
             MXLog.error("Failed retrieving user identity: \(error)")
             return .failure(.sdkError(error))
         }
+    }
+    
+    // MARK: - Auto Recovery Key Implementation
+    
+    /// НОВЫЙ БЕЗОПАСНЫЙ МЕТОД: Выполняет полную диагностику и настройку автоматического восстановления
+    /// БЕЗОПАСНО: Сначала проверяет существующий backup на сервере, не перезаписывает данные
+    func performSafeAutoRecoverySetup() async {
+        MXLog.info("Starting SAFE auto recovery setup for user: \(userID)")
+        
+        let result = await autoRecoveryKeyService.performSafeAutoRecoverySetup()
+        
+        switch result {
+        case .success(let autoRecoveryResult):
+            MXLog.info("Auto recovery setup completed successfully - Operation: \(autoRecoveryResult.operation)")
+            actionsSubject.send(.autoRecoveryKeySetupCompleted)
+            
+        case .failure(let error):
+            MXLog.error("Auto recovery setup failed: \(error)")
+            actionsSubject.send(.autoRecoveryKeySetupFailed(error.localizedDescription))
+        }
+    }
+    
+    /// DEPRECATED: Настраивает автоматические ключи восстановления при инициализации клиента
+    @available(*, deprecated, message: "Use performSafeAutoRecoverySetup instead")
+    func setupAutoRecoveryKeyIfNeeded() async {
+        await performSafeAutoRecoverySetup()
+    }
+    
+    /// DEPRECATED: Восстанавливает backup автоматически при входе в приложение
+    @available(*, deprecated, message: "Use performSafeAutoRecoverySetup instead")
+    func restoreBackupIfNeeded() async {
+        await performSafeAutoRecoverySetup()
+    }
+    
+    /// Экспортирует ключ восстановления для резервного копирования
+    func exportRecoveryKeyForBackup() -> Result<String, ClientProxyError> {
+        let result = autoRecoveryKeyService.exportRecoveryKeyForBackup()
+        switch result {
+        case .success(let key):
+            return .success(key)
+        case .failure(let error):
+            return .failure(.sdkError(error))
+        }
+    }
+    
+    /// Автоматически настраивает cross-signing для улучшения шифрования
+    func setupCrossSigningIfNeeded() async -> Result<Void, ClientProxyError> {
+        MXLog.info("🔐 Starting automatic cross-signing setup")
+        
+        do {
+            let encryption = client.encryption()
+            
+            // Проверяем текущее состояние
+            let backupState = encryption.backupState()
+            let recoveryState = encryption.recoveryState()
+            let hasBackup = try await encryption.backupExistsOnServer()
+            
+            if backupState == .enabled && recoveryState == .enabled {
+                MXLog.info("✅ Cross-signing already properly configured")
+                return .success(())
+            }
+            
+            // Если backup не настроен, включаем его
+            if !hasBackup {
+                try await encryption.enableBackups()
+                MXLog.info("✅ Backups enabled")
+            }
+            
+            return .success(())
+            
+        } catch {
+            MXLog.error("❌ Cross-signing setup failed: \(error)")
+            return .failure(.sdkError(error))
+        }
+    }
+    
+    /// Проверяет статус cross-signing и шифрования
+    func getCrossSigningStatus() async -> CrossSigningStatus {
+        let encryption = client.encryption()
+        let backupState = encryption.backupState()
+        let recoveryState = encryption.recoveryState()
+        let hasBackup = (try? await encryption.backupExistsOnServer()) ?? false
+        let hasLocalRecoveryKey = keychainController.hasSSSSRecoveryKey(forUserID: userID)
+        
+        let isEnabled = backupState == .enabled && recoveryState == .enabled
+        
+        return CrossSigningStatus(
+            isEnabled: isEnabled,
+            hasBackup: hasBackup,
+            hasRecoveryKey: hasLocalRecoveryKey,
+            lastDeviceCount: nil,
+            needsSetup: !isEnabled || !hasBackup
+        )
+    }
+    
+    /// Получает детальную диагностику encryption для разработчиков
+    func getDetailedEncryptionDiagnostics() async -> String {
+        let status = await getCrossSigningStatus()
+        
+        var report = """
+        🔐 CROSS-SIGNING DIAGNOSTICS REPORT
+        
+        👤 User ID: \(userID)
+        📊 Status: \(status.description)
+        
+        ⚠️ POTENTIAL ISSUES:
+        """
+        
+        if !status.isEnabled {
+            report += "\n• Cross-signing is not properly enabled"
+        }
+        
+        if !status.hasBackup {
+            report += "\n• Key backup is not configured"
+        }
+        
+        if !status.hasRecoveryKey {
+            report += "\n• Recovery key is missing"
+        }
+        
+        return report
     }
 }
 

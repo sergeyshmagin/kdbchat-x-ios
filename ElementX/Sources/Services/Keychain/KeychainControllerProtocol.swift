@@ -40,4 +40,17 @@ protocol KeychainControllerProtocol: ClientSessionDelegate {
     func pinCodeBiometricState() -> Data?
     /// Removes the App Lock PIN code biometric state.
     func removePINCodeBiometricState()
+    
+    // MARK: SSSS Recovery Key Management
+    
+    /// Сохраняет SSSS ключ восстановления в Keychain с максимальной защитой
+    func setSSSSRecoveryKey(_ key: String, forUserID userID: String) throws
+    /// Получает SSSS ключ восстановления из Keychain
+    func ssssRecoveryKey(forUserID userID: String) -> String?
+    /// Проверяет существование SSSS ключа
+    func hasSSSSRecoveryKey(forUserID userID: String) -> Bool
+    /// Удаляет SSSS ключ и метаданные
+    func removeSSSSRecoveryKey(forUserID userID: String)
+    /// Получает дату создания ключа
+    func ssssRecoveryKeyCreationDate(forUserID userID: String) -> Date?
 }

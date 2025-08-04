@@ -9,6 +9,7 @@ import Foundation
 
 enum SecureBackupScreenViewModelAction {
     case manageRecoveryKey
+    case viewRecoveryKey
     case disableKeyBackup
 }
 
@@ -30,5 +31,6 @@ struct SecureBackupScreenViewStateBindings {
 
 enum SecureBackupScreenViewAction {
     case recoveryKey
+    case viewRecoveryKey
     case keyStorageToggled(Bool)
 }

@@ -26,6 +26,8 @@
 	</array>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>application-identifier</key>
+	<string>$(DEVELOPMENT_TEAM).$(BASE_BUNDLE_IDENTIFIER)</string>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(KEYCHAIN_ACCESS_GROUP_IDENTIFIER)</string>

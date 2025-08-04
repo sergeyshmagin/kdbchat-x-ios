@@ -35,6 +35,11 @@ struct DeveloperOptionsScreen: View {
                     context.send(viewAction: .exportLogs)
                 }
                 .foregroundColor(.blue)
+                
+                Button("🧹 Clear All Logs") {
+                    context.send(viewAction: .clearLogs)
+                }
+                .foregroundColor(.orange)
             }
             
             Section("General") {
@@ -97,6 +102,18 @@ struct DeveloperOptionsScreen: View {
                     context.send(viewAction: .showComprehensivePushDiagnostics)
                 }
                 .foregroundColor(.blue)
+            }
+            
+            Section("Recovery Keys Debug") {
+                Button("🩺 Diagnose Recovery Keys") {
+                    context.send(viewAction: .diagnoseRecoveryKeys)
+                }
+                .foregroundColor(.blue)
+                
+                Button("🗑️ Clear All Recovery Keys") {
+                    context.send(viewAction: .clearRecoveryKeys)
+                }
+                .foregroundColor(.red)
             }
             
             Section("Join rules") {

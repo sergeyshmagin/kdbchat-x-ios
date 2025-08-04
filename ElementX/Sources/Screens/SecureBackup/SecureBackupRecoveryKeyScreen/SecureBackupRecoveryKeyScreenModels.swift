@@ -16,6 +16,7 @@ enum SecureBackupRecoveryKeyScreenViewMode {
     case setupRecovery
     case changeRecovery
     case fixRecovery
+    case viewRecovery
     case unknown
 }
 
@@ -39,6 +40,8 @@ struct SecureBackupRecoveryKeyScreenViewState: BindableState {
             return recoveryKey == nil ? L10n.screenRecoveryKeyChangeTitle : L10n.screenRecoveryKeySaveTitle
         case .fixRecovery:
             return L10n.screenRecoveryKeyConfirmTitle
+        case .viewRecovery:
+            return L10n.commonRecoveryKey
         default:
             return L10n.errorUnknown
         }
@@ -52,6 +55,8 @@ struct SecureBackupRecoveryKeyScreenViewState: BindableState {
             return recoveryKey == nil ? L10n.screenRecoveryKeyChangeDescription : L10n.screenRecoveryKeySaveDescription
         case .fixRecovery:
             return L10n.screenRecoveryKeyConfirmDescription
+        case .viewRecovery:
+            return "Ваш ключ восстановления для резервного копирования сообщений"
         default:
             return nil
         }
@@ -65,6 +70,8 @@ struct SecureBackupRecoveryKeyScreenViewState: BindableState {
             return recoveryKey == nil ? L10n.screenRecoveryKeyChangeGenerateKeyDescription : L10n.screenRecoveryKeySaveKeyDescription
         case .fixRecovery:
             return L10n.screenRecoveryKeyConfirmKeyDescription
+        case .viewRecovery:
+            return "Скопируйте этот ключ в безопасное место. Он понадобится для восстановления сообщений на новых устройствах."
         default:
             return nil
         }
@@ -78,6 +85,7 @@ struct SecureBackupRecoveryKeyScreenViewBindings {
 
 enum SecureBackupRecoveryKeyScreenViewAction {
     case generateKey
+    case loadExistingKey
     case copyKey
     case keySaved
     case confirmKey

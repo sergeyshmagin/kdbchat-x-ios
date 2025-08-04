@@ -3,16 +3,15 @@ import MatrixRustSDK
 
 /**
  * КРИТИЧЕСКАЯ ДИАГНОСТИКА VoIP ПУШЕРА
- * 
+ *
  * Этот скрипт поможет определить причину проблемы с регистрацией VoIP пушера
  * на новом устройстве в production среде.
  */
 
 class VoIPDiagnostics {
-    
     enum DiagnosisResult {
         case clientIssue(reason: String)
-        case serverIssue(reason: String) 
+        case serverIssue(reason: String)
         case configurationIssue(reason: String)
         case networkIssue(reason: String)
         
@@ -21,7 +20,7 @@ class VoIPDiagnostics {
             case .clientIssue(let reason):
                 return "❌ КЛИЕНТСКАЯ ПРОБЛЕМА: \(reason)"
             case .serverIssue(let reason):
-                return "🔥 СЕРВЕРНАЯ ПРОБЛЕМА: \(reason)" 
+                return "🔥 СЕРВЕРНАЯ ПРОБЛЕМА: \(reason)"
             case .configurationIssue(let reason):
                 return "⚙️ ПРОБЛЕМА КОНФИГУРАЦИИ: \(reason)"
             case .networkIssue(let reason):
@@ -60,10 +59,10 @@ class VoIPDiagnostics {
         let appSettings = AppSettings()
         
         // Проверить production App ID (ИСПРАВЛЕНО: используем правильный Bundle ID)
-        let expectedVoipAppId = buildConfig.voipAppId  // Используем переменную из конфигурации
+        let expectedVoipAppId = buildConfig.voipAppId // Используем переменную из конфигурации
         let actualVoipAppId = buildConfig.voipAppId
         
-        let expectedAlertAppId = buildConfig.alertAppId  // Используем переменную из конфигурации
+        let expectedAlertAppId = buildConfig.alertAppId // Используем переменную из конфигурации
         let actualAlertAppId = buildConfig.alertAppId
         
         // Проверяем консистентность конфигурации
@@ -123,7 +122,6 @@ class VoIPDiagnostics {
 // MARK: - Runtime Diagnostic Extension
 
 extension NotificationManager {
-    
     func runVoIPDiagnostics() async -> String {
         var report = "🔍 КРИТИЧЕСКАЯ ДИАГНОСТИКА VoIP ПУШЕРА\n"
         report += "==========================================\n\n"
@@ -195,7 +193,7 @@ extension NotificationManager {
             report += "   - ❗ КРИТИЧНО: Нет пользовательской сессии. Сначала выполните вход.\n"
         }
         
-        if !lastVoIPRegistrationSuccess && voipTokenData != nil && userSession != nil {
+        if !lastVoIPRegistrationSuccess, voipTokenData != nil, userSession != nil {
             report += "   - ❗ КРИТИЧНО: Регистрация неуспешна несмотря на наличие токена и сессии.\n"
             report += "     * Проверить сетевое соединение\n"
             report += "     * Проверить конфигурацию сервера Sygnal\n"

@@ -8,9 +8,9 @@
 import Combine
 import Foundation
 import MatrixRustSDK
+import PushKit
 import UIKit
 import UserNotifications
-import PushKit
 
 #if LIVEKIT_ENABLED
 // LiveKitCallKitService is only available when LIVEKIT_ENABLED
@@ -144,7 +144,7 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
         
         // CRITICAL FIX: Re-register VoIP pusher immediately when user session is set
         // This must happen AFTER userSession is assigned and outside the Task to ensure proper timing
-        if let voipTokenData = self.voipTokenData, userSession != nil {
+        if let voipTokenData = voipTokenData, userSession != nil {
             MXLog.info("🔄 CRITICAL FIX: Auto-registering VoIP pusher with newly set user session")
             MXLog.info("🔄 User session: \(userSession != nil ? "Available" : "Nil")")
             MXLog.info("🔄 VoIP token: \(voipTokenData.base64EncodedString().prefix(20))...")
@@ -166,7 +166,7 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
     
     private func registerVoIPPusherWithRegularToken(with deviceToken: Data, clientProxy: ClientProxyProtocol) async -> Bool {
         let appId = appSettings.pusherAppID
-        let voipAppId = appSettings.voipAppId + ".voip"  // Добавляем .voip к app ID
+        let voipAppId = appSettings.voipAppId + ".voip" // Добавляем .voip к app ID
         let pushGateway = appSettings.pushGatewayNotifyEndpoint.absoluteString
         let bundleId = Bundle.main.bundleIdentifier ?? "Unknown"
         let buildType = ProcessInfo.processInfo.environment["DEBUG"] == "1" ? "DEBUG" : "RELEASE"
@@ -428,7 +428,6 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
 // MARK: - VoIP Push Support
 
 extension NotificationManager {
-    
     // VoIP Push Protocol Implementation
     
     func registerVoIPPusher(with tokenData: Data) async -> Bool {
@@ -437,12 +436,12 @@ extension NotificationManager {
         guard let userSession else {
             MXLog.error("[NotificationManager] Cannot register VoIP pusher - no user session")
             // Store token for later registration when session is available
-            self.voipTokenData = tokenData
+            voipTokenData = tokenData
             lastVoIPRegistrationSuccess = false
             return false
         }
         
-        self.voipTokenData = tokenData
+        voipTokenData = tokenData
         let result = await setVoIPPusher(with: tokenData, clientProxy: userSession.clientProxy)
         
         lastVoIPRegistrationSuccess = result
@@ -461,7 +460,7 @@ extension NotificationManager {
     }
     
     func hasVoIPToken() -> Bool {
-        return voipTokenData != nil
+        voipTokenData != nil
     }
     
     // MARK: - VoIP Retry Logic
@@ -512,7 +511,7 @@ extension NotificationManager {
         }
         
         // Step 2: Configure App ID (CRITICAL - server must recognize this)
-        let voipAppId = appSettings.voipAppId  // Используем правильный VoIP app ID
+        let voipAppId = appSettings.voipAppId // Используем правильный VoIP app ID
         let voipProfileTag = "voip_calls_only_\(String(appSettings.pusherProfileTag?.suffix(8) ?? "default"))"
         
         // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: VoIP токен также должен быть в hex формате!
@@ -541,21 +540,15 @@ extension NotificationManager {
         
         do {
             // Step 5: Create pusher configuration
-            let voipConfiguration = try await PusherConfiguration(
-                identifiers: .init(
-                    pushkey: pushKeyHex,
-                    appId: voipAppId
-                ),
-                kind: .http(data: .init(
-                    url: pushGatewayURL,
-                    format: .eventIdOnly,
-                    defaultPayload: nil
-                )),
-                appDisplayName: "KDB Chat",
-                deviceDisplayName: UIDevice.current.name,
-                profileTag: voipProfileTag,
-                lang: Bundle.app.preferredLocalizations.first ?? "en"
-            )
+            let voipConfiguration = try await PusherConfiguration(identifiers: .init(pushkey: pushKeyHex,
+                                                                                     appId: voipAppId),
+                                                                  kind: .http(data: .init(url: pushGatewayURL,
+                                                                                          format: .eventIdOnly,
+                                                                                          defaultPayload: nil)),
+                                                                  appDisplayName: "KDB Chat",
+                                                                  deviceDisplayName: UIDevice.current.name,
+                                                                  profileTag: voipProfileTag,
+                                                                  lang: Bundle.app.preferredLocalizations.first ?? "en")
             
             MXLog.info("[NotificationManager] 🔄 Sending pusher configuration to server...")
             
@@ -616,7 +609,7 @@ extension NotificationManager {
             // Check 2: User session available
             if self.userSession == nil {
                 MXLog.info("[NotificationManager] ℹ️ HEALTH CHECK: No user session yet, VoIP pusher will register on login")
-            } else if self.voipTokenData != nil && !self.lastVoIPRegistrationSuccess {
+            } else if self.voipTokenData != nil, !self.lastVoIPRegistrationSuccess {
                 MXLog.warning("[NotificationManager] ⚠️ HEALTH CHECK: VoIP pusher registration failed")
                 MXLog.warning("[NotificationManager] ⚠️ Retry count: \(self.voipPusherRegistrationRetryCount)")
             } else if self.lastVoIPRegistrationSuccess {
@@ -624,7 +617,7 @@ extension NotificationManager {
             }
             
             // Check 3: Automatic re-registration if needed
-            if self.userSession != nil && self.voipTokenData != nil && !self.lastVoIPRegistrationSuccess {
+            if self.userSession != nil, self.voipTokenData != nil, !self.lastVoIPRegistrationSuccess {
                 MXLog.info("[NotificationManager] 🔄 HEALTH CHECK: Triggering automatic VoIP pusher registration")
                 Task {
                     _ = await self.registerVoIPPusher(with: self.voipTokenData!)
@@ -636,14 +629,12 @@ extension NotificationManager {
     // MARK: - Diagnostic Methods
     
     func getVoIPPusherDiagnostics() -> VoIPPusherDiagnostics {
-        return VoIPPusherDiagnostics(
-            hasToken: voipTokenData != nil,
-            tokenPrefix: voipTokenData.map { String($0.base64EncodedString().prefix(20)) },
-            lastRegistrationAttempt: lastVoIPRegistrationAttempt,
-            registrationSuccess: lastVoIPRegistrationSuccess,
-            retryCount: voipPusherRegistrationRetryCount,
-            userSessionAvailable: userSession != nil
-        )
+        VoIPPusherDiagnostics(hasToken: voipTokenData != nil,
+                              tokenPrefix: voipTokenData.map { String($0.base64EncodedString().prefix(20)) },
+                              lastRegistrationAttempt: lastVoIPRegistrationAttempt,
+                              registrationSuccess: lastVoIPRegistrationSuccess,
+                              retryCount: voipPusherRegistrationRetryCount,
+                              userSessionAvailable: userSession != nil)
     }
     
     func testVoIPPusherRegistration() async -> VoIPPusherTestResult {
@@ -651,43 +642,36 @@ extension NotificationManager {
         
         // Check if we have a token
         guard let tokenData = voipTokenData else {
-            return VoIPPusherTestResult(
-                success: false,
-                message: "No VoIP token available. PushKit may not be properly configured.",
-                tokenReceived: false,
-                pusherRegistered: false,
-                errorDetails: "PKPushRegistry did not provide a token"
-            )
+            return VoIPPusherTestResult(success: false,
+                                        message: "No VoIP token available. PushKit may not be properly configured.",
+                                        tokenReceived: false,
+                                        pusherRegistered: false,
+                                        errorDetails: "PKPushRegistry did not provide a token")
         }
         
         // Check if we have a user session
         guard userSession != nil else {
-            return VoIPPusherTestResult(
-                success: false,
-                message: "No user session available. Please log in first.",
-                tokenReceived: true,
-                pusherRegistered: false,
-                errorDetails: "User session is nil"
-            )
+            return VoIPPusherTestResult(success: false,
+                                        message: "No user session available. Please log in first.",
+                                        tokenReceived: true,
+                                        pusherRegistered: false,
+                                        errorDetails: "User session is nil")
         }
         
         // Try to register the pusher
         let registrationSuccess = await registerVoIPPusher(with: tokenData)
         
-        return VoIPPusherTestResult(
-            success: registrationSuccess,
-            message: registrationSuccess ? "VoIP pusher registered successfully!" : "VoIP pusher registration failed.",
-            tokenReceived: true,
-            pusherRegistered: registrationSuccess,
-            errorDetails: registrationSuccess ? nil : "Check logs for detailed error"
-        )
+        return VoIPPusherTestResult(success: registrationSuccess,
+                                    message: registrationSuccess ? "VoIP pusher registered successfully!" : "VoIP pusher registration failed.",
+                                    tokenReceived: true,
+                                    pusherRegistered: registrationSuccess,
+                                    errorDetails: registrationSuccess ? nil : "Check logs for detailed error")
     }
 }
 
 // MARK: - PKPushRegistryDelegate
 
 extension NotificationManager: PKPushRegistryDelegate {
-    
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         guard type == .voIP else { return }
         
@@ -700,7 +684,7 @@ extension NotificationManager: PKPushRegistryDelegate {
         MXLog.info("[NotificationManager] 📲 VoIP Token Length (Base64): \(tokenBase64.count) chars")
         
         // Store token and notify delegate
-        self.voipTokenData = pushCredentials.token
+        voipTokenData = pushCredentials.token
         delegate?.voIPTokenUpdated(pushCredentials.token)
         
         // Register pusher immediately if we have a user session, otherwise store for later
@@ -728,7 +712,7 @@ extension NotificationManager: PKPushRegistryDelegate {
         MXLog.info("[NotificationManager] 📥 Received VoIP push notification")
         MXLog.debug("[NotificationManager] VoIP payload: \(payload.dictionaryPayload)")
         
-        // CRITICAL: According to Apple's requirements since iOS 13, we MUST report 
+        // CRITICAL: According to Apple's requirements since iOS 13, we MUST report
         // incoming VoIP push notifications to CallKit immediately within this method
         handleVoIPPushNotification(payload: payload.dictionaryPayload, completion: completion)
     }
@@ -761,12 +745,10 @@ extension NotificationManager: PKPushRegistryDelegate {
         let semaphore = DispatchSemaphore(value: 0)
         
         Task {
-            await delegate.handleVoIPPushNotification(
-                roomId: roomId,
-                callId: callId,
-                callerName: callerName,
-                hasVideo: hasVideo
-            )
+            await delegate.handleVoIPPushNotification(roomId: roomId,
+                                                      callId: callId,
+                                                      callerName: callerName,
+                                                      hasVideo: hasVideo)
             MXLog.info("[NotificationManager] ✅ VoIP call reported to CallKit via delegate")
             semaphore.signal()
         }
@@ -846,7 +828,7 @@ extension NotificationManager: PKPushRegistryDelegate {
         guard type == .voIP else { return }
         
         MXLog.warning("[NotificationManager] ⚠️ VoIP push token invalidated")
-        self.voipTokenData = nil
+        voipTokenData = nil
     }
 }
 

@@ -13,6 +13,7 @@ typealias SecureBackupRecoveryKeyScreenViewModelType = StateStoreViewModelV2<Sec
 class SecureBackupRecoveryKeyScreenViewModel: SecureBackupRecoveryKeyScreenViewModelType, SecureBackupRecoveryKeyScreenViewModelProtocol {
     private let secureBackupController: SecureBackupControllerProtocol
     private let userIndicatorController: UserIndicatorControllerProtocol
+    private let clientProxy: ClientProxyProtocol?
     
     private var actionsSubject: PassthroughSubject<SecureBackupRecoveryKeyScreenViewModelAction, Never> = .init()
     var actions: AnyPublisher<SecureBackupRecoveryKeyScreenViewModelAction, Never> {
@@ -21,13 +22,24 @@ class SecureBackupRecoveryKeyScreenViewModel: SecureBackupRecoveryKeyScreenViewM
 
     init(secureBackupController: SecureBackupControllerProtocol,
          userIndicatorController: UserIndicatorControllerProtocol,
-         isModallyPresented: Bool) {
+         isModallyPresented: Bool,
+         clientProxy: ClientProxyProtocol? = nil,
+         forceMode: SecureBackupRecoveryKeyScreenViewMode? = nil) {
         self.secureBackupController = secureBackupController
         self.userIndicatorController = userIndicatorController
+        self.clientProxy = clientProxy
         
+        let mode = forceMode ?? secureBackupController.recoveryState.value.viewMode
         super.init(initialViewState: .init(isModallyPresented: isModallyPresented,
-                                           mode: secureBackupController.recoveryState.value.viewMode,
+                                           mode: mode,
                                            bindings: .init()))
+        
+        // If forced to viewRecovery mode, automatically load the key
+        if mode == .viewRecovery {
+            DispatchQueue.main.async { [weak self] in
+                self?.process(viewAction: .loadExistingKey)
+            }
+        }
     }
     
     // MARK: - Public
@@ -36,6 +48,26 @@ class SecureBackupRecoveryKeyScreenViewModel: SecureBackupRecoveryKeyScreenViewM
         MXLog.info("View model: received view action: \(viewAction)")
         
         switch viewAction {
+        case .loadExistingKey:
+            guard let clientProxy = clientProxy else {
+                MXLog.error("Cannot load existing key: clientProxy not available")
+                state.bindings.alertInfo = .init(id: .init(),
+                                                 title: "Ошибка",
+                                                 message: "Не удалось загрузить ключ восстановления")
+                return
+            }
+            
+            let result = clientProxy.exportRecoveryKeyForBackup()
+            switch result {
+            case .success(let key):
+                state.recoveryKey = key
+                state.doneButtonEnabled = true
+            case .failure(let error):
+                MXLog.error("Failed loading existing recovery key with error: \(error)")
+                state.bindings.alertInfo = .init(id: .init(),
+                                                 title: "Ошибка",
+                                                 message: "Не удалось загрузить ключ восстановления")
+            }
         case .generateKey:
             state.isGeneratingKey = true
             
@@ -51,9 +83,29 @@ class SecureBackupRecoveryKeyScreenViewModel: SecureBackupRecoveryKeyScreenViewM
                 state.isGeneratingKey = false
             }
         case .copyKey:
-            UIPasteboard.general.string = state.recoveryKey
-            userIndicatorController.submitIndicator(.init(title: "Copied recovery key"))
+            guard let recoveryKey = state.recoveryKey else {
+                MXLog.error("Attempted to copy nil recovery key")
+                return
+            }
+            
+            UIPasteboard.general.string = recoveryKey
+            
+            // Добавляем тактильную обратную связь
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            
+            // Улучшенное уведомление с иконкой
+            userIndicatorController.submitIndicator(
+                UserIndicator(
+                    id: "recovery_key_copied",
+                    type: .toast,
+                    title: "Ключ восстановления скопирован",
+                    iconName: "doc.on.clipboard"
+                )
+            )
+            
             state.doneButtonEnabled = true
+            MXLog.info("Recovery key copied to clipboard with enhanced user feedback")
         case .keySaved:
             state.doneButtonEnabled = true
         case .confirmKey:

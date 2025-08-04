@@ -47,6 +47,11 @@ class EncryptionSettingsFlowCoordinator: FlowCoordinatorProtocol {
         /// The user finished managing their recovery key.
         case finishedManagingRecoveryKey
         
+        /// The user would like to view their recovery key.
+        case viewRecoveryKey
+        /// The user finished viewing their recovery key.
+        case finishedViewingRecoveryKey
+        
         /// The user doesn't want to use key backup any more.
         case disableKeyBackup
         /// The key backup screen was dismissed.
@@ -121,6 +126,11 @@ class EncryptionSettingsFlowCoordinator: FlowCoordinatorProtocol {
         }
         stateMachine.addRoutes(event: .finishedManagingRecoveryKey, transitions: [.recoveryKeyScreen => .secureBackupScreen])
         
+        stateMachine.addRoutes(event: .viewRecoveryKey, transitions: [.secureBackupScreen => .recoveryKeyScreen]) { [weak self] _ in
+            self?.presentViewRecoveryKeyScreen()
+        }
+        stateMachine.addRoutes(event: .finishedViewingRecoveryKey, transitions: [.recoveryKeyScreen => .secureBackupScreen])
+        
         stateMachine.addRoutes(event: .disableKeyBackup, transitions: [.secureBackupScreen => .keyBackupScreen]) { [weak self] _ in
             self?.presentKeyBackupScreen()
         }
@@ -141,6 +151,8 @@ class EncryptionSettingsFlowCoordinator: FlowCoordinatorProtocol {
             switch action {
             case .manageRecoveryKey:
                 stateMachine.tryEvent(.manageRecoveryKey)
+            case .viewRecoveryKey:
+                stateMachine.tryEvent(.viewRecoveryKey)
             case .disableKeyBackup:
                 stateMachine.tryEvent(.disableKeyBackup)
             }
@@ -156,7 +168,9 @@ class EncryptionSettingsFlowCoordinator: FlowCoordinatorProtocol {
         let sheetNavigationStackCoordinator = NavigationStackCoordinator()
         let coordinator = SecureBackupRecoveryKeyScreenCoordinator(parameters: .init(secureBackupController: userSession.clientProxy.secureBackupController,
                                                                                      userIndicatorController: userIndicatorController,
-                                                                                     isModallyPresented: true))
+                                                                                     isModallyPresented: true,
+                                                                                     clientProxy: userSession.clientProxy,
+                                                                                     forceMode: nil))
         
         coordinator.actions.sink { [weak self] action in
             guard let self else { return }
@@ -171,6 +185,30 @@ class EncryptionSettingsFlowCoordinator: FlowCoordinatorProtocol {
         
         navigationStackCoordinator.setSheetCoordinator(sheetNavigationStackCoordinator) { [stateMachine] in
             stateMachine.tryEvent(.finishedManagingRecoveryKey)
+        }
+    }
+    
+    private func presentViewRecoveryKeyScreen() {
+        let sheetNavigationStackCoordinator = NavigationStackCoordinator()
+        let coordinator = SecureBackupRecoveryKeyScreenCoordinator(parameters: .init(secureBackupController: userSession.clientProxy.secureBackupController,
+                                                                                     userIndicatorController: userIndicatorController,
+                                                                                     isModallyPresented: true,
+                                                                                     clientProxy: userSession.clientProxy,
+                                                                                     forceMode: .viewRecovery))
+        
+        coordinator.actions.sink { [weak self] action in
+            guard let self else { return }
+            switch action {
+            case .complete:
+                navigationStackCoordinator.setSheetCoordinator(nil)
+            }
+        }
+        .store(in: &cancellables)
+        
+        sheetNavigationStackCoordinator.setRootCoordinator(coordinator, animated: true)
+        
+        navigationStackCoordinator.setSheetCoordinator(sheetNavigationStackCoordinator) { [stateMachine] in
+            stateMachine.tryEvent(.finishedViewingRecoveryKey)
         }
     }
     
