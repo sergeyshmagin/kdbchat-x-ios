@@ -96,12 +96,10 @@ class SecureBackupRecoveryKeyScreenViewModel: SecureBackupRecoveryKeyScreenViewM
             
             // Улучшенное уведомление с иконкой
             userIndicatorController.submitIndicator(
-                UserIndicator(
-                    id: "recovery_key_copied",
-                    type: .toast,
-                    title: "Ключ восстановления скопирован",
-                    iconName: "doc.on.clipboard"
-                )
+                UserIndicator(id: "recovery_key_copied",
+                              type: .toast,
+                              title: "Ключ восстановления скопирован",
+                              iconName: "doc.on.clipboard")
             )
             
             state.doneButtonEnabled = true

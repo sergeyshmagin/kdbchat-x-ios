@@ -12,6 +12,9 @@ import Combine
 import SwiftState
 import SwiftUI
 import UserNotifications
+import Foundation
+
+
 
 #if LIVEKIT_ENABLED
 // LiveKit imports for call functionality

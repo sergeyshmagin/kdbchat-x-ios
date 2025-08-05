@@ -440,11 +440,11 @@ class SettingsFlowCoordinator: FlowCoordinatorProtocol {
         ⚠️ POTENTIAL ISSUES:
         """
         
-        if hasSSSSKey && recoveryState != .enabled {
+        if hasSSSSKey, recoveryState != .enabled {
             diagnostics += "\n• Local key exists but server backup not enabled"
         }
         
-        if !hasSSSSKey && (recoveryState == .enabled || recoveryState == .incomplete) {
+        if !hasSSSSKey, recoveryState == .enabled || recoveryState == .incomplete {
             diagnostics += "\n• Server backup exists but no local key"
         }
         
@@ -567,7 +567,7 @@ class SettingsFlowCoordinator: FlowCoordinatorProtocol {
             let recoveryState = secureBackup.recoveryState.value
             report += "🔄 Recovery State: \(recoveryState)\n"
             
-            if recoveryState == .disabled && keyBackupState == .unknown {
+            if recoveryState == .disabled, keyBackupState == .unknown {
                 report += "⚠️ Both recovery and backup are disabled - this could explain empty versions\n"
             }
             
@@ -692,35 +692,35 @@ class SettingsFlowCoordinator: FlowCoordinatorProtocol {
                 
             let message: String
             switch setupResult {
-                case .success:
-                    message = """
-                    ✅ CROSS-SIGNING RESET & SETUP COMPLETED
-                    
-                    🔄 Identity has been completely reset
-                    🔐 Cross-signing reconfigured from scratch
-                    📦 Fresh backup system created
-                    🔑 New recovery keys generated
-                    
-                    ⚡ Your encryption is now in a clean state!
-                    """
-                    
-                case .failure(let error):
-                    message = """
-                    ⚠️ CROSS-SIGNING RESET COMPLETED, SETUP FAILED
-                    
-                    ✅ Identity reset successful
-                    ❌ Setup failed: \(error.localizedDescription)
-                    
-                    💡 Manual setup may be required
-                    """
-                }
+            case .success:
+                message = """
+                ✅ CROSS-SIGNING RESET & SETUP COMPLETED
                 
-                await MainActor.run {
-                    print("🔄 \(message)")
-                }
+                🔄 Identity has been completely reset
+                🔐 Cross-signing reconfigured from scratch
+                📦 Fresh backup system created
+                🔑 New recovery keys generated
                 
-                MXLog.info("🔄 Cross-Signing Reset completed")
-                MXLog.info(message)
+                ⚡ Your encryption is now in a clean state!
+                """
+                    
+            case .failure(let error):
+                message = """
+                ⚠️ CROSS-SIGNING RESET COMPLETED, SETUP FAILED
+                
+                ✅ Identity reset successful
+                ❌ Setup failed: \(error.localizedDescription)
+                
+                💡 Manual setup may be required
+                """
+            }
+                
+            await MainActor.run {
+                print("🔄 \(message)")
+            }
+                
+            MXLog.info("🔄 Cross-Signing Reset completed")
+            MXLog.info(message)
             
         } catch {
             let message = """

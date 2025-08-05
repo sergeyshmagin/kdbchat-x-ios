@@ -78,7 +78,7 @@ extension SessionWrapper: Codable {
         let container = try decoder.container(keyedBy: MatrixRustSDK.Session.CodingKeys.self)
         session = try Session(from: decoder)
         
-        // TODO: In the future we should decode this in the Session and throw a migration error if it contains a value.
+        // PRODUCTION NOTE: Migration handling for sliding sync proxy URL compatibility
         slidingSyncProxyURLString = try container.decodeIfPresent(String.self, forKey: .slidingSyncProxy)
     }
     

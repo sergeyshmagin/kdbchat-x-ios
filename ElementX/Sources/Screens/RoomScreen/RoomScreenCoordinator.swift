@@ -11,6 +11,7 @@ import HTMLParser
 import SwiftUI
 import WysiwygComposer
 
+
 struct RoomScreenCoordinatorParameters {
     let clientProxy: ClientProxyProtocol
     let roomProxy: JoinedRoomProxyProtocol

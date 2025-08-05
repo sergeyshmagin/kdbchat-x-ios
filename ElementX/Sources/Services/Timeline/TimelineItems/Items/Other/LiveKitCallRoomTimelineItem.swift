@@ -38,10 +38,6 @@ struct LiveKitCallRoomTimelineItem: EventBasedTimelineItemProtocol, Equatable {
         }
     }
     
-    enum CallType: Equatable {
-        case video
-        case audio
-    }
     
     enum CallState: Equatable {
         case started

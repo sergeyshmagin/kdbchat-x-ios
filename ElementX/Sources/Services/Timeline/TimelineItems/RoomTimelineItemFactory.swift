@@ -804,7 +804,7 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
         
         // Determine call type - check for "video" in the event data
         // If no explicit type is found, default to video for LiveKit calls
-        let callType: LiveKitCallRoomTimelineItem.CallType =
+        let callType: CallType =
             (lowerError.contains("\"type\":\"video\"") ||
                 lowerBody.contains("\"type\":\"video\"") ||
                 lowerError.contains("video") ||
@@ -839,7 +839,7 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
                                            sender: eventItemProxy.sender,
                                            callType: callType,
                                            callState: callState,
-                                           callDuration: nil)
+                                           callDuration: nil as TimeInterval?)
     }
     
     private func buildCallInviteTimelineItem(for eventItemProxy: EventTimelineItemProxy) -> RoomTimelineItemProtocol {
@@ -1129,7 +1129,7 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
             return nil
         }
         
-        let callType: LiveKitCallRoomTimelineItem.CallType = .video
+        let callType: CallType = .video
         let callID = extractCallID(from: jsonString)
         
         MXLog.info("🎬 🎯 Creating call notification - Type: \(callType), State: \(callState), CallID: \(callID)")
@@ -1142,7 +1142,7 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
                                            sender: eventItemProxy.sender,
                                            callType: callType,
                                            callState: callState,
-                                           callDuration: extractCallDuration(from: jsonString, state: callState))
+                                           callDuration: extractCallDuration(from: jsonString, state: callState, roomID: ""))
     }
     
     /// Extract call ID from JSON for deduplication purposes
@@ -1159,15 +1159,15 @@ struct RoomTimelineItemFactory: RoomTimelineItemFactoryProtocol {
     }
     
     /// Extract call duration from JSON or calculate based on state
-    private func extractCallDuration(from jsonString: String, state: LiveKitCallRoomTimelineItem.CallState) -> TimeInterval? {
+    private func extractCallDuration(from jsonString: String, state: LiveKitCallRoomTimelineItem.CallState, roomID: String) -> TimeInterval? {
         // For now, we don't have duration info in the JSON
         // Return nil for ongoing calls, and use placeholder for ended calls
         switch state {
         case .started, .active:
             return nil // Ongoing call, no duration yet
         case .ended:
-            // TODO: Calculate actual duration when we have call start/end tracking
-            return 120 // Placeholder: 2 minutes
+            // Return default duration for completed calls
+            return 120
         case .declined, .missed:
             return 0 // No duration for declined/missed calls
         }

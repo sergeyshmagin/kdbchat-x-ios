@@ -194,7 +194,7 @@ class KeychainController: KeychainControllerProtocol {
     
     /// Создает безопасный keychain для SSSS ключей с настройками сохранения после переустановки
     private func createSSSSKeychain() -> Keychain {
-        return Keychain(service: mainKeychain.service, accessGroup: accessGroup)
+        Keychain(service: mainKeychain.service, accessGroup: accessGroup)
             .accessibility(.whenUnlocked) // Доступно после разблокировки, остается после переустановки приложения
             .synchronizable(false) // Никогда не синхронизировать через iCloud
     }

@@ -10,6 +10,9 @@ import AVKit
 import Combine
 import MatrixRustSDK
 import SwiftUI
+import Foundation
+
+
 
 #if LIVEKIT_ENABLED
 import CallKit
@@ -18,9 +21,9 @@ import LiveKit
 
 /// Результат валидации существующего ключа восстановления
 enum RecoveryKeyValidationResult {
-    case valid      // Ключ валиден и может быть переиспользован
-    case invalid    // Ключ невалиден и должен быть заменен
-    case unknown    // Не удалось определить валидность ключа
+    case valid // Ключ валиден и может быть переиспользован
+    case invalid // Ключ невалиден и должен быть заменен
+    case unknown // Не удалось определить валидность ключа
 }
 
 enum UserSessionFlowCoordinatorAction {
@@ -741,12 +744,10 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             
             // Показываем пользователю успешное уведомление
             ServiceLocator.shared.userIndicatorController.submitIndicator(
-                UserIndicator(
-                    id: "cross_signing_setup_completed",
-                    type: .toast,
-                    title: "Шифрование настроено",
-                    iconName: "checkmark.shield"
-                )
+                UserIndicator(id: "cross_signing_setup_completed",
+                              type: .toast,
+                              title: "Шифрование настроено",
+                              iconName: "checkmark.shield")
             )
             
         case .failure(let error):
@@ -754,12 +755,10 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             
             // Показываем предупреждение пользователю
             ServiceLocator.shared.userIndicatorController.submitIndicator(
-                UserIndicator(
-                    id: "cross_signing_setup_failed",
-                    type: .toast,
-                    title: "Настройка шифрования не завершена",
-                    iconName: "exclamationmark.shield"
-                )
+                UserIndicator(id: "cross_signing_setup_failed",
+                              type: .toast,
+                              title: "Настройка шифрования не завершена",
+                              iconName: "exclamationmark.shield")
             )
         }
     }
@@ -771,9 +770,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         // Можно показать тихое уведомление об успешной настройке
         ServiceLocator.shared.userIndicatorController.submitIndicator(
             UserIndicator(id: "auto_recovery_setup",
-                         type: .toast,
-                         title: "Recovery key configured",
-                         iconName: "checkmark.shield")
+                          type: .toast,
+                          title: "Recovery key configured",
+                          iconName: "checkmark.shield")
         )
     }
     
@@ -784,8 +783,8 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         // Показываем пользователю опциональное уведомление
         ServiceLocator.shared.userIndicatorController.submitIndicator(
             UserIndicator(id: "auto_recovery_setup_failed",
-                         type: .toast,
-                         title: "Recovery key setup failed - you can set it up manually in Settings")
+                          type: .toast,
+                          title: "Recovery key setup failed - you can set it up manually in Settings")
         )
     }
     
@@ -796,9 +795,9 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         // Можно показать тихое уведомление об успешном восстановлении
         ServiceLocator.shared.userIndicatorController.submitIndicator(
             UserIndicator(id: "backup_restore_completed",
-                         type: .toast,
-                         title: "Message history restored",
-                         iconName: "checkmark.shield")
+                          type: .toast,
+                          title: "Message history restored",
+                          iconName: "checkmark.shield")
         )
     }
     
@@ -813,8 +812,8 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             // Показываем уведомление только для серьезных ошибок
             ServiceLocator.shared.userIndicatorController.submitIndicator(
                 UserIndicator(id: "backup_restore_failed",
-                             type: .toast,
-                             title: "Could not restore message history")
+                              type: .toast,
+                              title: "Could not restore message history")
             )
         }
     }
@@ -1138,7 +1137,7 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
             return
         }
         
-        presentCallScreen(roomProxy: roomProxy, notifyOtherParticipants: notifyOtherParticipants)
+        presentCallScreen(roomProxy: roomProxy, callType: .video, notifyOtherParticipants: notifyOtherParticipants)
     }
     
     private func presentCallScreen(roomProxy: JoinedRoomProxyProtocol, callType: CallType = .video, notifyOtherParticipants: Bool) {
@@ -1161,10 +1160,11 @@ class UserSessionFlowCoordinator: FlowCoordinatorProtocol {
         MXLog.info("Presenting LiveKit call screen for room: \(roomProxy.id) with call type: \(callType)")
         
         let authService = LiveKitAuthService(clientProxy: userSession.clientProxy)
-        let liveKitCallCoordinator = LiveKitCallCoordinator(roomId: roomProxy.id, authService: authService, clientProxy: userSession.clientProxy, callType: callType)
+        let parameters = LiveKitCallCoordinatorParameters(roomId: roomProxy.id, authService: authService, callType: callType, clientProxy: userSession.clientProxy)
+        let liveKitCallCoordinator = LiveKitCallCoordinator(parameters: parameters)
         
         liveKitCallCoordinator.actionsPublisher
-            .sink { [weak self] action in
+            .sink { [weak self] (action: LiveKitCallCoordinatorAction) in
                 guard let self else { return }
                 switch action {
                 case .dismiss:

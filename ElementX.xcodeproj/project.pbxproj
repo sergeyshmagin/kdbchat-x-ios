@@ -155,6 +155,12 @@
 		194585F6CD77242B36D4ADF1 /* Result.swift in Sources */ = {isa = PBXBuildFile; fileRef = DADECBBB672497BCD4822468 /* Result.swift */; };
 		1950A80CD198BED283DFC2CE /* ClientProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18F2958E6D247AE2516BEEE8 /* ClientProxy.swift */; };
 		197441F1EF23A5DABACCA79F /* StickerRoomTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5338450E6783A576B5C16DD /* StickerRoomTimelineView.swift */; };
+		19B243332E40ED2B009FA081 /* CallKitIntegrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B2432F2E40ED2B009FA081 /* CallKitIntegrationService.swift */; };
+		19B243342E40ED2B009FA081 /* CallHistoryStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B2432E2E40ED2B009FA081 /* CallHistoryStorage.swift */; };
+		19B243352E40ED2B009FA081 /* CallHistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B2432C2E40ED2B009FA081 /* CallHistoryManager.swift */; };
+		19B243362E40ED2B009FA081 /* CallStatisticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B243312E40ED2B009FA081 /* CallStatisticsService.swift */; };
+		19B243372E40ED2B009FA081 /* CallHistoryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B2432D2E40ED2B009FA081 /* CallHistoryProtocol.swift */; };
+		19B243382E40ED2B009FA081 /* CallNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B243302E40ED2B009FA081 /* CallNotificationService.swift */; };
 		19BE9B512E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B4F2E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift */; };
 		19BE9B522E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B4E2E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift */; };
 		19BE9B692E3E83DB00E0B5A0 /* MockImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19BE9B5E2E3E83DB00E0B5A0 /* MockImageCache.swift */; };
@@ -1556,6 +1562,12 @@
 		18F2958E6D247AE2516BEEE8 /* ClientProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientProxy.swift; sourceTree = "<group>"; };
 		190EC7285D3CFEF0D3011BCF /* GeoURI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoURI.swift; sourceTree = "<group>"; };
 		196004E7695FBA292A7944AF /* ScreenTrackerViewModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenTrackerViewModifier.swift; sourceTree = "<group>"; };
+		19B2432C2E40ED2B009FA081 /* CallHistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallHistoryManager.swift; sourceTree = "<group>"; };
+		19B2432D2E40ED2B009FA081 /* CallHistoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallHistoryProtocol.swift; sourceTree = "<group>"; };
+		19B2432E2E40ED2B009FA081 /* CallHistoryStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallHistoryStorage.swift; sourceTree = "<group>"; };
+		19B2432F2E40ED2B009FA081 /* CallKitIntegrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallKitIntegrationService.swift; sourceTree = "<group>"; };
+		19B243302E40ED2B009FA081 /* CallNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallNotificationService.swift; sourceTree = "<group>"; };
+		19B243312E40ED2B009FA081 /* CallStatisticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallStatisticsService.swift; sourceTree = "<group>"; };
 		19BE9B4E2E3E7F6C00E0B5A0 /* AutoRecoveryKeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRecoveryKeyService.swift; sourceTree = "<group>"; };
 		19BE9B4F2E3E7F6C00E0B5A0 /* AutoRecoveryKeyServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRecoveryKeyServiceProtocol.swift; sourceTree = "<group>"; };
 		19BE9B532E3E83DB00E0B5A0 /* AutoRecoveryKeyServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRecoveryKeyServiceTests.swift; sourceTree = "<group>"; };
@@ -2924,6 +2936,7 @@
 		0787F81684E503024BD0C051 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				19B243322E40ED2B009FA081 /* Calls */,
 				19BE9B502E3E7F6C00E0B5A0 /* AutoRecoveryKey */,
 				4BF8D11D9ED15CFC373D0119 /* Analytics */,
 				7803E03F759061C948D66B7E /* AppLock */,
@@ -3105,6 +3118,19 @@
 				A0D745ADE5568E50270F70EF /* SupportingFiles */,
 			);
 			path = PreviewTests;
+			sourceTree = "<group>";
+		};
+		19B243322E40ED2B009FA081 /* Calls */ = {
+			isa = PBXGroup;
+			children = (
+				19B2432C2E40ED2B009FA081 /* CallHistoryManager.swift */,
+				19B2432D2E40ED2B009FA081 /* CallHistoryProtocol.swift */,
+				19B2432E2E40ED2B009FA081 /* CallHistoryStorage.swift */,
+				19B2432F2E40ED2B009FA081 /* CallKitIntegrationService.swift */,
+				19B243302E40ED2B009FA081 /* CallNotificationService.swift */,
+				19B243312E40ED2B009FA081 /* CallStatisticsService.swift */,
+			);
+			path = Calls;
 			sourceTree = "<group>";
 		};
 		19BE9B502E3E7F6C00E0B5A0 /* AutoRecoveryKey */ = {
@@ -7789,6 +7815,12 @@
 				0FA03F5A33C0857231B32B44 /* ReportRoomScreenViewModel.swift in Sources */,
 				2A61D2B4A225332CECA3B937 /* ReportRoomScreenViewModelProtocol.swift in Sources */,
 				4715FE33667C5899E64DD0E6 /* ResolveVerifiedUserSendFailureScreen.swift in Sources */,
+				19B243332E40ED2B009FA081 /* CallKitIntegrationService.swift in Sources */,
+				19B243342E40ED2B009FA081 /* CallHistoryStorage.swift in Sources */,
+				19B243352E40ED2B009FA081 /* CallHistoryManager.swift in Sources */,
+				19B243362E40ED2B009FA081 /* CallStatisticsService.swift in Sources */,
+				19B243372E40ED2B009FA081 /* CallHistoryProtocol.swift in Sources */,
+				19B243382E40ED2B009FA081 /* CallNotificationService.swift in Sources */,
 				583A41A4BE76E2E9E0B97881 /* ResolveVerifiedUserSendFailureScreenCoordinator.swift in Sources */,
 				108D3C0707A90B0F848CDBB9 /* ResolveVerifiedUserSendFailureScreenModels.swift in Sources */,
 				9A0326D2375075871D2AB537 /* ResolveVerifiedUserSendFailureScreenViewModel.swift in Sources */,

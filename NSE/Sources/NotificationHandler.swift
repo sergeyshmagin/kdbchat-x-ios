@@ -9,6 +9,26 @@ import CallKit
 import MatrixRustSDK
 import UserNotifications
 
+// NSE OPTIMIZATION: Timeout helper to prevent QoS priority inversion
+private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask {
+            try await operation()
+        }
+        
+        group.addTask {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            throw TimeoutError()
+        }
+        
+        let result = try await group.next()!
+        group.cancelAll()
+        return result
+    }
+}
+
+private struct TimeoutError: Error {}
+
 class NotificationHandler {
     private let userSession: NSEUserSession
     private let settings: CommonSettingsProtocol
@@ -261,49 +281,85 @@ class NotificationHandler {
         }
         
         // Create enhanced payload with LiveKit credentials for auto-connect
-        var payload = [ElementCallServiceNotificationKey.roomID.rawValue: roomID,
-                       ElementCallServiceNotificationKey.roomDisplayName.rawValue: roomDisplayName]
+        var payload: [String: Any] = [
+            ElementCallServiceNotificationKey.roomID.rawValue: roomID as Any,
+            ElementCallServiceNotificationKey.roomDisplayName.rawValue: roomDisplayName as Any
+        ]
         
-        // Add LiveKit credentials to payload if available
+        // ИСПРАВЛЕНИЕ ДУБЛИРОВАНИЯ: Используем единый метод для извлечения LiveKit credentials
         let liveKitCredentials = await extractLiveKitCredentialsFromMatrixEvent(notificationItemProxy)
-        if let accessToken = liveKitCredentials.accessToken, !accessToken.isEmpty {
-            payload["livekit_access_token"] = accessToken
-            MXLog.info("[NSE-CREDENTIALS] Added LiveKit access token to CallKit payload")
-        }
-        if let serverURL = liveKitCredentials.serverURL, !serverURL.isEmpty {
-            payload["livekit_server_url"] = serverURL
-            MXLog.info("[NSE-CREDENTIALS] Added LiveKit server URL to CallKit payload: \(serverURL)")
-        }
-        if let roomURL = liveKitCredentials.roomURL, !roomURL.isEmpty {
-            payload["livekit_room_url"] = roomURL
-            MXLog.info("[NSE-CREDENTIALS] Added LiveKit room URL to CallKit payload")
+        addLiveKitCredentialsToPayload(&payload, credentials: liveKitCredentials)
+        
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Используем правильный CallKit flow через App Group
+        // NSE не может прямо вызывать CallKit - нужно передать в основное приложение
+        MXLog.info("📞 CRITICAL FIX: Storing CallKit data for main app to process")
+        
+        // Store CallKit payload in App Group for main app
+        guard let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") else {
+            MXLog.error("❌ Failed to access App Group for CallKit data")
+            return showFallbackCallNotification(roomDisplayName: roomDisplayName)
         }
         
-        do {
-            try await CXProvider.reportNewIncomingVoIPPushPayload(payload)
-            MXLog.info("Call notification delegated to CallKit successfully")
+        // Enhanced CallKit payload with all necessary data
+        var callKitPayload: [String: Any] = [
+            "type": "incoming_call",
+            "room_id": roomID,
+            "room_display_name": roomDisplayName,
+            "caller_id": extractCallerUserId(from: notificationContent.userInfo),
+            "caller_display_name": roomDisplayName,
+            "call_id": UUID().uuidString,
+            "is_video": true,
+            "timestamp": Date().timeIntervalSince1970,
+            "processed_by": "nse",
+            // Add notification content for fallback
+            "notification_title": "Входящий звонок от \(roomDisplayName)",
+            "notification_body": "Нажмите для ответа"
+        ]
+        
+        // ИСПРАВЛЕНИЕ ДУБЛИРОВАНИЯ: Используем единый метод для добавления LiveKit credentials
+        addLiveKitCredentialsToPayload(&callKitPayload, credentials: liveKitCredentials)
+        
+        // Store for immediate processing by main app (optimized for NSE context)
+        appGroupDefaults.set(callKitPayload, forKey: "incoming_call_data")
+        
+        // NSE OPTIMIZATION: Synchronize with timeout to avoid blocking
+        let syncSuccess = appGroupDefaults.synchronize()
+        if syncSuccess {
+            MXLog.info("✅ CallKit data stored successfully in App Group")
             
-            // Additionally ensure the main app is awakened
-            // This is critical for LiveKit calls
-            NotificationCenter.default.post(name: Notification.Name("io.element.call.incoming"),
-                                            object: nil,
-                                            userInfo: payload)
-        } catch let error as NSError {
-            MXLog.error("Failed reporting voip call with error: \(error.localizedDescription) (domain: \(error.domain), code: \(error.code))")
+            // Wake up main app with critical notification that triggers CallKit
+            let wakeupContent = UNMutableNotificationContent()
+            wakeupContent.title = "Входящий звонок"
+            wakeupContent.body = roomDisplayName.isEmpty ? "Неизвестный абонент" : roomDisplayName
+            wakeupContent.categoryIdentifier = "CALLKIT_TRIGGER"
+            wakeupContent.sound = .defaultCritical
+            wakeupContent.userInfo = ["callkit_trigger": true, "app_group_key": "incoming_call_data"]
             
-            // Fallback: Show notification with custom actions for calls
+            // Critical notification for maximum wake-up chance
             if #available(iOS 15.0, *) {
-                notificationContent.interruptionLevel = .timeSensitive
+                wakeupContent.interruptionLevel = .critical
             }
-            notificationContent.categoryIdentifier = "INCOMING_CALL"
-            notificationContent.title = "Входящий вызов от \(roomDisplayName.isEmpty ? "Unknown" : roomDisplayName)"
-            notificationContent.body = "Коснитесь для ответа"
-            notificationContent.sound = UNNotificationSound(named: UNNotificationSoundName("ringtone.caf"))
             
-            return .shouldDisplay
-        } catch {
-            MXLog.error("Failed reporting voip call with unknown error: \(error)")
-            return .shouldDisplay
+            let wakeupRequest = UNNotificationRequest(
+                identifier: "callkit_wakeup_\(UUID().uuidString)",
+                content: wakeupContent,
+                trigger: nil // Immediate
+            )
+            
+            // NSE OPTIMIZATION: Add notification with timeout to prevent blocking
+            do {
+                try await withTimeout(seconds: 2) {
+                    try await UNUserNotificationCenter.current().add(wakeupRequest)
+                }
+                MXLog.info("✅ Critical wakeup notification sent to trigger CallKit")
+            } catch {
+                MXLog.error("❌ Failed to send wakeup notification: \(error)")
+                // Continue execution - App Group data is stored
+            }
+            
+        } else {
+            MXLog.error("❌ Failed to store CallKit data in App Group")
+            return showFallbackCallNotification(roomDisplayName: roomDisplayName)
         }
         
         return .processedShouldDiscard
@@ -332,20 +388,19 @@ class NotificationHandler {
             return .shouldDisplay // Fallback to regular notification
         }
         
-        // Extract LiveKit credentials from Matrix event
+        // ИСПРАВЛЕНИЕ ДУБЛИРОВАНИЯ: Используем единый метод для извлечения LiveKit credentials
         let liveKitCredentials = await extractLiveKitCredentialsFromMatrixEvent(notificationItemProxy)
         
-        let payload = [
+        var payload = [
             "event_id": eventId,
             "room_id": roomID,
             "sender_display_name": roomDisplayName.isEmpty ? "Unknown Caller" : roomDisplayName,
             "is_video": true, // Default to video call
-            "event_type": "m.call.invite",
-            // Include LiveKit credentials if available
-            "livekit_access_token": liveKitCredentials.accessToken ?? "",
-            "livekit_server_url": liveKitCredentials.serverURL ?? "",
-            "livekit_room_url": liveKitCredentials.roomURL ?? ""
+            "event_type": "m.call.invite"
         ] as [String: Any]
+        
+        // Add LiveKit credentials using unified method
+        addLiveKitCredentialsToPayload(&payload, credentials: liveKitCredentials)
         
         // Robust App Group communication with fallback
         let success = storeVoIPEventSafely(eventId: eventId,
@@ -529,7 +584,7 @@ class NotificationHandler {
             return false
         }
         
-        let voipEventData: [String: Any] = [
+        var voipEventData: [String: Any] = [
             "event_id": eventId,
             "room_id": roomID,
             "sender_display_name": roomDisplayName.isEmpty ? "Unknown Caller" : roomDisplayName,
@@ -538,12 +593,11 @@ class NotificationHandler {
             "timestamp": timestamp,
             "processed_at": Date().timeIntervalSince1970,
             "nse_version": "1.0", // For debugging
-            "processing_attempt": 1,
-            // Include LiveKit credentials
-            "livekit_access_token": liveKitCredentials.accessToken ?? "",
-            "livekit_server_url": liveKitCredentials.serverURL ?? "",
-            "livekit_room_url": liveKitCredentials.roomURL ?? ""
+            "processing_attempt": 1
         ]
+        
+        // ИСПРАВЛЕНИЕ ДУБЛИРОВАНИЯ: Используем единый метод для добавления LiveKit credentials
+        addLiveKitCredentialsToPayload(&voipEventData, credentials: liveKitCredentials)
         
         appGroupDefaults.set(voipEventData, forKey: "pending_voip_event")
         
@@ -590,7 +644,10 @@ class NotificationHandler {
                                             trigger: nil // Immediate delivery
         )
         
-        try await UNUserNotificationCenter.current().add(request)
+        // NSE OPTIMIZATION: Add notification with timeout
+        try await withTimeout(seconds: 2) {
+            try await UNUserNotificationCenter.current().add(request)
+        }
         MXLog.info("[NSE-RESILIENT] Wakeup notification scheduled")
     }
     
@@ -652,6 +709,66 @@ class NotificationHandler {
         #endif
         
         MXLog.info("[NSE-RESILIENT] 📞 VoIP event '\(eventType)' successfully sent to main app for room: \(roomId)")
+    }
+    
+    /// Extract caller user ID from notification payload
+    private func extractCallerUserId(from userInfo: [AnyHashable: Any]) -> String {
+        // Try different sources for caller user ID
+        if let senderId = userInfo["sender"] as? String {
+            return senderId
+        }
+        
+        if let content = userInfo["content"] as? [String: Any],
+           let senderId = content["sender"] as? String {
+            return senderId
+        }
+        
+        // Fallback to room ID if no sender found
+        return userInfo["room_id"] as? String ?? "unknown_caller"
+    }
+    
+    /// ИСПРАВЛЕНИЕ ДУБЛИРОВАНИЯ: Единый метод для добавления LiveKit credentials в payload
+    private func addLiveKitCredentialsToPayload(_ payload: inout [String: Any], credentials: LiveKitCredentials) {
+        if let accessToken = credentials.accessToken, !accessToken.isEmpty {
+            payload["livekit_access_token"] = accessToken
+            MXLog.info("[NSE-CREDENTIALS] Added LiveKit access token to payload")
+        } else {
+            payload["livekit_access_token"] = ""
+        }
+        
+        if let serverURL = credentials.serverURL, !serverURL.isEmpty {
+            payload["livekit_server_url"] = serverURL
+            MXLog.info("[NSE-CREDENTIALS] Added LiveKit server URL to payload: \(serverURL)")
+        } else {
+            payload["livekit_server_url"] = ""
+        }
+        
+        if let roomURL = credentials.roomURL, !roomURL.isEmpty {
+            payload["livekit_room_url"] = roomURL
+            MXLog.info("[NSE-CREDENTIALS] Added LiveKit room URL to payload")
+        } else {
+            payload["livekit_room_url"] = ""
+        }
+    }
+    
+    /// Show fallback call notification when CallKit fails
+    private func showFallbackCallNotification(roomDisplayName: String) -> NotificationProcessingResult {
+        MXLog.warning("⚠️ Showing fallback call notification")
+        
+        if #available(iOS 15.0, *) {
+            notificationContent.interruptionLevel = .critical
+        }
+        
+        notificationContent.categoryIdentifier = "INCOMING_CALL"
+        notificationContent.title = "Входящий звонок"
+        notificationContent.body = roomDisplayName.isEmpty ? "Неизвестный абонент" : "от \(roomDisplayName)"
+        notificationContent.sound = .defaultCritical
+        
+        // Add action buttons for call handling
+        notificationContent.userInfo["is_call_notification"] = true
+        notificationContent.userInfo["room_display_name"] = roomDisplayName
+        
+        return .shouldDisplay
     }
     
     private enum NotificationProcessingResult {

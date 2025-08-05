@@ -77,8 +77,8 @@ struct SecureBackupScreen: View {
         Section {
             // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Определяем реальную работоспособность recovery
             // Если backup работает, то recovery функционален, даже если SDK показывает incomplete
-            let isRecoveryActuallyWorking = (context.viewState.recoveryState == .enabled) || 
-                                          (context.viewState.recoveryState == .incomplete && context.viewState.keyBackupState == .enabled)
+            let isRecoveryActuallyWorking = (context.viewState.recoveryState == .enabled) ||
+                (context.viewState.recoveryState == .incomplete && context.viewState.keyBackupState == .enabled)
             
             if isRecoveryActuallyWorking {
                 // Recovery работает - показываем полные опции
@@ -123,10 +123,10 @@ struct SecureBackupScreen: View {
     @ViewBuilder
     private var recoveryKeySectionFooter: some View {
         // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Показываем описание incomplete только если recovery действительно не работает
-        let isRecoveryActuallyWorking = (context.viewState.recoveryState == .enabled) || 
-                                      (context.viewState.recoveryState == .incomplete && context.viewState.keyBackupState == .enabled)
+        let isRecoveryActuallyWorking = (context.viewState.recoveryState == .enabled) ||
+            (context.viewState.recoveryState == .incomplete && context.viewState.keyBackupState == .enabled)
         
-        if context.viewState.recoveryState == .incomplete && !isRecoveryActuallyWorking {
+        if context.viewState.recoveryState == .incomplete, !isRecoveryActuallyWorking {
             Text(L10n.screenChatBackupRecoveryActionConfirmDescription)
         } else {
             EmptyView()

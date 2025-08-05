@@ -911,9 +911,11 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
         unregisterForRemoteNotifications()
         
         Task {
-            // TODO: Unregister all pushers before logout when PushNotificationManager is added to project
-            // MXLog.info("🗑️ Unregistering all pushers before logout")
-            // await PushNotificationManager.shared.unregisterAllPushers()
+            // PRODUCTION: Unregister pushers before logout using NotificationManager
+            MXLog.info("🗑️ Unregistering all pushers before logout")
+            if let notificationManager = notificationManager as? NotificationManager {
+                await notificationManager.unregisterPusher()
+            }
             
             // First log out from the server
             await userSession.clientProxy.logout()
@@ -1072,7 +1074,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     private func refreshVoIPToken() async {
         #if LIVEKIT_ENABLED
         MXLog.info("🔄 Refreshing VoIP push token from AppCoordinator")
-        // TODO: Re-enable when PushNotificationManager is added to project
+        // PRODUCTION: VoIP token refresh enabled
         await liveKitCallKitService.refreshVoIPToken()
         #endif
     }
@@ -1081,7 +1083,7 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
     private func clearAllVoIPTokens() async {
         #if LIVEKIT_ENABLED
         MXLog.info("🗑️ Clearing ALL VoIP tokens from AppCoordinator")
-        // TODO: Re-enable when PushNotificationManager is added to project
+        // PRODUCTION: VoIP token refresh enabled
         await liveKitCallKitService.clearAllVoIPTokens()
         MXLog.info("✅ Forced complete VoIP token refresh")
         #endif
@@ -1176,6 +1178,13 @@ class AppCoordinator: AppCoordinatorProtocol, AuthenticationFlowCoordinatorDeleg
                     self?.voIPTokenUpdated(tokenData)
                 }
             }
+        
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Запуск мониторинга CallKit данных из App Group
+        // NSE сохраняет CallKit данные в App Group, основное приложение их обрабатывает
+        if let notificationManager = notificationManager as? NotificationManager {
+            notificationManager.startAppGroupCallKitMonitoring()
+            MXLog.info("[AppCoordinator] ✅ Started App Group CallKit monitoring")
+        }
     }
     
     private func observeUserSessionChanges() {

@@ -10,10 +10,11 @@ import Foundation
 import MatrixRustSDK
 
 // MARK: - Service Implementation
+
 @MainActor
 public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unchecked Sendable {
-    
     // MARK: - Constants
+
     /// Matrix recovery key base58 alphabet согласно спецификации
     private static let matrixBase58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
     
@@ -23,16 +24,18 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     /// Ожидаемая длина декодированного Matrix recovery key (35 байт)
     private static let matrixRecoveryKeyDecodedLength = 35
     
-    // MARK: - Dependencies  
+    // MARK: - Dependencies
+
     private let _clientProxy: any ClientProxyProtocol
     private let keychainController: KeychainControllerProtocol
     private let userID: String
     
-    nonisolated private var clientProxy: ClientProxyProtocol? {
+    private nonisolated var clientProxy: ClientProxyProtocol? {
         _clientProxy
     }
     
     // MARK: - State Management (SOLID principle - extracted responsibility)
+
     private let setupStateSubject = CurrentValueSubject<RecoveryKeyStatus, Never>(.notSetup)
     private var cancellables = Set<AnyCancellable>()
     private let observersLock = NSLock()
@@ -153,6 +156,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     // MARK: - Concurrency Control (Fixed race condition)
+
     private actor OperationSerializer {
         private var isOperationInProgress = false
         
@@ -178,11 +182,13 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     private var currentOperation: Task<Void, Never>?
     
     // MARK: - Configuration
+
     private let networkTimeout: TimeInterval = 30.0
     private let maxRetryAttempts = 3
     private let retryDelay: TimeInterval = 2.0
     
     // MARK: - Logging (DRY principle)
+
     private func logInfo(_ message: String, context: [String: Any] = [:]) {
         logWithLevel(.info, message, error: nil, context: context)
     }
@@ -219,10 +225,11 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     // MARK: - Initialization
+
     nonisolated init(clientProxy: ClientProxyProtocol,
-         keychainController: KeychainControllerProtocol,
-         userID: String) {
-        self._clientProxy = clientProxy
+                     keychainController: KeychainControllerProtocol,
+                     userID: String) {
+        _clientProxy = clientProxy
         self.keychainController = keychainController
         self.userID = userID
         
@@ -244,7 +251,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     // MARK: - Public Methods - NEW SAFE IMPLEMENTATION
     
     public func performSafeAutoRecoverySetup() async -> Result<AutoRecoveryResult, AutoRecoveryKeyError> {
-        return await withConcurrencyGuard { [weak self] in
+        await withConcurrencyGuard { [weak self] in
             await self?.performSafeSetupInternal() ?? .failure(.clientProxyUnavailable)
         }
     }
@@ -267,7 +274,6 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     private func performSetupWithClientProxy(_ clientProxy: ClientProxyProtocol) async -> Result<AutoRecoveryResult, AutoRecoveryKeyError> {
-        
         // Step 2: Use SecureBackup instead of direct encryption access
         updateRecoveryState(.validating, context: "checking recovery state")
         let secureBackup = clientProxy.secureBackupController
@@ -621,22 +627,21 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     public func checkExistingBackupOnServer() async -> Result<BackupInfo, AutoRecoveryKeyError> {
-        return await withTimeoutAndSelf { await $0.checkBackupOnServerInternal() }
+        await withTimeoutAndSelf { await $0.checkBackupOnServerInternal() }
     }
     
     /// Проверяет, принадлежит ли существующий backup текущему пользователю
     private func checkBackupOwnership() async -> Result<Bool, AutoRecoveryKeyError> {
-        return await withTimeoutAndSelf { await $0.checkBackupOwnershipInternal() }
+        await withTimeoutAndSelf { await $0.checkBackupOwnershipInternal() }
     }
     
     private func checkBackupOnServerInternal() async -> Result<BackupInfo, AutoRecoveryKeyError> {
-        return await withClientProxy { clientProxy in
+        await withClientProxy { clientProxy in
             await self.performBackupCheck(clientProxy)
         }
     }
     
     private func performBackupCheck(_ clientProxy: ClientProxyProtocol) async -> Result<BackupInfo, AutoRecoveryKeyError> {
-        
         let secureBackup = clientProxy.secureBackupController
         let recoveryState = secureBackup.recoveryState.value
         let keyBackupState = secureBackup.keyBackupState.value
@@ -646,24 +651,21 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
         
         logInfo("Backup check - Recovery: \(recoveryState), KeyBackup: \(keyBackupState), Exists: \(backupExists)")
         
-        let backupInfo = BackupInfo(
-            exists: backupExists,
-            version: backupExists ? "1" : nil,
-            algorithm: backupExists ? "m.megolm_backup.v1.curve25519-aes-sha2" : nil,
-            keyId: nil
-        )
+        let backupInfo = BackupInfo(exists: backupExists,
+                                    version: backupExists ? "1" : nil,
+                                    algorithm: backupExists ? "m.megolm_backup.v1.curve25519-aes-sha2" : nil,
+                                    keyId: nil)
         
         return .success(backupInfo)
     }
     
     private func checkBackupOwnershipInternal() async -> Result<Bool, AutoRecoveryKeyError> {
-        return await withClientProxy { clientProxy in
+        await withClientProxy { clientProxy in
             await self.performOwnershipCheck(clientProxy)
         }
     }
     
     private func performOwnershipCheck(_ clientProxy: ClientProxyProtocol) async -> Result<Bool, AutoRecoveryKeyError> {
-        
         let secureBackup = clientProxy.secureBackupController
         let recoveryState = secureBackup.recoveryState.value
         
@@ -690,14 +692,14 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
             case .success(false):
                 logWarning("Local key exists but incompatible with server backup - likely different session/user")
                 cleanupInvalidLocalKey(reason: "incompatible with server backup during ownership check")
-                // Продолжаем проверку через secret storage
+            // Продолжаем проверку через secret storage
             case .failure(let error):
                 logError("Failed to test restore compatibility", error: error)
                 // Продолжаем проверку через secret storage
             }
         }
         
-        // Если локального ключа нет, проверим может ли текущий пользователь 
+        // Если локального ключа нет, проверим может ли текущий пользователь
         // получить доступ к backup через secret storage
         let hasSecretStorageAccess = await checkSecretStorageAccess()
         
@@ -744,7 +746,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
         }
         
         // Опциональная полная валидация Matrix формата
-        if isValidBase58 && sanitizedKey.count >= 40 && sanitizedKey.count <= 60 {
+        if isValidBase58, sanitizedKey.count >= 40, sanitizedKey.count <= 60 {
             let isStructurallyValid = validateMatrixRecoveryKeyStructure(key)
             if isStructurallyValid {
                 logInfo("Recovery key passed full Matrix specification validation")
@@ -775,7 +777,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
         }
         
         // Проверяем header bytes согласно константе (DRY принцип)
-        guard decodedData[0] == Self.matrixRecoveryKeyHeaderBytes[0] && 
+        guard decodedData[0] == Self.matrixRecoveryKeyHeaderBytes[0],
               decodedData[1] == Self.matrixRecoveryKeyHeaderBytes[1] else {
             logWarning("Invalid recovery key header bytes: \(String(format: "0x%02X 0x%02X", decodedData[0], decodedData[1]))")
             return false
@@ -822,13 +824,13 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     
     /// Удаляет пробелы из recovery key (Matrix spec позволяет пробелы каждые 4 символа)
     private func sanitizeRecoveryKey(_ key: String) -> String {
-        return key.trimmingCharacters(in: .whitespacesAndNewlines)
-                 .replacingOccurrences(of: " ", with: "")
+        key.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
     }
     
     /// Создает preview ключа для безопасного логирования
     private func createKeyPreview(_ key: String) -> String {
-        return "\(key.prefix(10))...\(key.suffix(5))"
+        "\(key.prefix(10))...\(key.suffix(5))"
     }
     
     /// Unified method for logging key details (DRY principle)
@@ -838,11 +840,11 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     public func restoreExistingBackup() async -> Result<Void, AutoRecoveryKeyError> {
-        return await withTimeoutAndSelf { await $0.restoreExistingBackupInternal() }
+        await withTimeoutAndSelf { await $0.restoreExistingBackupInternal() }
     }
     
     private func restoreExistingBackupInternal() async -> Result<Void, AutoRecoveryKeyError> {
-        return await withClientProxy { clientProxy in
+        await withClientProxy { clientProxy in
             await self.performBackupRestore(clientProxy)
         }
     }
@@ -883,7 +885,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     public func createNewBackupSafely() async -> Result<Void, AutoRecoveryKeyError> {
-        return await withTimeoutAndSelf { await $0.createNewBackupSafelyInternal() }
+        await withTimeoutAndSelf { await $0.createNewBackupSafelyInternal() }
     }
     
     public func resetExistingBackup() async -> Result<Void, AutoRecoveryKeyError> {
@@ -928,13 +930,12 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     private func createNewBackupSafelyInternal() async -> Result<Void, AutoRecoveryKeyError> {
-        return await withClientProxy { clientProxy in
+        await withClientProxy { clientProxy in
             await self.performBackupCreation(clientProxy)
         }
     }
     
     private func performBackupCreation(_ clientProxy: ClientProxyProtocol) async -> Result<Void, AutoRecoveryKeyError> {
-        
         updateRecoveryState(.generating, context: "performBackupCreation")
         
         let secureBackup = clientProxy.secureBackupController
@@ -1092,23 +1093,22 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     
     @available(*, deprecated, message: "Use performSafeAutoRecoverySetup instead")
     public func restoreBackupAutomatically() async -> Result<Void, AutoRecoveryKeyError> {
-        return await restoreExistingBackup()
+        await restoreExistingBackup()
     }
     
     // MARK: - Other Public Methods
     
     public func enableAutomaticSecretSharing() async -> Result<Void, AutoRecoveryKeyError> {
-        return await withTimeoutAndSelf { await $0.enableAutomaticSecretSharingInternal() }
+        await withTimeoutAndSelf { await $0.enableAutomaticSecretSharingInternal() }
     }
     
     private func enableAutomaticSecretSharingInternal() async -> Result<Void, AutoRecoveryKeyError> {
-        return await withClientProxy { clientProxy in
+        await withClientProxy { clientProxy in
             await self.performSecretSharingSetup(clientProxy)
         }
     }
     
     private func performSecretSharingSetup(_ clientProxy: ClientProxyProtocol) async -> Result<Void, AutoRecoveryKeyError> {
-        
         let secureBackup = clientProxy.secureBackupController
         let recoveryState = secureBackup.recoveryState.value
         
@@ -1144,7 +1144,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
         let recoveryState = clientProxy.secureBackupController.recoveryState.value
         let keyBackupState = clientProxy.secureBackupController.keyBackupState.value
         
-        if recoveryState == .enabled && keyBackupState == .enabled {
+        if recoveryState == .enabled, keyBackupState == .enabled {
             let creationDate = keychainController.ssssRecoveryKeyCreationDate(forUserID: userID) ?? Date()
             return .active(createdAt: creationDate)
         } else if recoveryState == .settingUp {
@@ -1210,14 +1210,14 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     }
     
     private func withConcurrencyGuard<T>(_ operation: @escaping @Sendable () async -> T) async -> T {
-        return await operationSerializer.withExclusiveAccess {
+        await operationSerializer.withExclusiveAccess {
             await operation()
         }
     }
     
     /// Generic timeout wrapper for safe operations with automatic self handling (FIXED MainActor issues)
     private func withTimeoutAndSelf<T>(_ operation: @escaping (AutoRecoveryKeyService) async -> Result<T, AutoRecoveryKeyError>) async -> Result<T, AutoRecoveryKeyError> {
-        return await withTaskGroup(of: Result<T, AutoRecoveryKeyError>.self) { group in
+        await withTaskGroup(of: Result<T, AutoRecoveryKeyError>.self) { group in
             // Add timeout task
             group.addTask {
                 do {
@@ -1249,7 +1249,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     
     /// Generic timeout wrapper for operations
     private func withTimeout<T>(_ timeout: TimeInterval, operation: @escaping () async -> Result<T, AutoRecoveryKeyError>) async -> Result<T, AutoRecoveryKeyError> {
-        return await withTaskGroup(of: Result<T, AutoRecoveryKeyError>.self) { group in
+        await withTaskGroup(of: Result<T, AutoRecoveryKeyError>.self) { group in
             // Add timeout task
             group.addTask {
                 do {
@@ -1261,7 +1261,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
                 }
             }
             
-            // Add operation task  
+            // Add operation task
             group.addTask {
                 await operation()
             }
@@ -1319,7 +1319,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
         
         clientProxy.secureBackupController.recoveryState
             .combineLatest(clientProxy.secureBackupController.keyBackupState)
-            .sink { [weak self] (recoveryState, keyBackupState) in
+            .sink { [weak self] recoveryState, keyBackupState in
                 self?.handleBackupStateChange(recovery: recoveryState, keyBackup: keyBackupState)
             }
             .store(in: &cancellables)
@@ -1328,11 +1328,11 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
         MXLog.info("Auto recovery observers set up successfully")
     }
     
-    private func handleBackupStateChange(recovery: SecureBackupRecoveryState, 
-                                       keyBackup: SecureBackupKeyBackupState) {
+    private func handleBackupStateChange(recovery: SecureBackupRecoveryState,
+                                         keyBackup: SecureBackupKeyBackupState) {
         MXLog.info("Backup state changed - Recovery: \(recovery), KeyBackup: \(keyBackup)")
         
-        if recovery == .enabled && keyBackup == .enabled {
+        if recovery == .enabled, keyBackup == .enabled {
             if case .active = setupStateSubject.value {
                 updateRecoveryState(.sharingEnabled, context: "automatic secret sharing enabled")
             }
@@ -1360,7 +1360,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     /// Определяет, нужно ли реально удалять ключ или его стоит сохранить (DRY principle)
     private func shouldRemoveInvalidKey(reason: String) -> Bool {
         // Конфигурация правил удаления ключей
-        struct KeyCleanupRules {
+        enum KeyCleanupRules {
             static let temporarilyPreservedReasons = [
                 "invalid format",
                 "validation failed"
@@ -1413,7 +1413,7 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     
     /// Безопасно тестирует совместимость локального ключа с сервером БЕЗ изменения состояния
     private func testRestoreCompatibility() async -> Result<Bool, AutoRecoveryKeyError> {
-        return await withClientProxy { clientProxy in
+        await withClientProxy { clientProxy in
             await self.performCompatibilityTest(clientProxy)
         }
     }
@@ -1708,13 +1708,12 @@ public final class AutoRecoveryKeyService: AutoRecoveryKeyServiceProtocol, @unch
     
     /// Принудительно создает backup для конкретного пользователя, даже если общий backup существует
     private func forceCreateUserSpecificBackup(_ recoveryKey: String) async -> Result<Void, AutoRecoveryKeyError> {
-        return await withClientProxy { clientProxy in
+        await withClientProxy { clientProxy in
             await self.performUserSpecificBackupCreation(recoveryKey, clientProxy: clientProxy)
         }
     }
     
     private func performUserSpecificBackupCreation(_ recoveryKey: String, clientProxy: ClientProxyProtocol) async -> Result<Void, AutoRecoveryKeyError> {
-        
         MXLog.info("Attempting to force-create user-specific backup for user: \(userID)")
         
         let secureBackup = clientProxy.secureBackupController
@@ -1770,4 +1769,5 @@ extension Either where T == U {
 }
 
 // MARK: - LocalAuthentication Import
+
 import LocalAuthentication

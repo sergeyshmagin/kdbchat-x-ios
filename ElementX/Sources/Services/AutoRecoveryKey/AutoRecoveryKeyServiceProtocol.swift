@@ -8,6 +8,7 @@
 import Foundation
 
 // MARK: - Protocol Definition
+
 public protocol AutoRecoveryKeyServiceProtocol {
     /// Выполняет полную диагностику и настройку автоматического восстановления
     /// БЕЗОПАСНО: Сначала проверяет существующий backup на сервере, не перезаписывает данные
@@ -48,6 +49,7 @@ public protocol AutoRecoveryKeyServiceProtocol {
 }
 
 // MARK: - Error Types
+
 public enum AutoRecoveryKeyError: LocalizedError, Equatable {
     case keyGenerationFailed
     case keyStorageFailed
@@ -105,6 +107,7 @@ public enum AutoRecoveryKeyError: LocalizedError, Equatable {
 }
 
 // MARK: - Status Types
+
 public enum RecoveryKeyStatus: Equatable {
     case notSetup
     case setupInProgress
@@ -137,6 +140,7 @@ public enum RecoveryKeyStatus: Equatable {
 }
 
 // MARK: - Backup Info Types
+
 public struct BackupInfo {
     public let exists: Bool
     public let version: String?
@@ -152,6 +156,7 @@ public struct BackupInfo {
 }
 
 // MARK: - Operation Result Types
+
 public enum AutoRecoveryOperation {
     case checkExistingBackup
     case validateLocalKey

@@ -830,6 +830,178 @@ extension NotificationManager: PKPushRegistryDelegate {
         MXLog.warning("[NotificationManager] ⚠️ VoIP push token invalidated")
         voipTokenData = nil
     }
+    
+    // MARK: - CallKit App Group Integration
+    
+    /// Process CallKit data stored by NSE in App Group
+    func processCallKitDataFromAppGroup() async {
+        MXLog.info("[NotificationManager] 🔍 Checking App Group for CallKit data")
+        
+        guard let appGroupDefaults = UserDefaults(suiteName: "group.io.kdbchat") else {
+            MXLog.error("[NotificationManager] ❌ Failed to access App Group UserDefaults")
+            return
+        }
+        
+        // Check for incoming call data stored by NSE
+        guard let callKitData = appGroupDefaults.dictionary(forKey: "incoming_call_data") else {
+            MXLog.debug("[NotificationManager] ℹ️ No CallKit data found in App Group")
+            return
+        }
+        
+        MXLog.info("[NotificationManager] 📞 Found CallKit data in App Group, processing...")
+        
+        // Extract call information
+        guard let roomId = callKitData["room_id"] as? String,
+              let callId = callKitData["call_id"] as? String,
+              let callerDisplayName = callKitData["caller_display_name"] as? String else {
+            MXLog.error("[NotificationManager] ❌ Invalid CallKit data structure")
+            return
+        }
+        
+        let callerId = callKitData["caller_id"] as? String ?? roomId
+        let isVideo = callKitData["is_video"] as? Bool ?? true
+        let timestamp = callKitData["timestamp"] as? TimeInterval ?? Date().timeIntervalSince1970
+        
+        // Check if data is fresh (within 2 minutes)
+        let dataAge = Date().timeIntervalSince1970 - timestamp
+        if dataAge > 120 {
+            MXLog.warning("[NotificationManager] ⚠️ CallKit data is stale (\(dataAge)s old), ignoring")
+            appGroupDefaults.removeObject(forKey: "incoming_call_data")
+            appGroupDefaults.synchronize()
+            return
+        }
+        
+        // Extract LiveKit credentials if available
+        let liveKitAccessToken = callKitData["livekit_access_token"] as? String
+        let liveKitServerURL = callKitData["livekit_server_url"] as? String
+        let liveKitRoomURL = callKitData["livekit_room_url"] as? String
+        
+        MXLog.info("[NotificationManager] 📞 Processing call: Room=\(roomId), Caller=\(callerDisplayName), Video=\(isVideo)")
+        MXLog.info("[NotificationManager] 🎬 LiveKit credentials: Token=\(liveKitAccessToken != nil ? "[PRESENT]" : "[MISSING]"), Server=\(liveKitServerURL ?? "[MISSING]")")
+        
+        // Report to CallKit via LiveKitCallKitService
+        #if LIVEKIT_ENABLED
+        do {
+            if let accessToken = liveKitAccessToken,
+               let serverURL = liveKitServerURL,
+               !accessToken.isEmpty,
+               !serverURL.isEmpty {
+                // Use enhanced method with credentials
+                try await LiveKitCallKitService.shared.reportIncomingCallWithCredentials(
+                    roomId: roomId,
+                    callId: callId,
+                    callerName: callerDisplayName,
+                    hasVideo: isVideo,
+                    liveKitAccessToken: accessToken,
+                    liveKitServerURL: serverURL,
+                    liveKitRoomURL: liveKitRoomURL
+                )
+                MXLog.info("[NotificationManager] ✅ CallKit reported with LiveKit credentials")
+            } else {
+                // Fallback to standard method
+                try await LiveKitCallKitService.shared.reportIncomingCall(
+                    roomId: roomId,
+                    callId: callId,
+                    callerName: callerDisplayName,
+                    hasVideo: isVideo
+                )
+                MXLog.info("[NotificationManager] ✅ CallKit reported (standard flow)")
+            }
+            
+            // Clean up processed data
+            appGroupDefaults.removeObject(forKey: "incoming_call_data")
+            appGroupDefaults.synchronize()
+            
+        } catch {
+            MXLog.error("[NotificationManager] ❌ Failed to report CallKit call: \(error)")
+            
+            // Don't clean up on failure - might retry later
+            // But add a retry count to prevent infinite loops
+            let retryCount = callKitData["retry_count"] as? Int ?? 0
+            if retryCount < 3 {
+                var updatedData = callKitData
+                updatedData["retry_count"] = retryCount + 1
+                appGroupDefaults.set(updatedData, forKey: "incoming_call_data")
+                appGroupDefaults.synchronize()
+                MXLog.info("[NotificationManager] 🔄 CallKit data retry count: \(retryCount + 1)")
+            } else {
+                MXLog.error("[NotificationManager] ❌ Max CallKit retry attempts reached, cleaning up")
+                appGroupDefaults.removeObject(forKey: "incoming_call_data")
+                appGroupDefaults.synchronize()
+            }
+        }
+        #else
+        MXLog.error("[NotificationManager] ❌ LIVEKIT_ENABLED not defined - cannot process CallKit")
+        appGroupDefaults.removeObject(forKey: "incoming_call_data")
+        appGroupDefaults.synchronize()
+        #endif
+    }
+    
+    /// Setup periodic check for App Group CallKit data
+    func startAppGroupCallKitMonitoring() {
+        MXLog.info("[NotificationManager] 🔄 Starting App Group CallKit monitoring")
+        
+        // Check immediately
+        Task {
+            await processCallKitDataFromAppGroup()
+        }
+        
+        // Setup periodic checks every 5 seconds
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task {
+                await self?.processCallKitDataFromAppGroup()
+            }
+        }
+    }
+    
+    /// Unregister all pushers before logout
+    func unregisterPusher() async {
+        MXLog.info("[NotificationManager] 🗑️ Unregistering all pushers")
+        
+        guard let userSession else {
+            MXLog.warning("[NotificationManager] Cannot unregister pusher - no user session")
+            return
+        }
+        
+        // Cancel any ongoing retry timers
+        voipRetryTimer?.invalidate()
+        voipRetryTimer = nil
+        
+        // Unregister VoIP pusher if we have a token
+        if let voipTokenData = voipTokenData {
+            MXLog.info("[NotificationManager] 🔄 Unregistering VoIP pusher")
+            
+            do {
+                let tokenString = voipTokenData.map { String(format: "%02.2hhx", $0) }.joined()
+                
+                // Create empty pusher configuration to remove the pusher
+                let voipAppId = "\(appSettings.pushGatewayNotifyEndpoint.host ?? "unknown").\(InfoPlistReader.main.bundleIdentifier).voip"
+                
+                let emptyConfiguration = try await PusherConfiguration(identifiers: .init(pushkey: tokenString,
+                                                                                          appId: voipAppId),
+                                                                       kind: .http(data: .init(url: "",
+                                                                                               format: .eventIdOnly,
+                                                                                               defaultPayload: "")),
+                                                                       appDisplayName: "",
+                                                                       deviceDisplayName: "",
+                                                                       profileTag: "voip_\(pusherProfileTag())",
+                                                                       lang: "en")
+                
+                // Setting pusher with empty configuration effectively removes it
+                try await userSession.clientProxy.setPusher(with: emptyConfiguration)
+                MXLog.info("[NotificationManager] ✅ Successfully unregistered VoIP pusher")
+            } catch {
+                MXLog.error("[NotificationManager] ❌ Failed to unregister VoIP pusher: \(error)")
+            }
+        }
+        
+        // Clear stored token data
+        voipTokenData = nil
+        lastVoIPRegistrationSuccess = false
+        voipPusherRegistrationRetryCount = 0
+        
+        MXLog.info("[NotificationManager] ✅ Pusher unregistration completed")
+    }
 }
 
 extension UNUserNotificationCenter: UserNotificationCenterProtocol { }

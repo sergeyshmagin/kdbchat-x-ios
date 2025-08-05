@@ -14,6 +14,7 @@ import SwiftUI
 import LiveKit
 #endif
 
+
 struct HomeScreen: View {
     @ObservedObject var context: HomeScreenViewModel.Context
     let userSession: UserSessionProtocol
@@ -46,9 +47,8 @@ struct HomeScreen: View {
                     .navigationTitle(getNavigationTitle(for: selectedTab))
                     .toolbar(content: { toolbar })
             case .settings:
-                settingsContentView
-                    .navigationTitle(getNavigationTitle(for: selectedTab))
-                    .toolbar(content: { toolbar })
+                // Настройки теперь открываются напрямую через модальное окно
+                EmptyView()
             }
             
             // Bottom tab bar
@@ -117,27 +117,6 @@ struct HomeScreen: View {
     }
     
     @ViewBuilder
-    private var settingsContentView: some View {
-        VStack {
-            Spacer()
-            Text("Настройки")
-                .font(.title2)
-                .foregroundColor(.compound.textSecondary)
-            Text("Настройки приложения")
-                .font(.body)
-                .foregroundColor(.compound.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Button("Открыть настройки") {
-                context.send(viewAction: .showSettings)
-            }
-            .buttonStyle(.compound(.primary))
-            .padding(.top, 20)
-            Spacer()
-        }
-    }
-    
-    @ViewBuilder
     private var tabBar: some View {
         VStack(spacing: 0) {
             // Tab bar content
@@ -157,7 +136,12 @@ struct HomeScreen: View {
     @ViewBuilder
     private func tabButton(for tab: HomeScreenTab) -> some View {
         Button {
-            selectedTab = tab
+            if tab == .settings {
+                // Открываем настройки напрямую
+                context.send(viewAction: .showSettings)
+            } else {
+                selectedTab = tab
+            }
         } label: {
             VStack(spacing: 5) {
                 ZStack {
@@ -178,7 +162,7 @@ struct HomeScreen: View {
                     }
                     
                     // Green dot for settings tab (notifications indicator)
-                    if tab == .settings {
+                    if tab == .settings, context.viewState.requiresExtraAccountSetup {
                         Circle()
                             .fill(Color.green)
                             .frame(width: 8, height: 8)
@@ -200,18 +184,12 @@ struct HomeScreen: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
             Button {
-                context.send(viewAction: .showSettings)
+                // Функционал создания конференции будет добавлен в следующих релизах
             } label: {
-                LoadableAvatarImage(url: context.viewState.userAvatarURL,
-                                    name: context.viewState.userDisplayName,
-                                    contentID: context.viewState.userID,
-                                    avatarSize: .user(on: .home),
-                                    mediaProvider: context.mediaProvider)
-                    .accessibilityIdentifier(A11yIdentifiers.homeScreen.userAvatar)
-                    .overlayBadge(10, isBadged: context.viewState.requiresExtraAccountSetup)
-                    .compositingGroup()
+                CompoundIcon(\.videoCall, size: .medium, relativeTo: .body)
+                    .foregroundColor(.compound.iconSecondary)
             }
-            .accessibilityLabel(L10n.commonSettings)
+            .accessibilityLabel("Создать конференцию")
         }
         
         ToolbarItem(placement: .primaryAction) {
@@ -250,6 +228,39 @@ struct HomeScreen: View {
 }
 
 // MARK: - CallLogView (Embedded)
+
+// MARK: - Shared Utilities
+
+private extension HomeScreen {
+    /// Utility function to extract initials from a display name
+    /// Used across multiple components to maintain consistency
+    static func getInitials(from name: String) -> String {
+        let components = name.split(separator: " ")
+        let initials = components.prefix(2).compactMap(\.first).map { String($0) }
+        return initials.joined().uppercased()
+    }
+    
+    /// Utility function to format timestamp with Russian locale
+    /// Used across multiple components to maintain consistency
+    static func formatTimestamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: date)
+        } else if calendar.isDateInYesterday(date) {
+            return "Вчера"
+        } else if calendar.dateInterval(of: .weekOfYear, for: date)?.contains(Date()) == true {
+            formatter.dateFormat = "EEEE"
+            return formatter.string(from: date)
+        } else {
+            formatter.dateFormat = "dd.MM.yy"
+            return formatter.string(from: date)
+        }
+    }
+}
 
 struct CallLogView: View {
     let userSession: UserSessionProtocol
@@ -368,7 +379,7 @@ struct CallLogView: View {
                 .fill(Color.compound.bgActionSecondaryRest)
                 .frame(width: 40, height: 40)
                 .overlay {
-                    Text(getInitials(from: contact.displayName ?? contact.userId))
+                    Text(HomeScreen.getInitials(from: contact.displayName ?? contact.userId))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.compound.textPrimary)
                 }
@@ -532,12 +543,6 @@ struct CallLogView: View {
         .padding(.vertical, 12)
         .background(Color.compound.bgCanvasDefault)
     }
-    
-    private func getInitials(from name: String) -> String {
-        let components = name.split(separator: " ")
-        let initials = components.prefix(2).compactMap(\.first).map { String($0) }
-        return initials.joined().uppercased()
-    }
 }
 
 // MARK: - ContactDetailsView
@@ -576,7 +581,7 @@ struct ContactDetailsView: View {
                 .fill(Color.compound.bgActionSecondaryRest)
                 .frame(width: 80, height: 80)
                 .overlay {
-                    Text(getInitials(from: contact.displayName ?? contact.userId))
+                    Text(HomeScreen.getInitials(from: contact.displayName ?? contact.userId))
                         .font(.system(size: 28, weight: .medium))
                         .foregroundColor(.compound.textPrimary)
                 }
@@ -704,12 +709,6 @@ struct ContactDetailsView: View {
             }
         }
     }
-    
-    private func getInitials(from name: String) -> String {
-        let components = name.split(separator: " ")
-        let initials = components.prefix(2).compactMap(\.first).map { String($0) }
-        return initials.joined().uppercased()
-    }
 }
 
 // MARK: - ContactCallHistoryRow
@@ -796,23 +795,7 @@ struct RealContact: Identifiable {
     
     var formattedCallTime: String {
         guard let lastCallTime = lastCallTime else { return "" }
-        
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        
-        let calendar = Calendar.current
-        if calendar.isDateInToday(lastCallTime) {
-            formatter.dateFormat = "HH:mm"
-            return formatter.string(from: lastCallTime)
-        } else if calendar.isDateInYesterday(lastCallTime) {
-            return "Вчера"
-        } else if calendar.dateInterval(of: .weekOfYear, for: lastCallTime)?.contains(Date()) == true {
-            formatter.dateFormat = "EEEE"
-            return formatter.string(from: lastCallTime)
-        } else {
-            formatter.dateFormat = "dd.MM.yy"
-            return formatter.string(from: lastCallTime)
-        }
+        return HomeScreen.formatTimestamp(lastCallTime)
     }
 }
 
@@ -829,22 +812,7 @@ struct RealCallEntry: Identifiable {
     let duration: TimeInterval?
     
     var formattedTimestamp: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        
-        let calendar = Calendar.current
-        if calendar.isDateInToday(timestamp) {
-            formatter.dateFormat = "HH:mm"
-            return formatter.string(from: timestamp)
-        } else if calendar.isDateInYesterday(timestamp) {
-            return "Вчера"
-        } else if calendar.dateInterval(of: .weekOfYear, for: timestamp)?.contains(Date()) == true {
-            formatter.dateFormat = "EEEE"
-            return formatter.string(from: timestamp)
-        } else {
-            formatter.dateFormat = "dd.MM.yy"
-            return formatter.string(from: timestamp)
-        }
+        HomeScreen.formatTimestamp(timestamp)
     }
     
     var formattedDuration: String? {
@@ -977,9 +945,83 @@ class CallLogViewModel: ObservableObject {
     }
     
     private func loadCallHistory() async {
-        // Здесь будем загружать реальную историю звонков из Matrix
-        // Пока используем заглушку
-        allCalls = []
+        // ИНТЕГРАЦИЯ С CALL HISTORY MANAGER: Загружаем реальную историю звонков
+        let callHistoryEntries = await CallHistoryManager.shared.getCallHistory()
+        
+        // Используем реальную историю звонков
+        // let callHistoryEntries: [Any] = [] // Больше не нужен stub
+        
+        // Конвертируем CallHistoryEntry в RealCallEntry для UI
+        allCalls = callHistoryEntries.map { entry in
+            let participantName: String
+            let participantUserId: String
+            let isIncoming: Bool
+            
+            if entry.callInfo.direction == .incoming {
+                participantName = entry.callInfo.caller.displayName ?? entry.callInfo.caller.userId
+                participantUserId = entry.callInfo.caller.userId
+                isIncoming = true
+            } else {
+                participantName = entry.callInfo.callee.displayName ?? entry.callInfo.callee.userId
+                participantUserId = entry.callInfo.callee.userId
+                isIncoming = false
+            }
+            
+            return RealCallEntry(
+                id: entry.id,
+                roomId: entry.callInfo.roomId,
+                userId: participantUserId,
+                displayName: participantName,
+                avatarURL: entry.callInfo.direction == .incoming ? 
+                    entry.callInfo.caller.avatarURL : entry.callInfo.callee.avatarURL,
+                callType: entry.callInfo.type,
+                direction: entry.callInfo.direction,
+                status: entry.callInfo.status,
+                timestamp: entry.callInfo.timestamp,
+                duration: entry.callInfo.duration
+            )
+        }
+        
+        // Сортируем по времени (новые сверху)
+        allCalls.sort { $0.timestamp > $1.timestamp }
+        
+        MXLog.info("[CallLogViewModel] ✅ Loaded \(allCalls.count) call history entries")
+        
+        // Обновляем контакты с информацией о последних звонках
+        updateContactsWithCallHistory()
+    }
+    
+    private func updateContactsWithCallHistory() {
+        // Для каждого контакта находим последний звонок
+        for i in allContacts.indices {
+            let contact = allContacts[i]
+            
+            // Ищем последний звонок с этим контактом
+            let contactCalls = allCalls.filter { call in
+                call.roomId == contact.roomId || call.userId == contact.userId
+            }
+            
+            if let lastCall = contactCalls.first {
+                allContacts[i] = RealContact(
+                    id: contact.id,
+                    userId: contact.userId,
+                    displayName: contact.displayName,
+                    avatarURL: contact.avatarURL,
+                    roomId: contact.roomId,
+                    lastCall: lastCall.callType,
+                    lastCallTime: lastCall.timestamp,
+                    isMissed: lastCall.status == .missed
+                )
+            }
+        }
+    }
+    
+    /// Refresh call history from CallHistoryManager
+    func refreshCallHistory() {
+        Task {
+            await loadCallHistory()
+            filterData()
+        }
     }
     
     private func filterData() {
@@ -1084,8 +1126,8 @@ class CallLogViewModel: ObservableObject {
         // В реальной реализации здесь бы была очистка истории в Matrix
         MXLog.info("Call history cleared from local storage")
         
-        // TODO: Реализовать очистку истории звонков в Matrix SDK
-        // Это может включать удаление событий звонков из временной шкалы комнат
+        // ПРИМЕЧАНИЕ: Очистка истории звонков в Matrix SDK
+        // будет реализована при интеграции с Matrix SDK API для событий звонков
     }
 }
 

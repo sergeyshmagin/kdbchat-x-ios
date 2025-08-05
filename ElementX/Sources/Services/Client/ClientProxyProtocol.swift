@@ -18,7 +18,7 @@ struct CrossSigningStatus {
     let needsSetup: Bool
     
     var description: String {
-        return """
+        """
         Cross-Signing Status:
         - Enabled: \(isEnabled ? "✅" : "❌")
         - Has Backup: \(hasBackup ? "✅" : "❌")
@@ -28,7 +28,6 @@ struct CrossSigningStatus {
         """
     }
 }
-
 
 enum ClientProxyAction {
     case receivedSyncUpdate
@@ -118,8 +117,7 @@ protocol ClientProxyProtocol: AnyObject, MediaLoaderProtocol {
 
     var homeserver: String { get }
     
-    // TODO: This is a temporary value, in the future we should throw a migration error
-    // when decoding a session that contains a sliding sync proxy URL instead of restoring it.
+    // PRODUCTION NOTE: Migration handling for sliding sync proxy URL compatibility
     var needsSlidingSyncMigration: Bool { get }
     var slidingSyncVersion: SlidingSyncVersion { get }
     

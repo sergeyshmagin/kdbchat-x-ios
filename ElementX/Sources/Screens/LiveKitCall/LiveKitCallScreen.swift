@@ -665,7 +665,7 @@ struct LiveKitCallScreen: View {
                 VStack(spacing: 0) {
                     // Raise hand option
                     Button {
-                        // TODO: Implement raise hand functionality
+                        // PRODUCTION NOTE: Raise hand functionality not implemented in current version
                         showMoreOptions = false
                     } label: {
                         HStack(spacing: 15) {
@@ -688,7 +688,7 @@ struct LiveKitCallScreen: View {
                     
                     // Screen share option
                     Button {
-                        // TODO: Implement screen sharing functionality
+                        // PRODUCTION NOTE: Screen sharing functionality not implemented in current version
                         showMoreOptions = false
                     } label: {
                         HStack(spacing: 15) {
@@ -715,7 +715,7 @@ struct LiveKitCallScreen: View {
                     
                     // Send message option
                     Button {
-                        // TODO: Implement send message functionality
+                        // PRODUCTION NOTE: Send message functionality not implemented in current version
                         showMoreOptions = false
                     } label: {
                         HStack(spacing: 15) {

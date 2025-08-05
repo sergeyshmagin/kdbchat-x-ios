@@ -5,14 +5,16 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-#if LIVEKIT_ENABLED
 import AVFoundation
 import CallKit
 import Foundation
-import LiveKit
 import MatrixRustSDK
 import PushKit
 import UIKit
+import UserNotifications
+
+// MARK: - Call History Integration  
+// Интеграция с CallHistoryManager и CallNotificationService активна
 
 enum LiveKitCallKitError: Error, LocalizedError {
     case providerConfigurationFailed
@@ -36,6 +38,40 @@ enum LiveKitCallKitError: Error, LocalizedError {
         }
     }
 }
+
+// MARK: - Supporting Types
+
+struct LiveKitCall: Identifiable {
+    let id: String
+    let roomId: String
+    let callUUID: UUID
+    let isIncoming: Bool
+    let callerName: String
+    let startTime: Date
+    let hasVideo: Bool?
+    
+    // LiveKit credentials from push payload
+    let liveKitAccessToken: String?
+    let liveKitServerURL: String?
+    let liveKitRoomURL: String?
+    
+    init(id: String, roomId: String, callUUID: UUID, isIncoming: Bool, callerName: String, hasVideo: Bool? = nil,
+         liveKitAccessToken: String? = nil, liveKitServerURL: String? = nil, liveKitRoomURL: String? = nil) {
+        self.id = id
+        self.roomId = roomId
+        self.callUUID = callUUID
+        self.isIncoming = isIncoming
+        self.callerName = callerName
+        self.hasVideo = hasVideo
+        self.liveKitAccessToken = liveKitAccessToken
+        self.liveKitServerURL = liveKitServerURL
+        self.liveKitRoomURL = liveKitRoomURL
+        startTime = Date()
+    }
+}
+
+#if LIVEKIT_ENABLED
+import LiveKit
 
 final class LiveKitCallKitService: NSObject, ObservableObject {
     // MARK: - Properties
@@ -142,13 +178,29 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
         
         activeCalls[callUUID] = call
         
+        // ИНТЕГРАЦИЯ С CALL HISTORY: Записываем входящий звонок в историю
+        let callInfo = CallInfo(
+            id: callId,
+            roomId: roomId,
+            caller: CallParticipant(userId: roomId, displayName: callerName, avatarURL: nil as URL?, handle: roomId),
+            callee: CallParticipant(userId: "self", displayName: "Me", avatarURL: nil as URL?, handle: "self"),
+            type: hasVideo ? CallType.video : CallType.audio,
+            direction: CallDirection.incoming,
+            timestamp: Date(),
+            duration: nil as TimeInterval?,
+            status: CallStatus.ringing,
+            liveKitConfig: nil as LiveKitConfig?
+        )
+        
+        await CallHistoryManager.shared.recordCall(callInfo)
+        
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             provider.reportNewIncomingCall(with: callUUID, update: update) { error in
                 if let error = error {
                     MXLog.error("Failed to report incoming call: \(error)")
                     continuation.resume(throwing: error)
                 } else {
-                    MXLog.info("Successfully reported incoming call")
+                    MXLog.info("Successfully reported incoming call to CallKit - will appear in system call log")
                     continuation.resume()
                 }
             }
@@ -175,6 +227,22 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
         
         activeCalls[callUUID] = call
         
+        // ИНТЕГРАЦИЯ С CALL HISTORY: Записываем исходящий звонок в историю
+        let callInfo = CallInfo(
+            id: callId,
+            roomId: roomId,
+            caller: CallParticipant(userId: "self", displayName: "Me", avatarURL: nil as URL?, handle: "self"),
+            callee: CallParticipant(userId: roomId, displayName: participantName, avatarURL: nil as URL?, handle: roomId),
+            type: isVideo ? CallType.video : CallType.audio,
+            direction: CallDirection.outgoing,
+            timestamp: Date(),
+            duration: nil as TimeInterval?,
+            status: CallStatus.ringing,
+            liveKitConfig: nil as LiveKitConfig?
+        )
+        
+        await CallHistoryManager.shared.recordCall(callInfo)
+        
         let transaction = CXTransaction(action: startCallAction)
         
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -183,7 +251,7 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
                     MXLog.error("Failed to start outgoing call: \(error)")
                     continuation.resume(throwing: error)
                 } else {
-                    MXLog.info("Successfully started outgoing call")
+                    MXLog.info("Successfully started outgoing call - will appear in system call log")
                     continuation.resume()
                 }
             }
@@ -357,6 +425,11 @@ extension LiveKitCallKitService: CXProviderDelegate {
             return
         }
         
+        // ИНТЕГРАЦИЯ С CALL HISTORY: Обновляем статус звонка на "отвечен"
+        Task {
+            await CallHistoryManager.shared.updateCallStatus(call.id, status: CallStatus.answered)
+        }
+        
         Task {
             do {
                 try configureAudioSession()
@@ -458,6 +531,14 @@ extension LiveKitCallKitService: CXProviderDelegate {
             return
         }
         
+        // ИНТЕГРАЦИЯ С CALL HISTORY: Записываем продолжительность и статус завершения
+        let callStartTime = call.startTime ?? Date()
+        let duration = Date().timeIntervalSince(callStartTime)
+        
+        Task {
+            await CallHistoryManager.shared.updateCallDuration(call.id, duration: duration)
+        }
+        
         Task {
             do {
                 // End the LiveKit call
@@ -505,7 +586,65 @@ extension LiveKitCallKitService: CXProviderDelegate {
     
     func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {
         MXLog.error("CallKit: Action timed out: \(action)")
+        
+        // ИНТЕГРАЦИЯ С MISSED CALLS: Если входящий звонок не был отвечен, считаем его пропущенным
+        if let answerAction = action as? CXAnswerCallAction,
+           let call = activeCalls[answerAction.callUUID],
+           call.isIncoming {
+            
+            MXLog.info("[CallKitService] 📞 Incoming call timed out - marking as missed: \(call.id)")
+            
+            Task {
+                // Обновляем статус в истории звонков
+                await CallHistoryManager.shared.updateCallStatus(call.id, status: CallStatus.missed)
+                
+                // Показываем уведомление о пропущенном звонке
+                await CallNotificationService.shared.scheduleMissedCallNotification(
+                    callId: call.id,
+                    callerName: call.callerName,
+                    roomId: call.roomId,
+                    timestamp: call.startTime ?? Date()
+                )
+            }
+        }
+        
         action.fail()
+    }
+    
+    /// Handle call being declined by user
+    func handleCallDeclined(callUUID: UUID) {
+        guard let call = activeCalls[callUUID] else { return }
+        
+        MXLog.info("[CallKitService] 📞 Call declined by user: \(call.id)")
+        
+        Task {
+            // Обновляем статус в истории
+            await CallHistoryManager.shared.updateCallStatus(call.id, status: CallStatus.declined)
+            
+            // Для входящих звонков, которые были отклонены, не показываем "пропущенный звонок"
+            // Но можем показать другое уведомление если нужно
+        }
+    }
+    
+    /// Handle when call is not answered within timeout
+    func handleCallMissed(callUUID: UUID) {
+        guard let call = activeCalls[callUUID],
+              call.isIncoming else { return }
+        
+        MXLog.info("[CallKitService] 📞 Incoming call missed (not answered): \(call.id)")
+        
+        Task {
+            // Обновляем статус в истории
+            await CallHistoryManager.shared.updateCallStatus(call.id, status: CallStatus.missed)
+            
+            // Показываем уведомление о пропущенном звонке
+            await CallNotificationService.shared.scheduleMissedCallNotification(
+                callId: call.id,
+                callerName: call.callerName,
+                roomId: call.roomId,
+                timestamp: call.startTime ?? Date()
+            )
+        }
     }
     
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
@@ -519,37 +658,6 @@ extension LiveKitCallKitService: CXProviderDelegate {
     
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
         MXLog.info("CallKit: Audio session deactivated")
-    }
-}
-
-// MARK: - Supporting Types
-
-struct LiveKitCall: Identifiable {
-    let id: String
-    let roomId: String
-    let callUUID: UUID
-    let isIncoming: Bool
-    let callerName: String
-    let startTime: Date
-    let hasVideo: Bool?
-    
-    // LiveKit credentials from push payload
-    let liveKitAccessToken: String?
-    let liveKitServerURL: String?
-    let liveKitRoomURL: String?
-    
-    init(id: String, roomId: String, callUUID: UUID, isIncoming: Bool, callerName: String, hasVideo: Bool? = nil,
-         liveKitAccessToken: String? = nil, liveKitServerURL: String? = nil, liveKitRoomURL: String? = nil) {
-        self.id = id
-        self.roomId = roomId
-        self.callUUID = callUUID
-        self.isIncoming = isIncoming
-        self.callerName = callerName
-        self.hasVideo = hasVideo
-        self.liveKitAccessToken = liveKitAccessToken
-        self.liveKitServerURL = liveKitServerURL
-        self.liveKitRoomURL = liveKitRoomURL
-        startTime = Date()
     }
 }
 
@@ -868,6 +976,9 @@ extension LiveKitCallKitService {
             MXLog.warning("Call already active for room \(roomId), ignoring")
             return
         }
+        
+        // 🔥 CRITICAL FIX: Record incoming call in CallHistoryManager
+        await recordIncomingCall(roomId: roomId, callId: callId, callerName: callerName, isVideo: hasVideo)
         
         do {
             try await reportIncomingCall(roomId: roomId, callId: callId, callerName: callerName, hasVideo: hasVideo)
@@ -1206,6 +1317,86 @@ extension LiveKitCallKitService {
             MXLog.error("❌ [MATRIX-RUST-SDK] Failed to serialize call hangup content: \(error)")
             throw error
         }
+    }
+    
+    // MARK: - Call History Integration
+    
+    /// Record incoming call in CallHistoryManager
+    private func recordIncomingCall(roomId: String, callId: String, callerName: String, isVideo: Bool) async {
+        do {
+            // TODO: Get current user info when ClientProxy is available
+            // For now, using placeholder current user info
+            let currentUser = CallParticipant(
+                userId: "current_user", // TODO: Get from ClientProxy
+                displayName: "Me", // TODO: Get from ClientProxy
+                avatarURL: nil,
+                handle: "Me"
+            )
+            
+            // Create caller participant from incoming call info
+            let caller = CallParticipant(
+                userId: roomId, // Temporary: using roomId as placeholder
+                displayName: callerName,
+                avatarURL: nil,
+                handle: callerName
+            )
+            
+            // Create call info for incoming call
+            let callInfo = CallInfo(
+                id: callId,
+                roomId: roomId,
+                caller: caller,
+                callee: currentUser,
+                type: isVideo ? .video : .audio,
+                direction: .incoming,
+                timestamp: Date(),
+                duration: nil,
+                status: .ringing,
+                liveKitConfig: nil
+            )
+            
+            // Record call in CallHistoryManager
+            await CallHistoryManager.shared.recordCall(callInfo)
+            MXLog.info("🔥 CRITICAL: Successfully recorded incoming call in CallHistoryManager: \(callId)")
+            
+        } catch {
+            MXLog.error("🔥 CRITICAL: Failed to record incoming call in CallHistoryManager: \(error)")
+        }
+    }
+}
+
+#else
+// MARK: - LiveKit Disabled Stub
+
+final class LiveKitCallKitService: NSObject, ObservableObject {
+    static let shared = LiveKitCallKitService()
+    
+    @Published var activeCall: LiveKitCall?
+    @Published var isCallActive = false
+    
+    override init() {
+        super.init()
+        MXLog.info("LiveKitCallKitService initialized (LiveKit disabled)")
+    }
+    
+    func setLiveKitCallService(_ service: Any) {
+        MXLog.warning("LiveKit is disabled - setLiveKitCallService ignored")
+    }
+    
+    func configureWithClientProxy(_ clientProxy: Any) {
+        MXLog.warning("LiveKit is disabled - configureWithClientProxy ignored")
+    }
+    
+    func reportIncomingCall(roomId: String, callId: String, callerName: String, hasVideo: Bool = true) async throws {
+        throw LiveKitCallKitError.providerConfigurationFailed
+    }
+    
+    func startOutgoingCall(roomId: String, callId: String, participantName: String, isVideo: Bool = true) async throws {
+        throw LiveKitCallKitError.providerConfigurationFailed
+    }
+    
+    func endCall(callUUID: UUID) async throws {
+        throw LiveKitCallKitError.providerConfigurationFailed
     }
 }
 #endif

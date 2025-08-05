@@ -65,20 +65,27 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
             .sink { [weak self] securityState in
                 guard let self else { return }
                 
-                switch securityState.recoveryState {
-                case .disabled:
+                // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Синхронизация логики с SettingsScreenViewModel
+                // Зеленая точка должна показываться только когда в настройках есть элементы требующие внимания
+                switch (securityState.verificationState, securityState.recoveryState) {
+                case (.verified, .disabled):
+                    // Верификация есть, recovery отключен - требует настройки
                     state.requiresExtraAccountSetup = true
                     if !state.securityBannerMode.isDismissed {
                         state.securityBannerMode = .show(.setUpRecovery)
                     }
-                case .incomplete:
+                case (.verified, .incomplete):
+                    // Верификация есть, recovery неполный - требует подтверждения
                     state.requiresExtraAccountSetup = true
-                    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Дать время автоматическому восстановлению завершиться
-                    // перед показом баннера восстановления
                     handleIncompleteRecoveryState()
-                default:
-                    state.securityBannerMode = .none
+                case (.unknown, _):
+                    // Неизвестное состояние верификации - не показываем точку
                     state.requiresExtraAccountSetup = false
+                    state.securityBannerMode = .none
+                default:
+                    // Все настроено корректно - точка не нужна
+                    state.requiresExtraAccountSetup = false
+                    state.securityBannerMode = .none
                 }
             }
             .store(in: &cancellables)
@@ -543,7 +550,7 @@ class HomeScreenViewModel: HomeScreenViewModelType, HomeScreenViewModelProtocol 
             // даже если recovery state все еще incomplete из-за бага SDK
             let isBackupWorking = (keyBackupState == .enabled || keyBackupState == .enabling)
             
-            if currentSecurityState.recoveryState == .incomplete && !isBackupWorking {
+            if currentSecurityState.recoveryState == .incomplete, !isBackupWorking {
                 MXLog.info("[HomeScreenViewModel] Recovery incomplete and backup not working - showing recovery banner")
                 state.securityBannerMode = .show(.recoveryOutOfSync)
             } else if isBackupWorking {

@@ -5,12 +5,11 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import XCTest
 @testable import ElementX
+import XCTest
 
 @MainActor
 class AutoRecoveryKeyServiceTests: XCTestCase {
-    
     var service: AutoRecoveryKeyService!
     var mockClientProxy: MockClientProxy!
     var mockKeychainController: MockKeychainController!
@@ -24,11 +23,9 @@ class AutoRecoveryKeyServiceTests: XCTestCase {
         mockClientProxy = MockClientProxy()
         mockClientProxy.underlyingSecureBackupController = mockSecureBackupController
         
-        service = AutoRecoveryKeyService(
-            clientProxy: mockClientProxy,
-            keychainController: mockKeychainController,
-            userID: "@test:matrix.org"
-        )
+        service = AutoRecoveryKeyService(clientProxy: mockClientProxy,
+                                         keychainController: mockKeychainController,
+                                         userID: "@test:matrix.org")
     }
     
     override func tearDown() {
@@ -243,10 +240,10 @@ extension XCTestCase {
         }
     }
     
-    func XCTAssertSuccess<T>(_ result: Result<T, some Error>, 
-                            validation: (T) -> Void, 
-                            file: StaticString = #filePath, 
-                            line: UInt = #line) {
+    func XCTAssertSuccess<T>(_ result: Result<T, some Error>,
+                             validation: (T) -> Void,
+                             file: StaticString = #filePath,
+                             line: UInt = #line) {
         switch result {
         case .success(let value):
             validation(value)
@@ -255,10 +252,10 @@ extension XCTestCase {
         }
     }
     
-    func XCTAssertFailure<T, E: Error & Equatable>(_ result: Result<T, E>, 
-                                                  validation: (E) -> Void, 
-                                                  file: StaticString = #filePath, 
-                                                  line: UInt = #line) {
+    func XCTAssertFailure<T, E: Error & Equatable>(_ result: Result<T, E>,
+                                                   validation: (E) -> Void,
+                                                   file: StaticString = #filePath,
+                                                   line: UInt = #line) {
         switch result {
         case .success(let value):
             XCTFail("Expected failure, got success: \(value)", file: file, line: line)

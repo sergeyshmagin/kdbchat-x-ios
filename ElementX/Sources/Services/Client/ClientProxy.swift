@@ -57,14 +57,9 @@ class ClientProxy: ClientProxyProtocol {
     let secureBackupController: SecureBackupControllerProtocol
     
     /// Lazy-инициализация сервиса автоматических ключей восстановления (DIP принцип)
-    private(set) lazy var autoRecoveryKeyService: AutoRecoveryKeyServiceProtocol = {
-        AutoRecoveryKeyService(
-            clientProxy: self,
-            keychainController: keychainController,
-            userID: userID
-        )
-    }()
-    
+    private(set) lazy var autoRecoveryKeyService: AutoRecoveryKeyServiceProtocol = AutoRecoveryKeyService(clientProxy: self,
+                                                                                                          keychainController: keychainController,
+                                                                                                          userID: userID)
     
     private(set) var sessionVerificationController: SessionVerificationControllerProxyProtocol?
     
@@ -1261,7 +1256,7 @@ class ClientProxy: ClientProxyProtocol {
             let recoveryState = encryption.recoveryState()
             let hasBackup = try await encryption.backupExistsOnServer()
             
-            if backupState == .enabled && recoveryState == .enabled {
+            if backupState == .enabled, recoveryState == .enabled {
                 MXLog.info("✅ Cross-signing already properly configured")
                 return .success(())
             }
@@ -1285,18 +1280,16 @@ class ClientProxy: ClientProxyProtocol {
         let encryption = client.encryption()
         let backupState = encryption.backupState()
         let recoveryState = encryption.recoveryState()
-        let hasBackup = (try? await encryption.backupExistsOnServer()) ?? false
+        let hasBackup = await (try? encryption.backupExistsOnServer()) ?? false
         let hasLocalRecoveryKey = keychainController.hasSSSSRecoveryKey(forUserID: userID)
         
         let isEnabled = backupState == .enabled && recoveryState == .enabled
         
-        return CrossSigningStatus(
-            isEnabled: isEnabled,
-            hasBackup: hasBackup,
-            hasRecoveryKey: hasLocalRecoveryKey,
-            lastDeviceCount: nil,
-            needsSetup: !isEnabled || !hasBackup
-        )
+        return CrossSigningStatus(isEnabled: isEnabled,
+                                  hasBackup: hasBackup,
+                                  hasRecoveryKey: hasLocalRecoveryKey,
+                                  lastDeviceCount: nil,
+                                  needsSetup: !isEnabled || !hasBackup)
     }
     
     /// Получает детальную диагностику encryption для разработчиков
