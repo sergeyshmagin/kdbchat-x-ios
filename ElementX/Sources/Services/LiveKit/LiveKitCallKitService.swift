@@ -13,7 +13,8 @@ import PushKit
 import UIKit
 import UserNotifications
 
-// MARK: - Call History Integration  
+// MARK: - Call History Integration
+
 // Интеграция с CallHistoryManager и CallNotificationService активна
 
 enum LiveKitCallKitError: Error, LocalizedError {
@@ -179,18 +180,16 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
         activeCalls[callUUID] = call
         
         // ИНТЕГРАЦИЯ С CALL HISTORY: Записываем входящий звонок в историю
-        let callInfo = CallInfo(
-            id: callId,
-            roomId: roomId,
-            caller: CallParticipant(userId: roomId, displayName: callerName, avatarURL: nil as URL?, handle: roomId),
-            callee: CallParticipant(userId: "self", displayName: "Me", avatarURL: nil as URL?, handle: "self"),
-            type: hasVideo ? CallType.video : CallType.audio,
-            direction: CallDirection.incoming,
-            timestamp: Date(),
-            duration: nil as TimeInterval?,
-            status: CallStatus.ringing,
-            liveKitConfig: nil as LiveKitConfig?
-        )
+        let callInfo = CallInfo(id: callId,
+                                roomId: roomId,
+                                caller: CallParticipant(userId: roomId, displayName: callerName, avatarURL: nil as URL?, handle: roomId),
+                                callee: CallParticipant(userId: "self", displayName: "Me", avatarURL: nil as URL?, handle: "self"),
+                                type: hasVideo ? CallType.video : CallType.audio,
+                                direction: CallDirection.incoming,
+                                timestamp: Date(),
+                                duration: nil as TimeInterval?,
+                                status: CallStatus.ringing,
+                                liveKitConfig: nil as LiveKitConfig?)
         
         await CallHistoryManager.shared.recordCall(callInfo)
         
@@ -228,18 +227,16 @@ final class LiveKitCallKitService: NSObject, ObservableObject {
         activeCalls[callUUID] = call
         
         // ИНТЕГРАЦИЯ С CALL HISTORY: Записываем исходящий звонок в историю
-        let callInfo = CallInfo(
-            id: callId,
-            roomId: roomId,
-            caller: CallParticipant(userId: "self", displayName: "Me", avatarURL: nil as URL?, handle: "self"),
-            callee: CallParticipant(userId: roomId, displayName: participantName, avatarURL: nil as URL?, handle: roomId),
-            type: isVideo ? CallType.video : CallType.audio,
-            direction: CallDirection.outgoing,
-            timestamp: Date(),
-            duration: nil as TimeInterval?,
-            status: CallStatus.ringing,
-            liveKitConfig: nil as LiveKitConfig?
-        )
+        let callInfo = CallInfo(id: callId,
+                                roomId: roomId,
+                                caller: CallParticipant(userId: "self", displayName: "Me", avatarURL: nil as URL?, handle: "self"),
+                                callee: CallParticipant(userId: roomId, displayName: participantName, avatarURL: nil as URL?, handle: roomId),
+                                type: isVideo ? CallType.video : CallType.audio,
+                                direction: CallDirection.outgoing,
+                                timestamp: Date(),
+                                duration: nil as TimeInterval?,
+                                status: CallStatus.ringing,
+                                liveKitConfig: nil as LiveKitConfig?)
         
         await CallHistoryManager.shared.recordCall(callInfo)
         
@@ -591,7 +588,6 @@ extension LiveKitCallKitService: CXProviderDelegate {
         if let answerAction = action as? CXAnswerCallAction,
            let call = activeCalls[answerAction.callUUID],
            call.isIncoming {
-            
             MXLog.info("[CallKitService] 📞 Incoming call timed out - marking as missed: \(call.id)")
             
             Task {
@@ -599,12 +595,10 @@ extension LiveKitCallKitService: CXProviderDelegate {
                 await CallHistoryManager.shared.updateCallStatus(call.id, status: CallStatus.missed)
                 
                 // Показываем уведомление о пропущенном звонке
-                await CallNotificationService.shared.scheduleMissedCallNotification(
-                    callId: call.id,
-                    callerName: call.callerName,
-                    roomId: call.roomId,
-                    timestamp: call.startTime ?? Date()
-                )
+                await CallNotificationService.shared.scheduleMissedCallNotification(callId: call.id,
+                                                                                    callerName: call.callerName,
+                                                                                    roomId: call.roomId,
+                                                                                    timestamp: call.startTime ?? Date())
             }
         }
         
@@ -638,12 +632,10 @@ extension LiveKitCallKitService: CXProviderDelegate {
             await CallHistoryManager.shared.updateCallStatus(call.id, status: CallStatus.missed)
             
             // Показываем уведомление о пропущенном звонке
-            await CallNotificationService.shared.scheduleMissedCallNotification(
-                callId: call.id,
-                callerName: call.callerName,
-                roomId: call.roomId,
-                timestamp: call.startTime ?? Date()
-            )
+            await CallNotificationService.shared.scheduleMissedCallNotification(callId: call.id,
+                                                                                callerName: call.callerName,
+                                                                                roomId: call.roomId,
+                                                                                timestamp: call.startTime ?? Date())
         }
     }
     
@@ -1326,34 +1318,28 @@ extension LiveKitCallKitService {
         do {
             // TODO: Get current user info when ClientProxy is available
             // For now, using placeholder current user info
-            let currentUser = CallParticipant(
-                userId: "current_user", // TODO: Get from ClientProxy
-                displayName: "Me", // TODO: Get from ClientProxy
-                avatarURL: nil,
-                handle: "Me"
-            )
+            let currentUser = CallParticipant(userId: "current_user", // TODO: Get from ClientProxy
+                                              displayName: "Me", // TODO: Get from ClientProxy
+                                              avatarURL: nil,
+                                              handle: "Me")
             
             // Create caller participant from incoming call info
-            let caller = CallParticipant(
-                userId: roomId, // Temporary: using roomId as placeholder
-                displayName: callerName,
-                avatarURL: nil,
-                handle: callerName
-            )
+            let caller = CallParticipant(userId: roomId, // Temporary: using roomId as placeholder
+                                         displayName: callerName,
+                                         avatarURL: nil,
+                                         handle: callerName)
             
             // Create call info for incoming call
-            let callInfo = CallInfo(
-                id: callId,
-                roomId: roomId,
-                caller: caller,
-                callee: currentUser,
-                type: isVideo ? .video : .audio,
-                direction: .incoming,
-                timestamp: Date(),
-                duration: nil,
-                status: .ringing,
-                liveKitConfig: nil
-            )
+            let callInfo = CallInfo(id: callId,
+                                    roomId: roomId,
+                                    caller: caller,
+                                    callee: currentUser,
+                                    type: isVideo ? .video : .audio,
+                                    direction: .incoming,
+                                    timestamp: Date(),
+                                    duration: nil,
+                                    status: .ringing,
+                                    liveKitConfig: nil)
             
             // Record call in CallHistoryManager
             await CallHistoryManager.shared.recordCall(callInfo)
@@ -1366,6 +1352,7 @@ extension LiveKitCallKitService {
 }
 
 #else
+
 // MARK: - LiveKit Disabled Stub
 
 final class LiveKitCallKitService: NSObject, ObservableObject {

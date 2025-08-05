@@ -887,24 +887,20 @@ extension NotificationManager: PKPushRegistryDelegate {
                !accessToken.isEmpty,
                !serverURL.isEmpty {
                 // Use enhanced method with credentials
-                try await LiveKitCallKitService.shared.reportIncomingCallWithCredentials(
-                    roomId: roomId,
-                    callId: callId,
-                    callerName: callerDisplayName,
-                    hasVideo: isVideo,
-                    liveKitAccessToken: accessToken,
-                    liveKitServerURL: serverURL,
-                    liveKitRoomURL: liveKitRoomURL
-                )
+                try await LiveKitCallKitService.shared.reportIncomingCallWithCredentials(roomId: roomId,
+                                                                                         callId: callId,
+                                                                                         callerName: callerDisplayName,
+                                                                                         hasVideo: isVideo,
+                                                                                         liveKitAccessToken: accessToken,
+                                                                                         liveKitServerURL: serverURL,
+                                                                                         liveKitRoomURL: liveKitRoomURL)
                 MXLog.info("[NotificationManager] ✅ CallKit reported with LiveKit credentials")
             } else {
                 // Fallback to standard method
-                try await LiveKitCallKitService.shared.reportIncomingCall(
-                    roomId: roomId,
-                    callId: callId,
-                    callerName: callerDisplayName,
-                    hasVideo: isVideo
-                )
+                try await LiveKitCallKitService.shared.reportIncomingCall(roomId: roomId,
+                                                                          callId: callId,
+                                                                          callerName: callerDisplayName,
+                                                                          hasVideo: isVideo)
                 MXLog.info("[NotificationManager] ✅ CallKit reported (standard flow)")
             }
             

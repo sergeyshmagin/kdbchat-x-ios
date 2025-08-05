@@ -11,7 +11,6 @@ import Foundation
 /// SOLID PRINCIPLE: Single Responsibility - Ответственен только за интеграцию с CallKit
 @MainActor
 public final class CallKitIntegrationService: NSObject, CallKitIntegrationProtocol {
-    
     private let callObserver = CXCallObserver()
     private weak var storage: CallHistoryStorage?
     
@@ -40,8 +39,8 @@ public final class CallKitIntegrationService: NSObject, CallKitIntegrationProtoc
                 
                 // Check if already tracked using systemCallInfo
                 let calls = await storage.getCallHistory()
-                let alreadyTracked = calls.contains(where: { 
-                    $0.systemCallInfo?.uuid.uuidString == callId 
+                let alreadyTracked = calls.contains(where: {
+                    $0.systemCallInfo?.uuid.uuidString == callId
                 })
                 
                 if alreadyTracked {
@@ -53,23 +52,19 @@ public final class CallKitIntegrationService: NSObject, CallKitIntegrationProtoc
                 
                 for entry in recentCalls {
                     let timeDiff = abs(entry.callInfo.timestamp.timeIntervalSinceNow)
-                    if timeDiff < 300 && entry.systemCallInfo == nil {
+                    if timeDiff < 300, entry.systemCallInfo == nil {
                         // Create system call info for linking
-                        let systemCallInfo = SystemCallInfo(
-                            uuid: systemCall.uuid,
-                            handle: systemCall.uuid.uuidString, // CXCall doesn't have handle property
-                            startTime: Date(), // CXCall doesn't provide start time directly
-                            endTime: systemCall.hasEnded ? Date() : nil, // Approximate end time
-                            connected: systemCall.hasConnected
-                        )
+                        let systemCallInfo = SystemCallInfo(uuid: systemCall.uuid,
+                                                            handle: systemCall.uuid.uuidString, // CXCall doesn't have handle property
+                                                            startTime: Date(), // CXCall doesn't provide start time directly
+                                                            endTime: systemCall.hasEnded ? Date() : nil, // Approximate end time
+                                                            connected: systemCall.hasConnected)
                         
                         // Create updated entry with system call info
-                        let updatedEntry = CallHistoryEntry(
-                            id: entry.id,
-                            callInfo: entry.callInfo,
-                            recordedAt: entry.recordedAt,
-                            systemCallInfo: systemCallInfo
-                        )
+                        let updatedEntry = CallHistoryEntry(id: entry.id,
+                                                            callInfo: entry.callInfo,
+                                                            recordedAt: entry.recordedAt,
+                                                            systemCallInfo: systemCallInfo)
                         
                         // Record the updated entry (storage will handle deduplication)
                         await storage.recordCall(updatedEntry.callInfo)

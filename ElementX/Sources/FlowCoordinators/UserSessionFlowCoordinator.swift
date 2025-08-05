@@ -8,11 +8,9 @@
 import AnalyticsEvents
 import AVKit
 import Combine
+import Foundation
 import MatrixRustSDK
 import SwiftUI
-import Foundation
-
-
 
 #if LIVEKIT_ENABLED
 import CallKit

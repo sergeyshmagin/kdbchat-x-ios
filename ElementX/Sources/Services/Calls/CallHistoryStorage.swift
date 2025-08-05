@@ -5,13 +5,12 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import Foundation
 import Combine
+import Foundation
 
 /// SOLID PRINCIPLE: Single Responsibility - Ответственен только за хранение истории звонков
 @MainActor
 public final class CallHistoryStorage: ObservableObject, CallHistoryStorageProtocol {
-    
     // Published properties for reactive UI updates
     @Published private(set) var inAppCalls: [CallHistoryEntry] = []
     
@@ -29,12 +28,10 @@ public final class CallHistoryStorage: ObservableObject, CallHistoryStorageProto
     // MARK: - CallHistoryStorageProtocol
     
     public func recordCall(_ callInfo: CallInfo) async {
-        let entry = CallHistoryEntry(
-            id: callInfo.id,
-            callInfo: callInfo,
-            recordedAt: Date(),
-            systemCallInfo: nil
-        )
+        let entry = CallHistoryEntry(id: callInfo.id,
+                                     callInfo: callInfo,
+                                     recordedAt: Date(),
+                                     systemCallInfo: nil)
         
         // Thread-safe update with background preparation
         await Task.detached(priority: .background) {
@@ -62,12 +59,10 @@ public final class CallHistoryStorage: ObservableObject, CallHistoryStorageProto
                 var updatedCallInfo = existingEntry.callInfo
                 updatedCallInfo.status = status
                 
-                let updatedEntry = CallHistoryEntry(
-                    id: existingEntry.id,
-                    callInfo: updatedCallInfo,
-                    recordedAt: existingEntry.recordedAt,
-                    systemCallInfo: existingEntry.systemCallInfo
-                )
+                let updatedEntry = CallHistoryEntry(id: existingEntry.id,
+                                                    callInfo: updatedCallInfo,
+                                                    recordedAt: existingEntry.recordedAt,
+                                                    systemCallInfo: existingEntry.systemCallInfo)
                 
                 self.inAppCalls[index] = updatedEntry
                 MXLog.info(logMessage)
@@ -91,12 +86,10 @@ public final class CallHistoryStorage: ObservableObject, CallHistoryStorageProto
                 updatedCallInfo.duration = duration
                 updatedCallInfo.status = .ended
                 
-                let updatedEntry = CallHistoryEntry(
-                    id: existingEntry.id,
-                    callInfo: updatedCallInfo,
-                    recordedAt: existingEntry.recordedAt,
-                    systemCallInfo: existingEntry.systemCallInfo
-                )
+                let updatedEntry = CallHistoryEntry(id: existingEntry.id,
+                                                    callInfo: updatedCallInfo,
+                                                    recordedAt: existingEntry.recordedAt,
+                                                    systemCallInfo: existingEntry.systemCallInfo)
                 
                 self.inAppCalls[index] = updatedEntry
                 MXLog.info(logMessage)
@@ -105,7 +98,7 @@ public final class CallHistoryStorage: ObservableObject, CallHistoryStorageProto
     }
     
     public func getCallHistory() async -> [CallHistoryEntry] {
-        return inAppCalls
+        inAppCalls
     }
     
     public func getCallHistory(filter: CallHistoryFilter) async -> [CallHistoryEntry] {

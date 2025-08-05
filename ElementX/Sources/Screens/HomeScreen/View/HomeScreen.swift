@@ -14,7 +14,6 @@ import SwiftUI
 import LiveKit
 #endif
 
-
 struct HomeScreen: View {
     @ObservedObject var context: HomeScreenViewModel.Context
     let userSession: UserSessionProtocol
@@ -967,19 +966,17 @@ class CallLogViewModel: ObservableObject {
                 isIncoming = false
             }
             
-            return RealCallEntry(
-                id: entry.id,
-                roomId: entry.callInfo.roomId,
-                userId: participantUserId,
-                displayName: participantName,
-                avatarURL: entry.callInfo.direction == .incoming ? 
-                    entry.callInfo.caller.avatarURL : entry.callInfo.callee.avatarURL,
-                callType: entry.callInfo.type,
-                direction: entry.callInfo.direction,
-                status: entry.callInfo.status,
-                timestamp: entry.callInfo.timestamp,
-                duration: entry.callInfo.duration
-            )
+            return RealCallEntry(id: entry.id,
+                                 roomId: entry.callInfo.roomId,
+                                 userId: participantUserId,
+                                 displayName: participantName,
+                                 avatarURL: entry.callInfo.direction == .incoming ?
+                                     entry.callInfo.caller.avatarURL : entry.callInfo.callee.avatarURL,
+                                 callType: entry.callInfo.type,
+                                 direction: entry.callInfo.direction,
+                                 status: entry.callInfo.status,
+                                 timestamp: entry.callInfo.timestamp,
+                                 duration: entry.callInfo.duration)
         }
         
         // Сортируем по времени (новые сверху)
@@ -1002,16 +999,14 @@ class CallLogViewModel: ObservableObject {
             }
             
             if let lastCall = contactCalls.first {
-                allContacts[i] = RealContact(
-                    id: contact.id,
-                    userId: contact.userId,
-                    displayName: contact.displayName,
-                    avatarURL: contact.avatarURL,
-                    roomId: contact.roomId,
-                    lastCall: lastCall.callType,
-                    lastCallTime: lastCall.timestamp,
-                    isMissed: lastCall.status == .missed
-                )
+                allContacts[i] = RealContact(id: contact.id,
+                                             userId: contact.userId,
+                                             displayName: contact.displayName,
+                                             avatarURL: contact.avatarURL,
+                                             roomId: contact.roomId,
+                                             lastCall: lastCall.callType,
+                                             lastCallTime: lastCall.timestamp,
+                                             isMissed: lastCall.status == .missed)
             }
         }
     }

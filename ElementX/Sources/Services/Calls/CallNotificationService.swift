@@ -5,9 +5,9 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import UserNotifications
 import Foundation
 import UIKit
+import UserNotifications
 
 /// Service for managing call-related notifications and badges
 /// КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Добавлен @MainActor для thread safety
@@ -18,7 +18,7 @@ public final class CallNotificationService: NSObject {
     private let notificationCenter = UNUserNotificationCenter.current()
     private var scheduledMissedCallNotifications: Set<String> = []
     
-    private override init() {
+    override private init() {
         super.init()
         setupNotificationCategories()
     }
@@ -55,11 +55,9 @@ public final class CallNotificationService: NSObject {
         
         // Schedule notification with slight delay to avoid conflicts with CallKit
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2.0, repeats: false)
-        let request = UNNotificationRequest(
-            identifier: "missed_call_\(callId)",
-            content: content,
-            trigger: trigger
-        )
+        let request = UNNotificationRequest(identifier: "missed_call_\(callId)",
+                                            content: content,
+                                            trigger: trigger)
         
         do {
             try await notificationCenter.add(request)
@@ -148,10 +146,9 @@ public final class CallNotificationService: NSObject {
             content.interruptionLevel = .passive
         }
         
-        let request = UNNotificationRequest(
-            identifier: "call_answered_elsewhere_\(UUID().uuidString)",
-            content: content,
-            trigger: nil // Immediate
+        let request = UNNotificationRequest(identifier: "call_answered_elsewhere_\(UUID().uuidString)",
+                                            content: content,
+                                            trigger: nil // Immediate
         )
         
         do {
@@ -176,10 +173,9 @@ public final class CallNotificationService: NSObject {
             content.interruptionLevel = .passive
         }
         
-        let request = UNNotificationRequest(
-            identifier: "call_ended_\(UUID().uuidString)",
-            content: content,
-            trigger: nil // Immediate
+        let request = UNNotificationRequest(identifier: "call_ended_\(UUID().uuidString)",
+                                            content: content,
+                                            trigger: nil // Immediate
         )
         
         do {
@@ -194,24 +190,18 @@ public final class CallNotificationService: NSObject {
     
     private func setupNotificationCategories() {
         // Missed call category with actions
-        let callBackAction = UNNotificationAction(
-            identifier: "CALL_BACK",
-            title: "Перезвонить",
-            options: [.foreground]
-        )
+        let callBackAction = UNNotificationAction(identifier: "CALL_BACK",
+                                                  title: "Перезвонить",
+                                                  options: [.foreground])
         
-        let messageAction = UNNotificationAction(
-            identifier: "SEND_MESSAGE",
-            title: "Сообщение",
-            options: [.foreground]
-        )
+        let messageAction = UNNotificationAction(identifier: "SEND_MESSAGE",
+                                                 title: "Сообщение",
+                                                 options: [.foreground])
         
-        let missedCallCategory = UNNotificationCategory(
-            identifier: "MISSED_CALL",
-            actions: [callBackAction, messageAction],
-            intentIdentifiers: [],
-            options: [.customDismissAction]
-        )
+        let missedCallCategory = UNNotificationCategory(identifier: "MISSED_CALL",
+                                                        actions: [callBackAction, messageAction],
+                                                        intentIdentifiers: [],
+                                                        options: [.customDismissAction])
         
         // Register categories
         notificationCenter.setNotificationCategories([missedCallCategory])
@@ -225,10 +215,9 @@ public final class CallNotificationService: NSObject {
     func getMissedCallStatistics() -> MissedCallStatistics {
         let pendingCount = scheduledMissedCallNotifications.count
         
-        return MissedCallStatistics(
-            pendingMissedCalls: pendingCount,
-            totalScheduledToday: 0, // Would need persistent storage to track
-            averageResponseTime: 0 // Would need to track user interactions
+        return MissedCallStatistics(pendingMissedCalls: pendingCount,
+                                    totalScheduledToday: 0, // Would need persistent storage to track
+                                    averageResponseTime: 0 // Would need to track user interactions
         )
     }
     
@@ -267,12 +256,10 @@ public final class CallNotificationService: NSObject {
         for entry in callHistory.prefix(5) { // Check recent missed calls
             if !scheduledMissedCallNotifications.contains(entry.id) {
                 let callerName = entry.callInfo.caller.displayName ?? "Неизвестный абонент"
-                await scheduleMissedCallNotification(
-                    callId: entry.id,
-                    callerName: callerName,
-                    roomId: entry.callInfo.roomId,
-                    timestamp: entry.callInfo.timestamp
-                )
+                await scheduleMissedCallNotification(callId: entry.id,
+                                                     callerName: callerName,
+                                                     roomId: entry.callInfo.roomId,
+                                                     timestamp: entry.callInfo.timestamp)
             }
         }
     }

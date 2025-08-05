@@ -5,10 +5,11 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import SwiftUI
 import Compound
+import SwiftUI
 
 // MARK: - Global Call Types
+
 /// ElementX call type enumeration - Global definition for entire app
 public enum ElementXCallType: String, CaseIterable {
     case audio
@@ -25,6 +26,7 @@ public enum ElementXCallType: String, CaseIterable {
 }
 
 // MARK: - Type Alias for Convenience
+
 /// Convenience alias to avoid conflicts with MatrixRustSDK.CallType
 public typealias CallType = ElementXCallType
 
@@ -56,6 +58,7 @@ public enum CallStatus: String, CaseIterable {
 }
 
 // MARK: - Call Data Structures
+
 /// Call participant information
 public struct CallParticipant {
     public let userId: String
@@ -285,5 +288,5 @@ struct Application: App {
 }
 
 // MARK: - Call Services Reference
-// Ссылки на сервисы будут использовать оригинальные реализации из Services/Calls/
 
+// Ссылки на сервисы будут использовать оригинальные реализации из Services/Calls/

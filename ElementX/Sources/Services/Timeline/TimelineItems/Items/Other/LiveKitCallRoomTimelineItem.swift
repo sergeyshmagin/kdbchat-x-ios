@@ -38,7 +38,6 @@ struct LiveKitCallRoomTimelineItem: EventBasedTimelineItemProtocol, Equatable {
         }
     }
     
-    
     enum CallState: Equatable {
         case started
         case active

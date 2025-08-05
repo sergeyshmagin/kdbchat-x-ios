@@ -217,7 +217,7 @@ final class LiveKitCallService: ObservableObject {
             }
             
             // 🔥 CRITICAL FIX: Record outgoing call in CallHistoryManager
-            if let clientProxy = self.clientProxy, let callId = currentCallId {
+            if let clientProxy = clientProxy, let callId = currentCallId {
                 await recordOutgoingCall(roomId: roomId, callId: callId, clientProxy: clientProxy, isVideo: isVideoEnabled)
             }
             
@@ -880,34 +880,29 @@ final class LiveKitCallService: ObservableObject {
             let currentUserDisplayName = await clientProxy.userDisplayName
             
             // Create caller participant (current user)
-            let caller = CallParticipant(
-                userId: currentUserId,
-                displayName: currentUserDisplayName,
-                avatarURL: nil, // TODO: Add avatar URL when available
-                handle: currentUserDisplayName ?? currentUserId
-            )
+            let caller = CallParticipant(userId: currentUserId,
+                                         displayName: currentUserDisplayName,
+                                         avatarURL: nil, // TODO: Add avatar URL when available
+                                         handle: currentUserDisplayName ?? currentUserId)
             
             // For now, we'll use roomId as callee handle since we don't have easy access to other participant info
             // This will be improved when we get proper room participant querying
-            let callee = CallParticipant(
-                userId: roomId, // Temporary: using roomId as placeholder
-                displayName: "Contact", // Temporary placeholder
-                avatarURL: nil,
-                handle: "Contact"
-            )
+            let callee = CallParticipant(userId: roomId, // Temporary: using roomId as placeholder
+                                         displayName: "Contact", // Temporary placeholder
+                                         avatarURL: nil,
+                                         handle: "Contact")
             
             // Create call info
-            let callInfo = CallInfo(
-                id: callId,
-                roomId: roomId,
-                caller: caller,
-                callee: callee,
-                type: isVideo ? .video : .audio,
-                direction: .outgoing,
-                timestamp: Date(),
-                duration: nil,
-                status: .ringing,
-                liveKitConfig: nil // Will be set later when available
+            let callInfo = CallInfo(id: callId,
+                                    roomId: roomId,
+                                    caller: caller,
+                                    callee: callee,
+                                    type: isVideo ? .video : .audio,
+                                    direction: .outgoing,
+                                    timestamp: Date(),
+                                    duration: nil,
+                                    status: .ringing,
+                                    liveKitConfig: nil // Will be set later when available
             )
             
             // Record call in CallHistoryManager

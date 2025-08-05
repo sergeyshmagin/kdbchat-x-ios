@@ -5,8 +5,8 @@
 // Please see LICENSE files in the repository root for full details.
 //
 
-import Foundation
 import Combine
+import Foundation
 
 /// SOLID PRINCIPLE: Composition over Inheritance - Объединяет отдельные сервисы
 /// SOLID PRINCIPLE: Dependency Inversion - Зависит от абстракций, а не от конкретных классов
@@ -22,10 +22,10 @@ public final class CallHistoryManager: NSObject, CallHistoryManagerProtocol {
     
     // SOLID PRINCIPLE: Delegation - Асинхронный доступ к данным через публичный интерфейс
     public func getInAppCalls() async -> [CallHistoryEntry] {
-        return await storage.getCallHistory()
+        await storage.getCallHistory()
     }
     
-    private override init() {
+    override private init() {
         // SOLID PRINCIPLE: Dependency Injection через композицию
         storage = CallHistoryStorage()
         callKitIntegration = CallKitIntegrationService(storage: storage)
@@ -57,12 +57,12 @@ public final class CallHistoryManager: NSObject, CallHistoryManagerProtocol {
     
     /// SOLID PRINCIPLE: Delegation - Получение истории через специализированный сервис
     public func getCallHistory() async -> [CallHistoryEntry] {
-        return await storage.getCallHistory()
+        await storage.getCallHistory()
     }
     
     /// SOLID PRINCIPLE: Delegation - Фильтрация через специализированный сервис
     public func getCallHistory(filter: CallHistoryFilter) async -> [CallHistoryEntry] {
-        return await storage.getCallHistory(filter: filter)
+        await storage.getCallHistory(filter: filter)
     }
     
     // MARK: - CallKitIntegrationProtocol Delegation
@@ -76,7 +76,7 @@ public final class CallHistoryManager: NSObject, CallHistoryManagerProtocol {
     
     /// SOLID PRINCIPLE: Delegation - Статистика через специализированный сервис
     public func getCallStatistics() async -> CallStatistics {
-        return await statisticsService.getCallStatistics()
+        await statisticsService.getCallStatistics()
     }
     
     // MARK: - Cleanup Delegation
@@ -85,7 +85,6 @@ public final class CallHistoryManager: NSObject, CallHistoryManagerProtocol {
     public func cleanupOldEntries(olderThan days: Int = 30) async {
         await storage.cleanupOldEntries(olderThan: days)
     }
-    
     
     // MARK: - Published Properties for UI Binding
     
@@ -138,8 +137,10 @@ extension CallHistoryEntry {
     }
 }
 
-// MARK: - Additional Types Reference  
+// MARK: - Additional Types Reference
+
 // CallNotification и CallNotificationType определены в Application.swift
 
 // MARK: - Data Types Reference
+
 // CallHistoryFilter и CallStatistics определены в Application.swift

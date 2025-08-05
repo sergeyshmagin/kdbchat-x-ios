@@ -27,7 +27,7 @@ private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async
     }
 }
 
-private struct TimeoutError: Error {}
+private struct TimeoutError: Error { }
 
 class NotificationHandler {
     private let userSession: NSEUserSession
@@ -340,10 +340,9 @@ class NotificationHandler {
                 wakeupContent.interruptionLevel = .critical
             }
             
-            let wakeupRequest = UNNotificationRequest(
-                identifier: "callkit_wakeup_\(UUID().uuidString)",
-                content: wakeupContent,
-                trigger: nil // Immediate
+            let wakeupRequest = UNNotificationRequest(identifier: "callkit_wakeup_\(UUID().uuidString)",
+                                                      content: wakeupContent,
+                                                      trigger: nil // Immediate
             )
             
             // NSE OPTIMIZATION: Add notification with timeout to prevent blocking
