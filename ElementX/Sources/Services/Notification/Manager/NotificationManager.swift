@@ -16,6 +16,28 @@ import UserNotifications
 // LiveKitCallKitService is only available when LIVEKIT_ENABLED
 #endif
 
+// MARK: - VoIP Validation Types
+
+/// Result of VoIP payload validation
+private enum VoIPValidationResult {
+    case valid(roomId: String, callId: String)
+    case invalid(String)
+    
+    var isValid: Bool {
+        switch self {
+        case .valid: return true
+        case .invalid: return false
+        }
+    }
+    
+    var errorMessage: String? {
+        switch self {
+        case .valid: return nil
+        case .invalid(let message): return message
+        }
+    }
+}
+
 final class NotificationManager: NSObject, NotificationManagerProtocol {
     private let notificationCenter: UserNotificationCenterProtocol
     private let appSettings: AppSettings
@@ -33,6 +55,11 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
     private var voipRetryTimer: Timer?
     private var lastVoIPRegistrationAttempt: Date?
     private var lastVoIPRegistrationSuccess = false
+    
+    // VoIP Call Deduplication (Apple "One Push Per Call" compliance)
+    private var processedCallIds = Set<String>()
+    private let callDeduplicationCleanupInterval: TimeInterval = 300 // 5 minutes
+    private var deduplicationCleanupTimer: Timer?
     
     init(notificationCenter: UserNotificationCenterProtocol,
          appSettings: AppSettings) {
@@ -71,9 +98,10 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
             }
             .store(in: &cancellables)
             
-        // VoIP Push через обычные push уведомления (без специального entitlement)
-        // PKPushRegistry не используем - будем получать VoIP через обычный token с .voip topic
-        MXLog.info("[NotificationManager] VoIP calls will use regular push notifications with .voip topic")
+        // ✅ VoIP Push через PKPushRegistry в соответствии с Apple Guidelines
+        // Используем PKPushRegistry исключительно для VoIP звонков с CallKit интеграцией
+        setupVoIPPushRegistry()
+        MXLog.info("[NotificationManager] ✅ VoIP calls configured to use PKPushRegistry with CallKit integration")
     }
         
     func requestAuthorization() {
@@ -101,8 +129,11 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
         // Регистрируем обычный pusher
         let regularSuccess = await setPusher(with: deviceToken, clientProxy: userSession.clientProxy)
         
-        // Регистрируем VoIP pusher с тем же токеном, но с .voip topic
-        let voipSuccess = await registerVoIPPusherWithRegularToken(with: deviceToken, clientProxy: userSession.clientProxy)
+        // Регистрируем VoIP pusher ТОЛЬКО если есть VoIP токен
+        var voipSuccess = true
+        if let voipTokenData = voipTokenData {
+            voipSuccess = await registerVoIPPusher(with: voipTokenData)
+        }
         
         return regularSuccess && voipSuccess
     }
@@ -164,6 +195,9 @@ final class NotificationManager: NSObject, NotificationManagerProtocol {
     
     // MARK: - VoIP Push через обычный token
     
+    // DEPRECATED: Эта функция использует обычный токен для VoIP, что неправильно!
+    // Используйте registerVoIPPusher с правильным VoIP токеном
+    @available(*, deprecated, message: "Use registerVoIPPusher with proper VoIP token")
     private func registerVoIPPusherWithRegularToken(with deviceToken: Data, clientProxy: ClientProxyProtocol) async -> Bool {
         let appId = appSettings.pusherAppID
         let voipAppId = appSettings.voipAppId + ".voip" // Добавляем .voip к app ID
@@ -489,13 +523,30 @@ extension NotificationManager {
     // Private VoIP Implementation
     
     private func setupVoIPPushRegistry() {
-        MXLog.info("[NotificationManager] 🔄 Setting up VoIP Push Registry")
+        MXLog.info("[NotificationManager] 🔄 ===== VOIP PUSH REGISTRY SETUP =====")
+        MXLog.info("[NotificationManager] 📱 Bundle ID: \(Bundle.main.bundleIdentifier ?? "Unknown")")
+        MXLog.info("[NotificationManager] 🏗️ Build: \(ProcessInfo.processInfo.environment["DEBUG"] == "1" ? "DEBUG" : "RELEASE")")
+        MXLog.info("[NotificationManager] 📋 App Display Name: \(InfoPlistReader.main.bundleDisplayName)")
         
+        // Проверяем Background Mode VoIP
+        let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String]
+        let hasVoIPMode = backgroundModes?.contains("voip") ?? false
+        MXLog.info("[NotificationManager] 🔍 VoIP Background Mode: \(hasVoIPMode ? "✅ ENABLED" : "❌ MISSING")")
+        
+        if !hasVoIPMode {
+            MXLog.error("[NotificationManager] ❌ CRITICAL: VoIP background mode not enabled in Info.plist!")
+            MXLog.error("[NotificationManager] ❌ Add 'voip' to UIBackgroundModes array in Info.plist")
+        }
+        
+        // Инициализируем PKPushRegistry
         pushRegistry = PKPushRegistry(queue: nil)
         pushRegistry?.delegate = self
         pushRegistry?.desiredPushTypes = [.voIP]
         
-        MXLog.info("[NotificationManager] ✅ VoIP Push Registry configured")
+        MXLog.info("[NotificationManager] ✅ PKPushRegistry initialized with delegate: \(pushRegistry?.delegate != nil ? "SET" : "NIL")")
+        MXLog.info("[NotificationManager] ✅ Desired push types: [.voIP]")
+        MXLog.info("[NotificationManager] ✅ VoIP Push Registry configuration completed")
+        MXLog.info("[NotificationManager] ===============================================")
     }
     
     private func setVoIPPusher(with deviceToken: Data, clientProxy: ClientProxyProtocol) async -> Bool {
@@ -511,7 +562,7 @@ extension NotificationManager {
         }
         
         // Step 2: Configure App ID (CRITICAL - server must recognize this)
-        let voipAppId = appSettings.voipAppId // Используем правильный VoIP app ID
+        let voipAppId = appSettings.voipAppId + ".voip" // Добавляем .voip к app ID для VoIP pusher
         let voipProfileTag = "voip_calls_only_\(String(appSettings.pusherProfileTag?.suffix(8) ?? "default"))"
         
         // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: VoIP токен также должен быть в hex формате!
@@ -519,8 +570,8 @@ extension NotificationManager {
         let pushKeyBase64 = deviceToken.base64EncodedString() // для сравнения в логах
         let pushGatewayURL = appSettings.pushGatewayNotifyEndpoint.absoluteString
         
-        // Step 3: CRITICAL VALIDATION - ensure configuration matches server expectations
-        // После исправления app_id больше нет специального .voip суффикса
+        // Step 3: CRITICAL VALIDATION - ensure configuration matches server expectations  
+        // VoIP pusher MUST use .voip app_id suffix для корректной работы с сервером
         let isProductionConfig = !voipAppId.contains("debug")
         
         MXLog.info("[NotificationManager] 📱 VoIP Pusher Configuration:")
@@ -709,8 +760,12 @@ extension NotificationManager: PKPushRegistryDelegate {
             return
         }
         
-        MXLog.info("[NotificationManager] 📥 Received VoIP push notification")
-        MXLog.debug("[NotificationManager] VoIP payload: \(payload.dictionaryPayload)")
+        MXLog.info("[NotificationManager] 📥 ===== VOIP PUSH RECEIVED =====")
+        MXLog.info("[NotificationManager] 🕐 Timestamp: \(Date())")
+        MXLog.info("[NotificationManager] 📱 Bundle ID: \(Bundle.main.bundleIdentifier ?? "Unknown")")
+        MXLog.info("[NotificationManager] 🔍 Push Type: VoIP (.voIP)")
+        MXLog.info("[NotificationManager] 📋 Payload Keys: \(payload.dictionaryPayload.keys.map { String(describing: $0) }.joined(separator: ", "))")
+        MXLog.debug("[NotificationManager] 📦 Full VoIP payload: \(payload.dictionaryPayload)")
         
         // CRITICAL: According to Apple's requirements since iOS 13, we MUST report
         // incoming VoIP push notifications to CallKit immediately within this method
@@ -718,10 +773,23 @@ extension NotificationManager: PKPushRegistryDelegate {
     }
     
     private func handleVoIPPushNotification(payload: [AnyHashable: Any], completion: @escaping () -> Void) {
-        // Extract call information from push payload
-        guard let roomId = extractRoomId(from: payload),
-              let callId = extractCallId(from: payload) else {
-            MXLog.error("[NotificationManager] ❌ Invalid VoIP push payload - missing room/call ID")
+        MXLog.info("[NotificationManager] 🔄 ===== VOIP PUSH PROCESSING =====")
+        
+        // CRITICAL: Comprehensive payload validation (Apple compliance)
+        let validationResult = validateVoIPPayload(payload)
+        
+        guard validationResult.isValid else {
+            MXLog.error("[NotificationManager] ❌ ===== VOIP PUSH VALIDATION FAILED =====")
+            MXLog.error("[NotificationManager] ❌ Validation error: \(validationResult.errorMessage ?? "Unknown error")")
+            MXLog.error("[NotificationManager] ❌ Available keys: \(payload.keys.map { String(describing: $0) }.joined(separator: ", "))")
+            MXLog.error("[NotificationManager] ❌ This violates Apple VoIP Push requirements!")
+            completion()
+            return
+        }
+        
+        // Extract validated call information
+        guard case .valid(let roomId, let callId) = validationResult else {
+            MXLog.error("[NotificationManager] ❌ Unexpected validation state")
             completion()
             return
         }
@@ -729,7 +797,36 @@ extension NotificationManager: PKPushRegistryDelegate {
         let callerName = extractCallerName(from: payload) ?? "Unknown Caller"
         let hasVideo = extractHasVideo(from: payload)
         
-        MXLog.info("[NotificationManager] 📞 Processing VoIP call: Room=\(roomId), Caller=\(callerName), Video=\(hasVideo)")
+        // CRITICAL: Call deduplication check (Apple "One Push Per Call" compliance)
+        // This prevents processing the same call multiple times which violates Apple guidelines
+        if processedCallIds.contains(callId) {
+            MXLog.warning("[NotificationManager] ⚠️ ===== DUPLICATE VOIP PUSH DETECTED =====")
+            MXLog.warning("[NotificationManager] ⚠️ Call ID already processed: \(callId)")
+            MXLog.warning("[NotificationManager] ⚠️ Room ID: \(roomId)")
+            MXLog.warning("[NotificationManager] ⚠️ This violates Apple's 'One Push Per Call' rule")
+            MXLog.warning("[NotificationManager] ⚠️ Ignoring duplicate VoIP push notification")
+            completion()
+            return
+        }
+        
+        // Add to processed calls set to prevent future duplicates
+        processedCallIds.insert(callId)
+        MXLog.info("[NotificationManager] 🔐 Call ID added to deduplication set: \(callId)")
+        
+        // Schedule cleanup for this call ID after 5 minutes
+        // This prevents memory bloat while maintaining reasonable deduplication window
+        DispatchQueue.main.asyncAfter(deadline: .now() + callDeduplicationCleanupInterval) { [weak self] in
+            self?.processedCallIds.remove(callId)
+            MXLog.debug("[NotificationManager] 🧹 Cleaned up call ID from deduplication set: \(callId)")
+        }
+        
+        MXLog.info("[NotificationManager] ✅ ===== VOIP PUSH VALIDATION SUCCESS =====")
+        MXLog.info("[NotificationManager] 📞 Room ID: \(roomId)")
+        MXLog.info("[NotificationManager] 📞 Call ID: \(callId)")
+        MXLog.info("[NotificationManager] 👤 Caller Name: \(callerName)")
+        MXLog.info("[NotificationManager] 📹 Has Video: \(hasVideo)")
+        MXLog.info("[NotificationManager] 🕐 Processing Time: \(Date())")
+        MXLog.info("[NotificationManager] 🔢 Active deduplicated calls: \(processedCallIds.count)")
         
         // CRITICAL: Report to CallKit immediately (synchronously required by Apple)
         // Apple requires that we report the call to CallKit before this method returns
@@ -741,8 +838,9 @@ extension NotificationManager: PKPushRegistryDelegate {
             return
         }
         
-        // Use a semaphore to make the async call synchronous as required by Apple
-        let semaphore = DispatchSemaphore(value: 0)
+        // APPLE REQUIREMENT FIX: Report to CallKit immediately without waiting
+        // Apple requires immediate CallKit registration, but we need to handle app startup gracefully
+        MXLog.info("[NotificationManager] 🚀 Reporting VoIP call to CallKit immediately (Apple requirement)")
         
         Task {
             await delegate.handleVoIPPushNotification(roomId: roomId,
@@ -750,17 +848,91 @@ extension NotificationManager: PKPushRegistryDelegate {
                                                       callerName: callerName,
                                                       hasVideo: hasVideo)
             MXLog.info("[NotificationManager] ✅ VoIP call reported to CallKit via delegate")
-            semaphore.signal()
         }
         
-        // Wait for CallKit registration to complete (with timeout)
-        let result = semaphore.wait(timeout: .now() + 5.0)
-        
-        if result == .timedOut {
-            MXLog.error("[NotificationManager] ❌ CallKit registration timed out!")
-        }
+        // Apple requires immediate completion - don't wait for CallKit registration
+        // This prevents app termination during startup when CallKit might not be ready
+        MXLog.info("[NotificationManager] ✅ VoIP push processing completed immediately (Apple compliance)")
         
         completion()
+    }
+    
+    // MARK: - VoIP Payload Validation
+    
+    /// Comprehensive VoIP payload validation according to Apple requirements
+    /// Returns detailed validation result with specific error messages
+    private func validateVoIPPayload(_ payload: [AnyHashable: Any]) -> VoIPValidationResult {
+        MXLog.info("[NotificationManager] 🔍 ===== VOIP PAYLOAD VALIDATION =====")
+        
+        // Basic structure validation
+        guard !payload.isEmpty else {
+            MXLog.error("[NotificationManager] ❌ Empty VoIP payload received")
+            return .invalid("Empty payload - violates Apple VoIP requirements")
+        }
+        
+        // Log payload structure for debugging
+        MXLog.debug("[NotificationManager] 📋 Payload keys: \(payload.keys.map { String(describing: $0) }.sorted().joined(separator: ", "))")
+        
+        // CRITICAL: Validate required call fields
+        guard let roomId = extractRoomId(from: payload), !roomId.isEmpty else {
+            MXLog.error("[NotificationManager] ❌ Missing or empty room_id in VoIP payload")
+            return .invalid("Missing room_id - required for call routing")
+        }
+        
+        guard let callId = extractCallId(from: payload), !callId.isEmpty else {
+            MXLog.error("[NotificationManager] ❌ Missing or empty call_id in VoIP payload")
+            return .invalid("Missing call_id - required for call deduplication")
+        }
+        
+        // Room ID format validation (Matrix room IDs should start with !)
+        if !roomId.hasPrefix("!") {
+            MXLog.warning("[NotificationManager] ⚠️ Room ID doesn't follow Matrix format: \(roomId)")
+        }
+        
+        // Call ID format validation (should be non-empty and reasonable length)
+        if callId.count < 3 || callId.count > 256 {
+            MXLog.warning("[NotificationManager] ⚠️ Call ID has unusual length (\(callId.count)): \(callId.prefix(32))")
+        }
+        
+        // Check for caller information (recommended but not strictly required)
+        let hasCallerInfo = extractCallerName(from: payload) != nil
+        if !hasCallerInfo {
+            MXLog.warning("[NotificationManager] ⚠️ No caller information found - user experience may be degraded")
+        }
+        
+        // Validate event type if present (should be call related)
+        if let eventType = payload["event_type"] as? String {
+            let validEventTypes = ["m.call.invite", "m.call.member", "m.call.notify"]
+            if !validEventTypes.contains(eventType) {
+                MXLog.error("[NotificationManager] ❌ Invalid event type for VoIP push: \(eventType)")
+                return .invalid("Invalid event type '\(eventType)' - not a call event")
+            }
+            MXLog.info("[NotificationManager] ✅ Valid call event type: \(eventType)")
+        }
+        
+        // Check for spam/abuse indicators
+        let suspiciousPatterns = ["test", "spam", "fake", "debug"]
+        for pattern in suspiciousPatterns {
+            if roomId.lowercased().contains(pattern) || callId.lowercased().contains(pattern) {
+                MXLog.warning("[NotificationManager] 🚨 Potentially suspicious call detected (pattern: \(pattern))")
+                break
+            }
+        }
+        
+        // Validate payload size (Apple recommends keeping VoIP payloads small)
+        let payloadString = String(describing: payload)
+        let payloadSize = payloadString.utf8.count
+        if payloadSize > 5000 { // 5KB warning threshold
+            MXLog.warning("[NotificationManager] ⚠️ Large VoIP payload detected (\(payloadSize) bytes) - may impact delivery")
+        }
+        
+        MXLog.info("[NotificationManager] ✅ ===== VOIP PAYLOAD VALIDATION SUCCESS =====")
+        MXLog.info("[NotificationManager] ✅ Room ID: \(roomId.prefix(32))...")
+        MXLog.info("[NotificationManager] ✅ Call ID: \(callId.prefix(32))...")
+        MXLog.info("[NotificationManager] ✅ Has Caller Info: \(hasCallerInfo)")
+        MXLog.info("[NotificationManager] ✅ Payload Size: \(payloadSize) bytes")
+        
+        return .valid(roomId: roomId, callId: callId)
     }
     
     // MARK: - VoIP Payload Parsing

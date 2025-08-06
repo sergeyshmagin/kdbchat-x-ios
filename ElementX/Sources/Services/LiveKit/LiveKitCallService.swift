@@ -877,7 +877,14 @@ final class LiveKitCallService: ObservableObject {
         do {
             // Get current user info
             let currentUserId = clientProxy.userID
-            let currentUserDisplayName = await clientProxy.userDisplayName
+            let currentUserDisplayName: String
+            
+            switch await clientProxy.profile(for: currentUserId) {
+            case .success(let profile):
+                currentUserDisplayName = profile.displayName ?? currentUserId
+            case .failure:
+                currentUserDisplayName = currentUserId // Fallback to user ID if profile fetch fails
+            }
             
             // Create caller participant (current user)
             let caller = CallParticipant(userId: currentUserId,

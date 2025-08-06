@@ -961,7 +961,10 @@ extension LiveKitCallKitService {
     
     /// Handle incoming call from Matrix call member event
     func handleIncomingCallFromMatrix(roomId: String, callId: String, callerName: String, hasVideo: Bool = true) async {
-        MXLog.info("Handling incoming call from Matrix event - Room: \(roomId), Caller: \(callerName), Video: \(hasVideo)")
+        MXLog.info("📞 Handling incoming call from Matrix event - Room: \(roomId), Caller: \(callerName), Video: \(hasVideo)")
+        
+        // Check if CallKit provider is properly initialized
+        MXLog.info("🔍 CallKit provider status: \(provider.isInvalidated ? "❌ Invalidated" : "✅ Active")")
         
         // Check if we already have an active call for this room
         guard activeCall?.roomId != roomId else {
@@ -974,9 +977,11 @@ extension LiveKitCallKitService {
         
         do {
             try await reportIncomingCall(roomId: roomId, callId: callId, callerName: callerName, hasVideo: hasVideo)
-            MXLog.info("Successfully reported incoming call from Matrix event")
+            MXLog.info("✅ Successfully reported incoming call from Matrix event to CallKit")
         } catch {
-            MXLog.error("Failed to report incoming call from Matrix event: \(error)")
+            MXLog.error("❌ Failed to report incoming call from Matrix event: \(error)")
+            // Report fake call to satisfy APNs requirements if real call fails
+            await reportFakeCallForAPNsCompliance()
         }
     }
     
